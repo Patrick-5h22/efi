@@ -294,3 +294,17 @@ test('suggestion : théorie omise si déjà planifiée pour la recommandation', 
   assert.ok(found);
   assert.equal(found.dateTheorie, null); // théorie R489 déjà posée le 01/09
 });
+
+test('testeur théorie non habilité signalé (affectation manuelle du jour)', () => {
+  const state = defaultState();
+  state.team.push({ id: 'p3', name: 'AUTRE A', quals: {} });
+  state.dayAssignments['2026-09-01'] = { testeur: 'p3' };
+  addInscription(state, {
+    stagiaire: 'A Un', formation: 'R489-1A', type: 'Initial',
+    datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p2',
+    dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 600, testeurId: 'p1',
+  });
+  const { rows } = computeSchedule(state);
+  assert.ok(rows[0].errors.some((e) => e.includes('Testeur théorie non habilité')), rows[0].errors.join('; '));
+});

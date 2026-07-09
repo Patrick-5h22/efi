@@ -209,6 +209,9 @@ function validateRows(rows, ctx) {
     if (row.testeurEffectif && !qualified(row.testeurEffectif, formation.code, 'T')) {
       row.errors.push('Testeur non habilité');
     }
+    if (row.testeurTheorie && !qualified(row.testeurTheorie, formation.code, 'T')) {
+      row.errors.push('Testeur théorie non habilité');
+    }
 
     // Formateur ≠ testeur du même candidat
     if (row.formateurEffectif) {
