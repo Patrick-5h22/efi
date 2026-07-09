@@ -22,7 +22,7 @@ export function renderPlanning(main, args, kind) {
     const week = isoWeek(date);
     let weekSep = '';
     if (week !== lastWeek) {
-      weekSep = `<tr><td class="day-col" colspan="${slots.length + 1}" style="background:#dde5f0;font-weight:700">Semaine ${week} <a href="#/semaine/${week}" class="no-print" style="font-weight:400;font-size:11px">→ grille</a></td></tr>`;
+      weekSep = `<tr><td class="day-col" colspan="${slots.length + 1}" style="background:var(--muted);font-weight:700">Semaine ${week} <a href="#/semaine/${week}" class="no-print" style="font-weight:400;font-size:11px">→ grille</a></td></tr>`;
       lastWeek = week;
     }
 

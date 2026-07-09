@@ -32,6 +32,7 @@ export function renderSemaine(main, args) {
     <div class="legend no-print">
       <span><span class="chip" style="background:var(--free)"></span>Disponible (cliquer pour inscrire)</span>
       <span><span class="chip" style="background:var(--busy)"></span>Occupé</span>
+      <span><span class="chip" style="background:var(--busy); outline:1px dashed var(--warn); outline-offset:-2px"></span>Pré-réservé</span>
       <span><span class="chip" style="background:var(--theory-bg);border-color:#e2c14d"></span>Théorie</span>
       <span><span class="chip" style="background:var(--closed)"></span>Fermé</span>
     </div>
@@ -129,9 +130,10 @@ function gridHTML(state, days, kind) {
       });
 
       if (occupants.length) {
-        const label = occupants.map((r) => `<span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || ''))}</span><span class="slot-detail">${esc(kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?') : 'Testeur : ' + (memberName(state, r.testeurEffectif) || '?'))}</span>`).join('<hr style="margin:2px 0;border:none;border-top:1px dashed #c77">');
+        const label = occupants.map((r) => `<span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || ''))}</span><span class="slot-detail">${esc(kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?') : 'Testeur : ' + (memberName(state, r.testeurEffectif) || '?'))}</span>`).join('<hr style="margin:2px 0;border:none;border-top:1px dashed var(--grid-line)">');
         const inscAttr = occupants.length === 1 ? ` data-insc="${occupants[0].insc.id}"` : '';
-        return `<td class="slot-busy"${inscAttr}>${label}</td>`;
+        const pre = occupants.every((r) => r.insc.statut === 'pre') ? ' slot-pre' : '';
+        return `<td class="slot-busy${pre}"${inscAttr}>${label}</td>`;
       }
 
       return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button" aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"></td>`;
@@ -143,7 +145,7 @@ function gridHTML(state, days, kind) {
       const load = rows.reduce((sum, r) => sum + (!r.cancelled && r.insc.datePratique === date && r.insc.debutPratique != null ? r.duree : 0), 0);
       if (load > 0) {
         const over = load > state.params.maxDailyLoad;
-        loadInfo = `<br><span style="font-weight:400;font-size:10px;color:${over ? 'var(--error)' : 'var(--text-dim)'}">${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''} / ${fmtTime(state.params.maxDailyLoad).replace(':', 'h')}</span>`;
+        loadInfo = `<br><span style="font-weight:400;font-size:10px;color:${over ? 'var(--error)' : 'var(--muted-foreground)'}">${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''} / ${fmtTime(state.params.maxDailyLoad).replace(':', 'h')}</span>`;
       }
     }
     return `<tr><td class="day-col">${fmtDateDay(date)}${loadInfo}</td><td class="who-col">${who}</td>${cells}</tr>`;

@@ -2,6 +2,7 @@
 
 import { loadState, saveState, defaultState, seedExamples, exportJSON, importJSON, migrate } from './store.js';
 import { createSyncer, loadRemoteState, getAccessCode, setAccessCode } from './db.js';
+import { applyTheme, watchSystemTheme, setupThemeMenu } from './theme.js';
 import { computeSchedule } from './engine.js';
 import { periodWeeks } from './dates.js';
 import { renderDashboard } from './views/dashboard.js';
@@ -189,7 +190,7 @@ function renderNav() {
   const currentWeek = page === 'semaine' ? Number(args[0]) : null;
 
   const link = (path, label, active) =>
-    `<a href="#/${path}" class="${active ? 'active' : ''}">${label}</a>`;
+    `<a href="#/${path}" class="${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${label}</a>`;
 
   document.getElementById('nav').innerHTML = `
     ${link('dashboard', '🏠 Tableau de bord', page === 'dashboard')}
@@ -249,6 +250,9 @@ function setupImportExport() {
 
 // ---------------------------------------------------------------------------
 boot();
+applyTheme();
+watchSystemTheme();
+setupThemeMenu(document.getElementById('theme-btn'), esc);
 setupImportExport();
 setupCloud();
 document.getElementById('btn-undo').addEventListener('click', () => app.undo());

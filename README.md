@@ -47,6 +47,13 @@ intervenants sont reconnus automatiquement.
 - Affectation automatique d'un intervenant habilité et libre (priorité à
   l'intervenant du jour), testing croisé possible.
 
+## Thèmes
+
+10 presets de couleur (teal par défaut, néon pour le mode sombre) et
+modes clair / sombre / système via le bouton 🎨 de la barre latérale.
+Le système de tokens (OKLCH, `css/tokens.css`) est repris du projet
+efi-placement pour une identité visuelle commune.
+
 ## Guide de démarrage
 
 1. **Équipe** : saisir les intervenants et cocher leurs habilitations

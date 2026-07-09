@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EFI — Planification formations & tests</title>
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    // Application du thème avant le premier rendu (anti-flash)
+    try {
+      const t = JSON.parse(localStorage.getItem('efi-theme') || '{}');
+      const preset = t.preset || 'teal';
+      document.documentElement.dataset.theme = preset;
+      const dark = t.mode === 'dark' || ((t.mode || 'auto') === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.classList.toggle('dark', dark);
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    } catch {}
+  </script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
 </head>
 <body>
@@ -19,6 +30,7 @@
       </div>
       <nav id="nav" aria-label="Navigation principale"></nav>
       <div class="sidebar-footer">
+        <span id="theme-menu"><button id="theme-btn" class="btn btn-ghost" title="Thème et mode sombre" aria-haspopup="menu">🎨</button></span>
         <button id="cloud-status" class="btn btn-ghost" data-status="off" title="Base partagée">☁</button>
         <button id="btn-undo" class="btn btn-ghost" title="Annuler (Ctrl+Z)">↩</button>
         <button id="btn-redo" class="btn btn-ghost" title="Rétablir (Ctrl+Y)">↪</button>
