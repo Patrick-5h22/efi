@@ -32,6 +32,10 @@ Score sur 100, mis à jour à chaque itération.
 | 7 | 72/100 | Régressions de la réécriture corrigées : indicateur ☁ retokenisé, séparateurs du planning global et pointillés des grilles en tokens (plus aucune couleur en dur dans les vues) |
 | 8 | 74/100 | Accessibilité : aria-current sur la navigation, prefers-reduced-motion respecté |
 | 9 | 77/100 | Documentation thèmes (aide + README), captures d'écran régénérées (dont sombre et néon), régression complète verte (47 tests, e2e 10/10, sync 8/8, mobile, PDF) |
+| 10 | 79/100 | KPI enrichis : icônes, heures réservées à côté du taux d'occupation, compteur de pré-réservations, hover subtil |
+| 11 | 80/100 | Cartes Dossiers façon card-jour : liseré primary quand le dossier est actif, atténuées quand tout est annulé |
+| 12 | 81/100 | Heatmap : jours 100 % pré-réservés cerclés de pointillés (cohérent avec les grilles) |
+| 13 | 85/100 | Palette de commandes Ctrl+K (composant « command » de la référence) : navigation, semaines, dossiers, thèmes et actions, filtrage accent-insensible, clavier complet — 7 vérifications navigateur ; le preset Néon force le sombre depuis tout mode |
 
 ## Référence (extraite de efi-placement)
 

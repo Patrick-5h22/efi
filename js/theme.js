@@ -39,7 +39,7 @@ export function setTheme(next, storage = localStorage) {
   const current = getTheme(storage);
   const theme = { ...current, ...next };
   // Le preset néon n'a de sens qu'en sombre
-  if (theme.preset === 'neon' && theme.mode === 'light') theme.mode = 'dark';
+  if (theme.preset === 'neon' && theme.mode !== 'dark') theme.mode = 'dark';
   storage.setItem(KEY, JSON.stringify(theme));
   applyTheme(theme);
   return theme;

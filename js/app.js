@@ -3,6 +3,7 @@
 import { loadState, saveState, defaultState, seedExamples, exportJSON, importJSON, migrate } from './store.js';
 import { createSyncer, loadRemoteState, getAccessCode, setAccessCode } from './db.js';
 import { applyTheme, watchSystemTheme, setupThemeMenu } from './theme.js';
+import { setupCommandPalette, openCommandPalette } from './views/command.js';
 import { computeSchedule } from './engine.js';
 import { periodWeeks } from './dates.js';
 import { renderDashboard } from './views/dashboard.js';
@@ -253,6 +254,8 @@ boot();
 applyTheme();
 watchSystemTheme();
 setupThemeMenu(document.getElementById('theme-btn'), esc);
+setupCommandPalette();
+document.getElementById('cmdk-btn').addEventListener('click', openCommandPalette);
 setupImportExport();
 setupCloud();
 document.getElementById('btn-undo').addEventListener('click', () => app.undo());
