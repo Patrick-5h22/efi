@@ -68,6 +68,9 @@ body {
   padding: 10px 12px; border-top: 1px solid var(--sidebar-border);
   display: flex; gap: 6px; flex-wrap: wrap;
 }
+#cloud-status[data-status="idle"] { color: var(--ok); border-color: var(--ok); }
+#cloud-status[data-status="error"] { color: var(--error); border-color: var(--error); }
+#cloud-status[data-status="saving"] { color: var(--warn); border-color: var(--warn); }
 
 /* ---------- Main ---------- */
 #main { flex: 1; padding: 20px 26px 60px; min-width: 0; }
@@ -189,6 +192,7 @@ td.slot-free:hover, td.slot-free:focus-visible {
   outline: 2px solid var(--ok); outline-offset: -2px;
 }
 td.slot-busy { background: var(--busy); white-space: normal; }
+td.slot-busy.slot-pre { background: repeating-linear-gradient(45deg, var(--busy), var(--busy) 5px, color-mix(in srgb, var(--busy) 55%, var(--card)) 5px, color-mix(in srgb, var(--busy) 55%, var(--card)) 10px); outline: 1px dashed var(--warn); outline-offset: -2px; }
 td.slot-theory { background: var(--theory-bg); border-color: var(--theory-border); white-space: normal; }
 td.slot-closed { background: var(--closed); color: var(--muted-foreground); }
 td.slot-off { background: var(--muted); }
@@ -266,6 +270,8 @@ table.cal td.cal-empty { background: var(--background); }
 .hm-days { display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; color: var(--muted-foreground); }
 .hm-days span { height: 18px; line-height: 18px; }
 .hm-grid { display: flex; gap: 3px; }
+.hm-months { display: flex; gap: 3px; height: 16px; }
+.hm-month { width: 18px; font-size: 10px; color: var(--muted-foreground); overflow: visible; white-space: nowrap; }
 .hm-col { display: flex; flex-direction: column; gap: 3px; }
 .hm-cell { width: 18px; height: 18px; border-radius: 4px; display: block; }
 .hm-cell[data-week] { cursor: pointer; }
@@ -325,6 +331,10 @@ table.cal td.cal-empty { background: var(--background); }
   a { color: inherit; text-decoration: none; }
 }
 @page { size: A4 landscape; margin: 10mm; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 
 /* ---------- Responsive ---------- */
 @media (max-width: 860px) {

@@ -27,6 +27,11 @@ Score sur 100, mis à jour à chaque itération.
 | 2 | 55/100 | Sélecteur de thème 🎨 (pastilles OKLCH + check, 10 presets dont Néon, modes clair/sombre/système), persistance localStorage, application anti-flash avant premier rendu, suivi de prefers-color-scheme, preset Néon (fond profond + halo cyan) opérationnel |
 | 3 | 60/100 | Rampe heatmap corrigée (color-mix en srgb — plus de dérive violette), dérivée du --primary du preset actif comme le prévoyait la référence, vérifiée en clair et en sombre |
 | 4 | 63/100 | Contrôle visuel de 6 combinaisons preset×mode + formulaire sombre + menu thème : rendus conformes ; correction :user-invalid (plus de bordure rouge avant saisie) |
+| 5 | 66/100 | Heatmap : ligne des mois (sept. → déc.) au-dessus des colonnes de semaines, façon GitHub |
+| 6 | 69/100 | Créneaux pré-réservés distingués sur les grilles (hachures + liseré pointillé) + entrée de légende |
+| 7 | 72/100 | Régressions de la réécriture corrigées : indicateur ☁ retokenisé, séparateurs du planning global et pointillés des grilles en tokens (plus aucune couleur en dur dans les vues) |
+| 8 | 74/100 | Accessibilité : aria-current sur la navigation, prefers-reduced-motion respecté |
+| 9 | 77/100 | Documentation thèmes (aide + README), captures d'écran régénérées (dont sombre et néon), régression complète verte (47 tests, e2e 10/10, sync 8/8, mobile, PDF) |
 
 ## Référence (extraite de efi-placement)
 

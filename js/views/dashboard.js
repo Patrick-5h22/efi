@@ -112,6 +112,7 @@ export function renderDashboard(main) {
 // taux d'occupation des créneaux offerts (formateur + testeur).
 // ---------------------------------------------------------------------------
 const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'];
+const MONTHS_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
 function heatmapHTML(state, weeks) {
   const occ = occupancyByDay(state, app.schedule);
@@ -135,10 +136,21 @@ function heatmapHTML(state, weeks) {
     return `<div class="hm-col">${cells}<span class="hm-week" data-week="${week}">${week}</span></div>`;
   }).join('');
 
+  // Ligne des mois : un label au début de chaque mois (au moins 2 semaines visibles)
+  let lastMonth = null;
+  const monthCells = weeks.map(({ monday }) => {
+    const m = Number(monday.slice(5, 7));
+    if (m !== lastMonth) { lastMonth = m; return `<span class="hm-month">${MONTHS_SHORT[m - 1]}</span>`; }
+    return '<span class="hm-month"></span>';
+  }).join('');
+
   return `
     <div class="hm-wrap">
-      <div class="hm-days">${DAY_LABELS.map((d) => `<span>${d}</span>`).join('')}<span></span></div>
-      <div class="hm-grid">${cols}</div>
+      <div class="hm-days"><span></span>${DAY_LABELS.map((d) => `<span>${d}</span>`).join('')}<span></span></div>
+      <div>
+        <div class="hm-months">${monthCells}</div>
+        <div class="hm-grid">${cols}</div>
+      </div>
     </div>
     <div class="legend" style="margin-top:10px">
       <span>Occupation :</span>

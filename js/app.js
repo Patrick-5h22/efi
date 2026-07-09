@@ -190,7 +190,7 @@ function renderNav() {
   const currentWeek = page === 'semaine' ? Number(args[0]) : null;
 
   const link = (path, label, active) =>
-    `<a href="#/${path}" class="${active ? 'active' : ''}">${label}</a>`;
+    `<a href="#/${path}" class="${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${label}</a>`;
 
   document.getElementById('nav').innerHTML = `
     ${link('dashboard', '🏠 Tableau de bord', page === 'dashboard')}

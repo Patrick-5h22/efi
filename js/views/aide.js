@@ -86,6 +86,8 @@ export function renderAide(main) {
         <li><b>🗂 Dossiers</b> : chaque inscription porte une entreprise/SIRET et un statut —
           🕐 pré-réservée, ✓ confirmée, ✕ annulée (avec motif). Une ligne annulée libère immédiatement
           ses créneaux et sort des contrôles, tout en restant visible dans les listes.</li>
+        <li><b>🎨 Thèmes</b> : bouton palette de la barre latérale — 10 presets de couleur (dont « Néon »
+          pour le mode sombre) et modes clair / sombre / système, mémorisés sur le poste.</li>
         <li><b>☁ Base partagée</b> : cliquer sur le nuage de la barre latérale et saisir le code d'accès pour
           charger le planning commun et synchroniser automatiquement chaque modification entre les postes
           (☁✓ synchronisé, ☁⚠ erreur — les données restent aussi en local).</li>
