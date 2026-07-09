@@ -2,7 +2,7 @@
 // (équivalent de l'onglet « Paramètres »).
 
 import { app, esc, toast } from '../app.js';
-import { fmtTime, parseTime } from '../dates.js';
+import { fmtTime, parseTime, fmtDateShort } from '../dates.js';
 import { defaultState, seedExamples, saveState } from '../store.js';
 
 export function renderParametres(main) {
@@ -51,9 +51,19 @@ export function renderParametres(main) {
 
     <div class="card">
       <h2>3. Période et jours fériés</h2>
-      <p>Période : <b>${esc(p.periodStart)}</b> → <b>${esc(p.periodEnd)}</b> (week-ends exclus).</p>
-      <p>Jours fériés exclus : ${(p.holidays || []).map((h) => `<span class="badge badge-info">${esc(h.date || h)}${h.label ? ' — ' + esc(h.label) : ''}</span>`).join(' ')}</p>
-      <p class="muted">Le calendrier d'ouverture du plateau se gère dans l'onglet « Jours EFI ».</p>
+      <div class="form-row">
+        <label class="field">Début de période <input type="date" value="${esc(p.periodStart)}" data-p-date="periodStart"></label>
+        <label class="field">Fin de période <input type="date" value="${esc(p.periodEnd)}" data-p-date="periodEnd"></label>
+      </div>
+      <p style="margin-bottom:6px">Jours fériés exclus :</p>
+      <div class="form-row">
+        ${(p.holidays || []).map((h, i) => `<span class="badge badge-info">${fmtDateShort(h.date || h)}${h.label ? ' — ' + esc(h.label) : ''} <button class="btn btn-sm btn-secondary" data-del-holiday="${i}" title="Retirer" style="padding:0 6px">✕</button></span>`).join(' ')}
+        <input type="date" id="new-holiday-date" title="Date du férié">
+        <input id="new-holiday-label" placeholder="Libellé (ex. Pâques)" style="max-width:150px">
+        <button class="btn btn-secondary btn-sm" id="btn-add-holiday">➕ Ajouter un férié</button>
+      </div>
+      <p class="muted">Les week-ends sont toujours exclus. Le calendrier d'ouverture du plateau se gère dans l'onglet « Jours EFI ».
+      Modifier la période régénère les semaines affichées (les inscriptions existantes sont conservées).</p>
     </div>
 
     <div class="card">
@@ -92,6 +102,37 @@ export function renderParametres(main) {
       app.commit();
       toast('Paramètre enregistré.', 'ok');
     });
+  });
+
+  main.querySelectorAll('[data-p-date]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const key = input.dataset.pDate;
+      if (!input.value) return;
+      const next = { ...state.params, [key]: input.value };
+      if (next.periodStart >= next.periodEnd) { toast('La fin de période doit suivre le début.', 'error'); input.value = state.params[key]; return; }
+      state.params[key] = input.value;
+      app.commit();
+      toast('Période mise à jour.', 'ok');
+    });
+  });
+
+  main.querySelectorAll('[data-del-holiday]').forEach((b) => {
+    b.addEventListener('click', () => {
+      state.params.holidays.splice(Number(b.dataset.delHoliday), 1);
+      app.commit();
+    });
+  });
+
+  main.querySelector('#btn-add-holiday').addEventListener('click', () => {
+    const date = main.querySelector('#new-holiday-date').value;
+    const label = main.querySelector('#new-holiday-label').value.trim();
+    if (!date) { toast('Choisissez une date de férié.', 'error'); return; }
+    state.params.holidays = state.params.holidays || [];
+    if (state.params.holidays.some((h) => (h.date || h) === date)) { toast('Ce férié existe déjà.', 'error'); return; }
+    state.params.holidays.push({ date, label });
+    state.params.holidays.sort((a, b) => (a.date || a).localeCompare(b.date || b));
+    app.commit();
+    toast('Férié ajouté.', 'ok');
   });
 
   main.querySelector('#btn-seed').addEventListener('click', () => {
