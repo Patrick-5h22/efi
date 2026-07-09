@@ -40,6 +40,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 17 | 92,5/100 | 24/14/10,5/14/16/8/4/4/4 | Suggestion : le test pratique proposé suit la formation pratique le même jour (ordre pédagogique), 32 tests |
 | 18 | 93/100 | 24/14/10,5/15/16/8,5/4/4/4 | Indicateur de charge quotidienne (Xh/6h, ⚠ si dépassement) sur les grilles semaine ; moteur mesuré à 6,5 ms pour 200 inscriptions |
 | 19 | 93,5/100 | 24/14/10,5/15/16/8,5/4/4,5/4 | Passe mobile : navigation compacte en pastilles, KPI sur 2 colonnes, zéro débordement horizontal vérifié à 390 px |
+| 20 | 94,5/100 | 24/14/10,5/15/16/9,5/4/4,5/4 | Test de bout en bout (tests/e2e.mjs) : ouverture d'un jour, réservation au clic, synthèse/planning, conflit détecté, undo — 10 vérifications vertes |
 
 ## Prochaines pistes
 
