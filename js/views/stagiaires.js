@@ -74,8 +74,9 @@ function groupCard(state, g) {
   }
   steps.sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start);
 
+  const active = g.rows.some((r) => !r.cancelled);
   return `
-    <div class="card">
+    <div class="card" style="${active ? 'border-left: 3px solid var(--primary);' : 'opacity:.75;'}">
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
         <h2 style="margin:0">${esc(g.name)}</h2>
         ${entreprise ? `<span class="muted">${esc(entreprise)}</span>` : ''}

@@ -39,7 +39,7 @@ export function setTheme(next, storage = localStorage) {
   const current = getTheme(storage);
   const theme = { ...current, ...next };
   // Le preset néon n'a de sens qu'en sombre
-  if (theme.preset === 'neon' && theme.mode === 'light') theme.mode = 'dark';
+  if (theme.preset === 'neon' && theme.mode !== 'dark') theme.mode = 'dark';
   storage.setItem(KEY, JSON.stringify(theme));
   applyTheme(theme);
   return theme;
@@ -52,6 +52,12 @@ export function applyTheme(theme = getTheme()) {
     || (theme.mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   html.classList.toggle('dark', wantsDark);
   html.style.colorScheme = wantsDark ? 'dark' : 'light';
+  // Pastille du preset actif sur le bouton (comme le ThemeSelect de la référence)
+  const dot = document.querySelector('#theme-btn .theme-dot');
+  if (dot) {
+    const preset = THEME_PRESETS.find((p) => p.id === theme.preset);
+    if (preset) dot.style.background = preset.dot;
+  }
 }
 
 // Suit le système quand le mode est « auto »

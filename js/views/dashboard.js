@@ -30,6 +30,8 @@ export function renderDashboard(main) {
     if (r.insc.dateTestPratique && r.insc.debutTestPratique != null) busySlots += state.params.practicalTestDuration / state.params.slotMinutes;
   }
   const occupation = totalSlots ? Math.min(100, Math.round((busySlots / totalSlots) * 100)) : 0;
+  const heuresReservees = busySlots * state.params.slotMinutes / 60;
+  const nbPre = rows.filter((r) => r.insc.statut === 'pre').length;
 
   main.innerHTML = `
     <div class="page-header">
@@ -41,11 +43,11 @@ export function renderDashboard(main) {
     </div>
 
     <div class="kpis">
-      <div class="kpi"><div class="kpi-value">${rows.length}</div><div class="kpi-label">Inscriptions</div></div>
-      <div class="kpi"><div class="kpi-value">${stagiaires}</div><div class="kpi-label">Stagiaires</div></div>
-      <div class="kpi ${errRows.length ? 'kpi-alert' : 'kpi-ok'}"><div class="kpi-value">${errRows.length ? errRows.length : '✓'}</div><div class="kpi-label">${errRows.length ? 'Lignes en anomalie' : 'Aucune anomalie'}</div></div>
-      <div class="kpi"><div class="kpi-value">${openCount}<span style="font-size:14px;color:var(--text-dim)">/${days.length}</span></div><div class="kpi-label">Jours EFI ouverts</div></div>
-      <div class="kpi"><div class="kpi-value">${occupation}%</div><div class="kpi-label">Occupation des jours ouverts</div></div>
+      <div class="kpi"><div class="kpi-value">${rows.length}</div><div class="kpi-label">📝 Inscriptions${nbPre ? ` — dont ${nbPre} pré-rés.` : ''}</div></div>
+      <div class="kpi"><div class="kpi-value">${stagiaires}</div><div class="kpi-label">🧑‍🎓 Stagiaires</div></div>
+      <div class="kpi ${errRows.length ? 'kpi-alert' : 'kpi-ok'}"><div class="kpi-value">${errRows.length ? errRows.length : '✓'}</div><div class="kpi-label">${errRows.length ? '⚠ Lignes en anomalie' : 'Aucune anomalie'}</div></div>
+      <div class="kpi"><div class="kpi-value">${openCount}<span style="font-size:14px;color:var(--muted-foreground)">/${days.length}</span></div><div class="kpi-label">📆 Jours EFI ouverts</div></div>
+      <div class="kpi"><div class="kpi-value">${occupation}%<span style="font-size:13px;color:var(--muted-foreground)"> · ${heuresReservees.toFixed(0)} h</span></div><div class="kpi-label">🔥 Occupation des jours ouverts</div></div>
     </div>
 
     ${errRows.length ? `
@@ -127,11 +129,13 @@ function heatmapHTML(state, weeks) {
       if (holidays.has(date)) return `<span class="hm-cell hm-holiday" title="${fmtDateDay(date)} — férié"></span>`;
       if (!openSet.has(date)) return `<span class="hm-cell hm-closed" title="${fmtDateDay(date)} — fermé (EFI)"></span>`;
       const d = occ.get(date) || { busy: 0, total: 0, ratio: 0, errors: 0 };
+      const dayRows = app.schedule.rows.filter((r) => !r.cancelled && (r.insc.datePratique === date || r.insc.dateTestPratique === date));
+      const allPre = dayRows.length > 0 && dayRows.every((r) => r.insc.statut === 'pre');
       const pct = Math.round(d.ratio * 100);
       const hours = (d.busy * state.params.slotMinutes / 60).toFixed(1).replace('.', ',').replace(',0', '');
       const title = `${fmtDateDay(date)} — ${pct} % (${hours} h réservées)${d.errors ? ` — ⚠ ${d.errors} anomalie(s)` : ''}`;
-      return `<span class="hm-cell hm-${level(d.ratio)} ${d.errors ? 'hm-alert' : ''}" data-week="${week}"
-        tabindex="0" role="button" title="${title}" aria-label="${title}"></span>`;
+      return `<span class="hm-cell hm-${level(d.ratio)} ${d.errors ? 'hm-alert' : ''} ${allPre ? 'hm-pre' : ''}" data-week="${week}"
+        tabindex="0" role="button" title="${title}${allPre ? ' — pré-réservé' : ''}" aria-label="${title}"></span>`;
     }).join('');
     return `<div class="hm-col">${cells}<span class="hm-week" data-week="${week}">${week}</span></div>`;
   }).join('');

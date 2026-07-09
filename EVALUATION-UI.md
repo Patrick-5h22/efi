@@ -32,6 +32,18 @@ Score sur 100, mis à jour à chaque itération.
 | 7 | 72/100 | Régressions de la réécriture corrigées : indicateur ☁ retokenisé, séparateurs du planning global et pointillés des grilles en tokens (plus aucune couleur en dur dans les vues) |
 | 8 | 74/100 | Accessibilité : aria-current sur la navigation, prefers-reduced-motion respecté |
 | 9 | 77/100 | Documentation thèmes (aide + README), captures d'écran régénérées (dont sombre et néon), régression complète verte (47 tests, e2e 10/10, sync 8/8, mobile, PDF) |
+| 10 | 79/100 | KPI enrichis : icônes, heures réservées à côté du taux d'occupation, compteur de pré-réservations, hover subtil |
+| 11 | 80/100 | Cartes Dossiers façon card-jour : liseré primary quand le dossier est actif, atténuées quand tout est annulé |
+| 12 | 81/100 | Heatmap : jours 100 % pré-réservés cerclés de pointillés (cohérent avec les grilles) |
+| 13 | 85/100 | Palette de commandes Ctrl+K (composant « command » de la référence) : navigation, semaines, dossiers, thèmes et actions, filtrage accent-insensible, clavier complet — 7 vérifications navigateur ; le preset Néon force le sombre depuis tout mode |
+| 14 | 86/100 | Mobile : menu thème repositionné sous le bouton (sidebar en haut), palette Ctrl+K remontée, zéro débordement re-vérifié |
+| 15 | 87/100 | Revue sombre systématique des 6 vues restantes (équipe, paramètres, jours, planning global, dossiers, aide) : calendriers, champs, badges et selects tous lisibles |
+| 16 | 88/100 | Audit : correction du script de vérification (le hash routing ne recharge pas le thème) — les captures sombres attestent maintenant du vrai rendu |
+| 17 | 89/100 | Touches néon finales : halo sur valeurs KPI, lueur des dialogs, hover lumineux des créneaux libres (uniquement quand le preset définit --neon-glow) |
+| 18 | 90/100 | Tooltips enrichis des grilles : date + heure sur créneaux libres, stagiaires + formation + statut sur créneaux occupés |
+| 19 | 92/100 | Batterie complète verte : 47 tests Node, e2e 10/10, sync 8/8, palette 7/7, phase 1 11/11, mobile ; captures docs régénérées dans la nouvelle interface (dont thème sombre et néon) |
+| 20 | 93/100 | Bouton thème = pastille du preset actif mise à jour en direct (fidèle au ThemeSelect de la référence) |
+| 21 | 93/100 | Bilan : note stabilisée — les points restants (icônes lucide identiques, polices Geist, composants Radix natifs) relèvent du portage Next.js, hors périmètre d'une app sans dépendance |
 
 ## Référence (extraite de efi-placement)
 
@@ -44,3 +56,17 @@ Score sur 100, mis à jour à chaque itération.
 - `session-badge.tsx` : badges à variantes dark (`dark:bg-red-950/40 …`)
 - Commentaire de la référence : « Si une heatmap Phase 4.2 consomme --primary,
   c'est voulu (cohérence avec le theme user) »
+
+## Bilan
+
+Note finale : **93/100** en 21 itérations (elle ne progresse plus — l'écart
+restant tient aux briques propres à Next.js/shadcn : icônes lucide, police
+Geist, primitives Radix, que reproduire à l'identique n'apporterait rien de
+fonctionnel à une application volontairement sans dépendance).
+
+Livré : le système de thème complet d'efi-placement (9 presets OKLCH exacts
++ mode sombre .dark identique), le preset « Néon » qui matérialise sa phase
+04.3, sa heatmap « phase 4.2 » réalisée selon son intention (rampe sur
+--primary), l'apparence shadcn (sidebar à tokens, cartes, formulaires,
+badges, dialogs), la palette de commandes Ctrl+K, et zéro régression sur
+83 vérifications automatisées.
