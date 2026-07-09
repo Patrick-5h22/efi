@@ -403,7 +403,7 @@ export function statutOf(row) {
 // Proposition automatique de créneaux : première combinaison
 // pratique (+ test pratique + théorie si obligatoires) sans anomalie.
 // ---------------------------------------------------------------------------
-export function suggestSlots(state, { stagiaire, formation: code, type }) {
+export function suggestSlots(state, { stagiaire, formation: code, type }, excludeId = null) {
   const { params } = state;
   const formation = formationByCode(state.formations, code);
   if (!formation || !stagiaire) return null;
@@ -412,18 +412,33 @@ export function suggestSlots(state, { stagiaire, formation: code, type }) {
   const slots = [];
   for (let t = params.dayStart; t + params.slotMinutes <= params.dayEnd; t += params.slotMinutes) slots.push(t);
 
-  // La théorie de la recommandation est-elle déjà planifiée pour ce stagiaire ?
+  // La théorie de la recommandation est-elle déjà planifiée pour ce stagiaire
+  // (hors ligne en cours de replanification) ?
   const hasTheory = state.inscriptions.some((i) => {
+    if (excludeId != null && i.id === excludeId) return false;
     const f = formationByCode(state.formations, i.formation);
     return i.stagiaire.toLowerCase() === stagiaire.toLowerCase() && f?.reco === formation.reco && i.dateTheorie;
   });
 
+  // Anomalies préexistantes par ligne : une proposition ne doit pas en créer
+  // de nouvelles sur les réservations déjà en place.
+  const baseline = new Map();
+  {
+    const base = structuredClone(state);
+    if (excludeId != null) base.inscriptions = base.inscriptions.filter((i) => i.id !== excludeId);
+    for (const r of computeSchedule(base).rows) baseline.set(r.insc.id, r.errors.length);
+  }
+
   const trial = (draft, ignorable = null) => {
     const sim = structuredClone(state);
+    if (excludeId != null) sim.inscriptions = sim.inscriptions.filter((i) => i.id !== excludeId);
     sim.inscriptions.push({ id: sim.nextId++, ...draft });
     const { rows } = computeSchedule(sim);
-    const errors = rows.find((r) => r.insc.id === sim.nextId - 1).errors;
-    return ignorable ? errors.every((e) => ignorable.test(e)) : errors.length === 0;
+    const newRow = rows.find((r) => r.insc.id === sim.nextId - 1);
+    const ok = ignorable ? newRow.errors.every((e) => ignorable.test(e)) : newRow.errors.length === 0;
+    if (!ok) return false;
+    // Les autres lignes ne doivent pas se dégrader
+    return rows.every((r) => r === newRow || r.errors.length <= (baseline.get(r.insc.id) ?? 0));
   };
 
   const IGNORE_MISSING_TESTS = /Test (pratique|théorique).*manquant/;

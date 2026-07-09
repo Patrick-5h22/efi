@@ -183,7 +183,7 @@ export function openInscriptionForm(options = {}) {
       dialog.querySelector('#suggest-info').textContent = 'Renseignez d’abord le stagiaire et la formation.';
       return;
     }
-    const found = suggestSlots(state, draft);
+    const found = suggestSlots(state, draft, editing ? editing.id : null);
     if (!found) {
       dialog.querySelector('#suggest-info').textContent = 'Aucune combinaison libre trouvée sur les jours EFI ouverts.';
       return;

@@ -46,6 +46,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 23 | 98/100 | 25/15/11/15/17/10/5/4,5/4 | Migration réelle validée : le CSV exporté du classeur s'importe 4/4 ✓ OK avec les mêmes intervenants (fixture en test d'intégration) ; affectation auto en 3 passes qui évite formateur=testeur du candidat ; nouveau contrôle « intervenant en formation et en test en même temps » ; heures HH:MM:SS acceptées ; 38 tests |
 | 24 | 98,5/100 | 25/15/11/15/17/10/5/4,5/5 | Documentation complète : outils pratiques (suggestion, undo, exports, imports) dans le mode d'emploi intégré, procédure de migration Excel dans le README |
 | 25 | 99/100 | 25/15/11/15/17/10/5/5/5 | Audit final : 38 tests unitaires + 10 vérifications e2e + smoke 11 vues + mobile + PDF, zéro résidu de debug, captures d'écran à jour |
+| 26 | 99,5/100 | 25/15/11,5/15/17/10,5/5/5/5 | Suite d'intégration : 7 scénarios de bout en bout (cycle de vie, multi-catégories, testing croisé, migration classeur→ICS/JSON, reconfiguration, équipe réduite, montée en charge 40 stagiaires). A révélé et corrigé 2 vrais bugs : replanification perdant la théorie, et nouvelle réservation dégradant une réservation existante (la suggestion garantit désormais la non-régression du planning) |
 
 ## Bilan
 
