@@ -6,6 +6,8 @@ import { removeInscription, memberName } from '../store.js';
 import { fmtTime, fmtDateShort, periodWeeks } from '../dates.js';
 import { openInscriptionForm } from './form.js';
 import { buildICS, downloadICS } from '../ics.js';
+import { importInscriptionsCSV } from '../csv.js';
+import { addInscription } from '../store.js';
 
 const filters = { search: '', week: '', status: '' };
 let sortKey = 'id';
@@ -46,6 +48,8 @@ export function renderInscriptions(main) {
         <button class="btn" id="btn-add">➕ Inscrire un stagiaire</button>
         <button class="btn btn-secondary" id="btn-csv">⬇ CSV</button>
         <button class="btn btn-secondary" id="btn-ics" title="Exporter toutes les réservations au format calendrier (.ics)">📅 .ics</button>
+        <button class="btn btn-secondary" id="btn-import-csv" title="Importer des inscriptions depuis un fichier CSV (export du classeur)">⬆ CSV</button>
+        <input type="file" id="csv-file" accept=".csv,text/csv" hidden>
       </div>
     </div>
 
@@ -92,6 +96,23 @@ export function renderInscriptions(main) {
   main.querySelector('#f-status').addEventListener('change', (e) => { filters.status = e.target.value; renderInscriptions(main); });
   main.querySelector('#btn-csv').addEventListener('click', () => exportCSV(state, rows));
   main.querySelector('#btn-ics').addEventListener('click', () => downloadICS(buildICS(state, app.schedule), 'efi-planning.ics'));
+  const csvInput = main.querySelector('#csv-file');
+  main.querySelector('#btn-import-csv').addEventListener('click', () => csvInput.click());
+  csvInput.addEventListener('change', async () => {
+    const file = csvInput.files[0];
+    if (!file) return;
+    try {
+      const { inscriptions, skipped } = importInscriptionsCSV(await file.text(), state.formations);
+      if (!inscriptions.length) { toast('Aucune ligne importable dans ce fichier.', 'error'); return; }
+      if (!confirm(`Importer ${inscriptions.length} inscription(s)` + (skipped.length ? ` (${skipped.length} ligne(s) ignorée(s))` : '') + ' ?')) return;
+      for (const data of inscriptions) addInscription(state, data);
+      app.commit();
+      toast(`${inscriptions.length} inscription(s) importée(s)` + (skipped.length ? ` — ignorées : ${skipped.map((s2) => 'l.' + s2.line).join(', ')}` : ''), 'ok');
+    } catch (e) {
+      toast('Import impossible : ' + e.message, 'error');
+    }
+    csvInput.value = '';
+  });
 
   main.querySelectorAll('th[data-sort]').forEach((th) => th.addEventListener('click', () => {
     const key = th.dataset.sort;
