@@ -51,7 +51,7 @@ export function fmtTime(minutes) {
 
 export function parseTime(str) {
   if (!str) return null;
-  const m = /^(\d{1,2})[:h]?(\d{2})?$/.exec(str.trim());
+  const m = /^(\d{1,2})[:h]?(\d{2})?(?::\d{2})?$/.exec(str.trim());
   if (!m) return null;
   return Number(m[1]) * 60 + Number(m[2] || 0);
 }

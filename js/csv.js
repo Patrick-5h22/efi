@@ -52,6 +52,8 @@ const COLUMN_PATTERNS = [
   ['dateTheorie', /date.*theo|theo.*date/],
   ['dateTestPratique', /date.*test|test.*date/],
   ['debutTestPratique', /debut.*test|test.*debut/],
+  ['formateur', /^formateur/],
+  ['testeur', /^testeur/],
 ];
 
 function normalize(s) {
@@ -82,8 +84,16 @@ function resolveFormation(formations, value) {
   return null;
 }
 
+function resolveMember(team, value) {
+  const v = normalize(value || '');
+  if (!v || !team) return null;
+  return team.find((m) => normalize(m.name) === v)?.id
+    || team.find((m) => normalize(m.name).includes(v) || v.includes(normalize(m.name)))?.id
+    || null;
+}
+
 // Retourne { inscriptions: [...], skipped: [{line, reason}] }
-export function importInscriptionsCSV(text, formations) {
+export function importInscriptionsCSV(text, formations, team = null) {
   const rows = parseCSV(text);
   if (rows.length < 2) throw new Error('CSV vide ou sans données.');
   const map = mapColumns(rows[0]);
@@ -108,6 +118,8 @@ export function importInscriptionsCSV(text, formations) {
       dateTheorie: parseDate(get(row, 'dateTheorie')),
       dateTestPratique: parseDate(get(row, 'dateTestPratique')),
       debutTestPratique: parseTime(get(row, 'debutTestPratique')),
+      formateurId: resolveMember(team, get(row, 'formateur')),
+      testeurId: resolveMember(team, get(row, 'testeur')),
     });
   });
   return { inscriptions, skipped };

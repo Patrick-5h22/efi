@@ -22,6 +22,7 @@ test('import CSV au format export de l’application', () => {
     datePratique: '2026-09-01', debutPratique: 480,
     dateTheorie: '2026-09-01',
     dateTestPratique: '2026-09-01', debutTestPratique: 570,
+    formateurId: null, testeurId: null,
   });
   assert.equal(inscriptions[1].formation, 'R486-A');
   assert.equal(inscriptions[1].type, 'Recyclage');
@@ -34,4 +35,21 @@ test('import CSV : lignes invalides ignorées avec raison', () => {
   assert.equal(inscriptions.length, 1);
   assert.equal(inscriptions[0].formation, 'R489-3');
   assert.equal(skipped.length, 2);
+});
+
+test('import du CSV réel exporté du classeur Excel : 4 lignes ✓ OK', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { defaultState, addInscription } = await import('../js/store.js');
+  const { computeSchedule } = await import('../js/engine.js');
+  const text = readFileSync(new URL('./fixtures/inscriptions-classeur.csv', import.meta.url), 'utf8');
+  const state = defaultState();
+  const { inscriptions, skipped } = importInscriptionsCSV(text, state.formations, state.team);
+  assert.equal(skipped.length, 0);
+  assert.equal(inscriptions.length, 4);
+  for (const d of inscriptions) addInscription(state, d);
+  const { rows } = computeSchedule(state);
+  for (const r of rows) assert.deepEqual(r.errors, [], `#${r.insc.id}: ${r.errors}`);
+  // Intervenants identiques au classeur (garcia forme, Medan teste)
+  assert.equal(rows[0].formateurEffectif, 'p2');
+  assert.equal(rows[0].testeurEffectif, 'p1');
 });

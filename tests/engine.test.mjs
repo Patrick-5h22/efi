@@ -319,3 +319,37 @@ test('suggestion : le test pratique proposé suit la formation pratique', async 
       `test à ${found.debutTestPratique} avant fin de pratique ${found.debutPratique + 90}`);
   }
 });
+
+test('affectation auto : le testeur évite le formateur du candidat', () => {
+  const state = defaultState();
+  // Tout en automatique : p1 formera (1er de la liste), le testeur doit être p2
+  addInscription(state, {
+    stagiaire: 'A Un', formation: 'R489-1A', type: 'Initial',
+    datePratique: '2026-09-01', debutPratique: 480,
+    dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 600,
+  });
+  const { rows } = computeSchedule(state);
+  assert.equal(rows[0].formateurEffectif, 'p1');
+  assert.equal(rows[0].testeurEffectif, 'p2');
+  assert.equal(rows[0].testeurTheorie, 'p2');
+  assert.deepEqual(rows[0].errors, []);
+});
+
+test('intervenant en formation et en test en même temps détecté (choix manuels)', () => {
+  const state = defaultState();
+  addInscription(state, {
+    stagiaire: 'A Un', formation: 'R489-1A', type: 'Initial',
+    datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p1',
+    dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 780, testeurId: 'p2',
+  });
+  addInscription(state, {
+    stagiaire: 'B Deux', formation: 'R489-1B', type: 'Initial',
+    datePratique: '2026-09-02', debutPratique: 480, formateurId: 'p2',
+    dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 510, testeurId: 'p1', // p1 forme A 08:00-09:30
+  });
+  const { rows } = computeSchedule(state);
+  assert.ok(rows[1].errors.some((e) => e.includes('formation et en test en même temps')), rows[1].errors.join('; '));
+});

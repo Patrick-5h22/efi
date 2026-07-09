@@ -67,59 +67,71 @@ export function computeSchedule(state) {
 
   const dayAssign = (date) => state.dayAssignments[date] || {};
 
-  const pickPerson = (date, code, kind, freeFn) => {
+  // avoid = intervenant à éviter (formateur du candidat) : on ne le retient
+  // que si personne d'autre n'est disponible.
+  const pickPerson = (date, code, kind, freeFn, avoid = null) => {
     const preferred = kind === 'F' ? dayAssign(date).formateur : dayAssign(date).testeur;
     const candidates = [];
     if (preferred) candidates.push(preferred);
     for (const m of team) if (!candidates.includes(m.id)) candidates.push(m.id);
+    let fallback = null;
     for (const id of candidates) {
-      if (qualified(id, code, kind) && freeFn(id)) return id;
+      if (!qualified(id, code, kind) || !freeFn(id)) continue;
+      if (avoid && id === avoid) { fallback = fallback || id; continue; }
+      return id;
     }
-    return null;
+    return fallback;
   };
 
-  // Théorie : testeur du jour (auto si non affecté). Bloque le créneau théorie.
+  // Passe 1 — formateurs effectifs (l'affectation du testeur et de la théorie
+  // évite ensuite le formateur du candidat)
+  for (const row of rows) {
+    const { insc, formation } = row;
+    if (!formation || !insc.datePratique || insc.debutPratique == null) continue;
+    const { datePratique: date, debutPratique: start } = insc;
+    const end = row.finPratique;
+    if (insc.formateurId) {
+      row.formateurEffectif = insc.formateurId;
+    } else {
+      row.formateurEffectif = pickPerson(date, formation.code, 'F',
+        (id) => isFreeForTraining(id, date, start, end, formation));
+      if (!row.formateurEffectif) row.errors.push('Aucun formateur disponible');
+    }
+    addBusy(row.formateurEffectif, { date, start, end, kind: 'formation', formation: formation.code, inscId: insc.id });
+  }
+
+  // Passe 2 — théorie : testeur du jour (auto si non affecté), en évitant les
+  // formateurs des candidats du jour. Bloque le créneau théorie.
   const theoryTesters = new Map(); // date -> personId|null
   for (const date of theoryDays) {
     let tester = dayAssign(date).testeur || null;
     if (!tester) {
-      // premier intervenant habilité T sur n'importe quelle reco testée ce jour-là
-      const codes = rows.filter((r) => r.insc.dateTheorie === date && r.formation?.tests).map((r) => r.formation.code);
-      tester = team.find((m) => codes.some((c) => qualified(m.id, c, 'T')))?.id
-        || team.find((m) => Object.values(m.quals || {}).some((q) => q.T))?.id
+      const candidatesRows = rows.filter((r) => r.insc.dateTheorie === date && r.formation?.tests);
+      const codes = candidatesRows.map((r) => r.formation.code);
+      const trainerIds = new Set(candidatesRows.map((r) => r.formateurEffectif).filter(Boolean));
+      const okFor = (m) => codes.length ? codes.some((c) => qualified(m.id, c, 'T'))
+        : Object.values(m.quals || {}).some((q) => q.T);
+      tester = team.find((m) => okFor(m) && !trainerIds.has(m.id))?.id
+        || team.find(okFor)?.id
         || null;
     }
     theoryTesters.set(date, tester);
     addBusy(tester, { date, start: params.theoryTime, end: theoryEnd, kind: 'theorie' });
   }
 
-  // Passe déterministe dans l'ordre des inscriptions (comme le classeur)
+  // Passe 3 — testeurs effectifs des tests pratiques (ordre des inscriptions)
   for (const row of rows) {
     const { insc, formation } = row;
     if (!formation) continue;
 
-    // Formateur effectif (pratique)
-    if (insc.datePratique && insc.debutPratique != null) {
-      const { datePratique: date, debutPratique: start } = insc;
-      const end = row.finPratique;
-      if (insc.formateurId) {
-        row.formateurEffectif = insc.formateurId;
-      } else {
-        row.formateurEffectif = pickPerson(date, formation.code, 'F',
-          (id) => isFreeForTraining(id, date, start, end, formation));
-        if (!row.formateurEffectif) row.errors.push('Aucun formateur disponible');
-      }
-      addBusy(row.formateurEffectif, { date, start, end, kind: 'formation', formation: formation.code, inscId: insc.id });
-    }
-
-    // Testeur effectif (test pratique)
     if (insc.dateTestPratique && insc.debutTestPratique != null && formation.tests) {
       const { dateTestPratique: date, debutTestPratique: start } = insc;
       const end = row.finTestPratique;
       if (insc.testeurId) {
         row.testeurEffectif = insc.testeurId;
       } else {
-        row.testeurEffectif = pickPerson(date, formation.code, 'T', (id) => isFree(id, date, start, end));
+        row.testeurEffectif = pickPerson(date, formation.code, 'T',
+          (id) => isFree(id, date, start, end), row.formateurEffectif);
         if (!row.testeurEffectif) row.errors.push('Aucun testeur disponible');
       }
       addBusy(row.testeurEffectif, { date, start, end, kind: 'test', formation: formation.code, inscId: insc.id });
@@ -228,6 +240,27 @@ function validateRows(rows, ctx) {
   for (let i = 0; i < rows.length; i++) {
     for (let j = i + 1; j < rows.length; j++) {
       crossChecks(rows[i], rows[j], params);
+    }
+  }
+
+  // Un même intervenant ne peut pas former et faire passer un test en même temps
+  for (const a of rows) {
+    if (!a.insc.datePratique || a.insc.debutPratique == null || !a.formateurEffectif) continue;
+    for (const b of rows) {
+      if (b.insc.dateTestPratique !== a.insc.datePratique || b.insc.debutTestPratique == null) continue;
+      if (b.testeurEffectif !== a.formateurEffectif) continue;
+      if (overlaps(a.insc.debutPratique, a.finPratique, b.insc.debutTestPratique, b.finTestPratique)) {
+        const msg = 'Intervenant en formation et en test en même temps';
+        if (!a.errors.includes(msg)) a.errors.push(msg);
+        if (!b.errors.includes(msg)) b.errors.push(msg);
+      }
+    }
+    // … ni former pendant le créneau théorie qu'il anime
+    const tt = theoryTesters.get(a.insc.datePratique);
+    if (tt && tt === a.formateurEffectif
+      && overlaps(a.insc.debutPratique, a.finPratique, params.theoryTime, theoryEnd)) {
+      const msg = 'Intervenant en formation pendant la théorie qu’il anime';
+      if (!a.errors.includes(msg)) a.errors.push(msg);
     }
   }
 

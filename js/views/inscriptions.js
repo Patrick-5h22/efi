@@ -102,7 +102,7 @@ export function renderInscriptions(main) {
     const file = csvInput.files[0];
     if (!file) return;
     try {
-      const { inscriptions, skipped } = importInscriptionsCSV(await file.text(), state.formations);
+      const { inscriptions, skipped } = importInscriptionsCSV(await file.text(), state.formations, state.team);
       if (!inscriptions.length) { toast('Aucune ligne importable dans ce fichier.', 'error'); return; }
       if (!confirm(`Importer ${inscriptions.length} inscription(s)` + (skipped.length ? ` (${skipped.length} ligne(s) ignorée(s))` : '') + ' ?')) return;
       for (const data of inscriptions) addInscription(state, data);
