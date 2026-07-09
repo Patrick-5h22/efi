@@ -3,6 +3,7 @@
 import { app, esc } from '../app.js';
 import { memberName } from '../store.js';
 import { workingDays, periodWeeks, fmtDateShort, fmtTime, isoWeek } from '../dates.js';
+import { openInscriptionForm } from './form.js';
 
 export function renderDashboard(main) {
   const state = app.state;
@@ -51,7 +52,7 @@ export function renderDashboard(main) {
       <h2>⚠ Anomalies à corriger</h2>
       <div class="table-wrap">
         <table class="data">
-          <thead><tr><th>N°</th><th>Stagiaire</th><th>Formation</th><th>Date</th><th>Anomalies</th></tr></thead>
+          <thead><tr><th>N°</th><th>Stagiaire</th><th>Formation</th><th>Date</th><th>Anomalies</th><th></th></tr></thead>
           <tbody>
             ${errRows.slice(0, 10).map((r) => `
               <tr class="row-error">
@@ -60,6 +61,7 @@ export function renderDashboard(main) {
                 <td>${esc(r.formation?.label || '')}</td>
                 <td>${fmtDateShort(r.insc.datePratique)}</td>
                 <td><ul class="status-errors">${r.errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></td>
+                <td><button class="btn btn-secondary btn-sm" data-edit="${r.insc.id}" title="Corriger">✏️</button></td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -100,4 +102,6 @@ export function renderDashboard(main) {
       </div>
     </div>
   `;
+
+  main.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => openInscriptionForm({ id: Number(b.dataset.edit) })));
 }

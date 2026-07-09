@@ -9,7 +9,8 @@ import { openInscriptionForm } from './form.js';
 export function renderSemaine(main, args) {
   const state = app.state;
   const weeks = periodWeeks(state.params);
-  const weekNum = Number(args[0]) || weeks[0].week;
+  const defaultWeek = app.schedule.rows.map((r) => r.semaine).filter(Boolean).sort((a, b) => a - b)[0] || weeks[0].week;
+  const weekNum = Number(args[0]) || defaultWeek;
   const week = weeks.find((w) => w.week === weekNum) || weeks[0];
   const days = weekDays(week.monday);
   const idx = weeks.findIndex((w) => w.week === week.week);
