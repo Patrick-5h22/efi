@@ -1,7 +1,7 @@
 // Formulaire d'inscription (création / édition) — boîte de dialogue partagée
 // entre la vue Inscriptions et les grilles de semaine.
 
-import { app, esc, toast, render } from '../app.js';
+import { app, esc, toast } from '../app.js';
 import { addInscription, updateInscription } from '../store.js';
 import { formationByCode, dureeFor, TYPES } from '../config.js';
 import { daySlots, fmtTime, workingDays, fmtDateDay } from '../dates.js';

@@ -45,9 +45,27 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 22 | 96/100 | 24/14/10,5/15/17/9,5/5/4,5/4 | Import CSV des inscriptions (migration depuis le classeur) : en-têtes reconnues par mots-clés, dates JJ/MM/AAAA ou ISO, lignes invalides ignorées avec raison, 35 tests |
 | 23 | 98/100 | 25/15/11/15/17/10/5/4,5/4 | Migration réelle validée : le CSV exporté du classeur s'importe 4/4 ✓ OK avec les mêmes intervenants (fixture en test d'intégration) ; affectation auto en 3 passes qui évite formateur=testeur du candidat ; nouveau contrôle « intervenant en formation et en test en même temps » ; heures HH:MM:SS acceptées ; 38 tests |
 | 24 | 98,5/100 | 25/15/11/15/17/10/5/4,5/5 | Documentation complète : outils pratiques (suggestion, undo, exports, imports) dans le mode d'emploi intégré, procédure de migration Excel dans le README |
+| 25 | 99/100 | 25/15/11/15/17/10/5/5/5 | Audit final : 38 tests unitaires + 10 vérifications e2e + smoke 11 vues + mobile + PDF, zéro résidu de debug, captures d'écran à jour |
 
-## Prochaines pistes
+## Bilan
 
-- Interface complète (inscriptions, plannings, synthèse)
-- Grilles semaine interactives avec réservation au clic
-- Export/import et impression
+Score final : **99/100** après 25 itérations (note stabilisée — le point
+restant correspond à des fonctionnalités hors périmètre du classeur :
+multi-utilisateurs temps réel, notifications).
+
+Couverture fonctionnelle du classeur : 100 % (inscriptions, contrôles,
+affectation automatique avec testing croisé, grilles semaine, synthèse
+imprimable, plannings globaux, équipe/habilitations, jours EFI,
+paramètres) — vérifiée notamment par l'import du CSV du classeur réel
+qui reproduit exactement les mêmes affectations et statuts ✓ OK.
+
+Au-delà du classeur : suggestion automatique de créneaux, disponibilités
+en direct, vue Stagiaires, undo/redo, exports CSV/ICS/JSON, import CSV,
+recherche/tri/filtres, accessibilité clavier, mobile, CI, 38 tests
+unitaires et un test de bout en bout.
+
+## Pistes futures (hors périmètre)
+
+- Synchronisation multi-postes (backend ou fichier partagé)
+- Envoi automatique des convocations (e-mail / ICS par stagiaire)
+- Intégration R485 (en attente d'accord du service FC)
