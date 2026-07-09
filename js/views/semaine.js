@@ -11,7 +11,7 @@ export function renderSemaine(main, args) {
   const weeks = periodWeeks(state.params);
   const weekNum = Number(args[0]) || weeks[0].week;
   const week = weeks.find((w) => w.week === weekNum) || weeks[0];
-  const days = weekDays(week.monday).filter((d) => d >= state.params.periodStart && d <= state.params.periodEnd || true);
+  const days = weekDays(week.monday);
   const idx = weeks.findIndex((w) => w.week === week.week);
 
   main.innerHTML = `
@@ -59,6 +59,13 @@ export function renderSemaine(main, args) {
       ? 'Inscrire une formation pratique sur ce créneau'
       : 'Réserver un test pratique sur ce créneau';
   });
+
+  // Clic sur un créneau occupé = éditer l'inscription
+  main.querySelectorAll('td.slot-busy[data-insc]').forEach((td) => {
+    td.style.cursor = 'pointer';
+    td.title = 'Modifier cette inscription';
+    td.addEventListener('click', () => openInscriptionForm({ id: Number(td.dataset.insc) }));
+  });
 }
 
 // Construit la grille (kind = 'F' formateur, 'T' testeur)
@@ -71,17 +78,30 @@ function gridHTML(state, days, kind) {
   const head = `<tr><th class="day-col">Jour</th><th class="who-col">Intervenant</th>${slots.map((t) => `<th>${fmtTime(t)}</th>`).join('')}</tr>`;
 
   const body = days.map((date) => {
+    const inPeriod = date >= state.params.periodStart && date <= state.params.periodEnd;
     const open = openSet.has(date);
     const holiday = (state.params.holidays || []).some((h) => (h.date || h) === date);
     const assign = state.dayAssignments[date] || {};
     const assignedId = kind === 'F' ? assign.formateur : assign.testeur;
+
+    // Intervenant du jour : affectation manuelle, sinon déduit de l'activité (auto)
     let who;
-    if (!open) who = '—';
+    if (!open || !inPeriod) who = '—';
     else if (assignedId) who = esc(memberName(state, assignedId));
-    else if (kind === 'T' && theoryTesters.get(date)) who = esc(memberName(state, theoryTesters.get(date))) + ' <span class="muted">(auto)</span>';
-    else who = '<span class="who-missing">⚠ à affecter</span>';
+    else {
+      const autoIds = new Set();
+      for (const r of rows) {
+        if (kind === 'F' && r.insc.datePratique === date && r.formateurEffectif) autoIds.add(r.formateurEffectif);
+        if (kind === 'T' && r.insc.dateTestPratique === date && r.testeurEffectif) autoIds.add(r.testeurEffectif);
+      }
+      if (kind === 'T' && theoryTesters.get(date)) autoIds.add(theoryTesters.get(date));
+      who = autoIds.size
+        ? [...autoIds].map((id) => esc(memberName(state, id))).join(', ') + ' <span class="muted">(auto)</span>'
+        : '<span class="who-missing">⚠ à affecter</span>';
+    }
 
     const cells = slots.map((t) => {
+      if (!inPeriod) return `<td class="slot-closed">—</td>`;
       if (isWeekend(date) || holiday) return `<td class="slot-closed">FÉRIÉ</td>`;
       if (!open) return `<td class="slot-closed">FERMÉ</td>`;
       const slotEnd = t + state.params.slotMinutes;
@@ -106,7 +126,8 @@ function gridHTML(state, days, kind) {
 
       if (occupants.length) {
         const label = occupants.map((r) => `<span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || ''))}</span><span class="slot-detail">${esc(kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?') : 'Testeur : ' + (memberName(state, r.testeurEffectif) || '?'))}</span>`).join('<hr style="margin:2px 0;border:none;border-top:1px dashed #c77">');
-        return `<td class="slot-busy">${label}</td>`;
+        const inscAttr = occupants.length === 1 ? ` data-insc="${occupants[0].insc.id}"` : '';
+        return `<td class="slot-busy"${inscAttr}>${label}</td>`;
       }
 
       return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}"></td>`;

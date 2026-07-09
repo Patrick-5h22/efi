@@ -23,6 +23,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 |-------|-------|-----------------------------|------------------|
 | 1 | 22/100 | 8/8/5/0/0/6/1/0/1 | Moteur de planification complet (durées, semaines, affectation auto, 15 contrôles), 22 tests unitaires, modèle de données, persistance de base |
 | 2 | 64/100 | 18/11/7/11/6/6/3/1/1 | Application complète : 10 vues (tableau de bord, inscriptions + formulaire avec aperçu des conflits en direct, grilles semaine cliquables, synthèse imprimable, plannings globaux, équipe, jours EFI, paramètres, mode d'emploi), export JSON/CSV, smoke test Playwright sans erreur |
+| 3 | 67/100 | 19/11/7/12/8/6/3/1/1 | Grilles semaine : jours hors période distingués, intervenant du jour déduit de l'activité (auto), clic sur créneau occupé = édition de l'inscription |
 
 ## Prochaines pistes
 
