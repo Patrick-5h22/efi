@@ -232,7 +232,13 @@ table.cal td.cal-empty { background: #fafbfd; }
 @media (max-width: 860px) {
   #app { flex-direction: column; }
   #sidebar { width: 100%; height: auto; position: static; }
-  #nav { display: flex; flex-wrap: wrap; }
-  #nav .nav-section { width: 100%; padding: 6px 14px 2px; }
-  #main { padding: 14px; }
+  #nav { display: flex; flex-wrap: wrap; padding: 4px 6px; gap: 2px; }
+  #nav a { padding: 6px 10px; border-left: none; border-radius: 6px; font-size: 12.5px; }
+  #nav a.active { border-left: none; }
+  #nav .nav-section { display: none; }
+  .brand { padding: 10px 14px; }
+  #main { padding: 14px 12px 40px; }
+  .page-header h1 { font-size: 18px; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  dialog { width: 96vw; }
 }

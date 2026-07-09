@@ -39,6 +39,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 16 | 92/100 | 24/14/10/14/16/8/4/4/4 | Documentation illustrée : 7 captures d'écran, guide de démarrage en 5 étapes dans le README |
 | 17 | 92,5/100 | 24/14/10,5/14/16/8/4/4/4 | Suggestion : le test pratique proposé suit la formation pratique le même jour (ordre pédagogique), 32 tests |
 | 18 | 93/100 | 24/14/10,5/15/16/8,5/4/4/4 | Indicateur de charge quotidienne (Xh/6h, ⚠ si dépassement) sur les grilles semaine ; moteur mesuré à 6,5 ms pour 200 inscriptions |
+| 19 | 93,5/100 | 24/14/10,5/15/16/8,5/4/4,5/4 | Passe mobile : navigation compacte en pastilles, KPI sur 2 colonnes, zéro débordement horizontal vérifié à 390 px |
 
 ## Prochaines pistes
 
