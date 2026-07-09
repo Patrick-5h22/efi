@@ -6,6 +6,7 @@ import { periodWeeks } from './dates.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderInscriptions } from './views/inscriptions.js';
 import { renderSemaine } from './views/semaine.js';
+import { renderStagiaires } from './views/stagiaires.js';
 import { renderSynthese } from './views/synthese.js';
 import { renderPlanning } from './views/planning.js';
 import { renderEquipe } from './views/equipe.js';
@@ -64,6 +65,7 @@ const routes = {
   'dashboard': renderDashboard,
   'inscriptions': renderInscriptions,
   'semaine': renderSemaine,
+  'stagiaires': renderStagiaires,
   'synthese': renderSynthese,
   'planning-formateur': (m, a) => renderPlanning(m, a, 'F'),
   'planning-testeur': (m, a) => renderPlanning(m, a, 'T'),
@@ -95,6 +97,7 @@ function renderNav() {
   document.getElementById('nav').innerHTML = `
     ${link('dashboard', '🏠 Tableau de bord', page === 'dashboard')}
     ${link('inscriptions', `📝 Inscriptions ${errorCount ? `<span class="nav-badge">${errorCount}</span>` : ''}`, page === 'inscriptions')}
+    ${link('stagiaires', '🧑‍🎓 Stagiaires', page === 'stagiaires')}
     ${link('synthese', '📋 Synthèse semaine', page === 'synthese')}
     <div class="nav-section">Plannings</div>
     ${link(`semaine/${currentWeek || weeks[0].week}`, '🗓 Grilles semaine', page === 'semaine')}
