@@ -241,3 +241,115 @@ test('test pratique pendant le créneau théorie interdit (même testeur)', () =
   const { rows } = computeSchedule(state);
   assert.ok(rows[1].errors.some((e) => e.includes('pendant le créneau théorie')), rows[1].errors.join('; '));
 });
+
+test('capacité dépassée : 3 candidats simultanés sur 2 chariots R489 Cat 3', () => {
+  const state = defaultState();
+  for (const [nom, testStart] of [['A Un', 780], ['B Deux', 840], ['C Trois', 900]]) {
+    addInscription(state, {
+      stagiaire: nom, formation: 'R489-3', type: 'Initial',
+      datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p1',
+      dateTheorie: '2026-09-01',
+      dateTestPratique: '2026-09-01', debutTestPratique: testStart, testeurId: 'p2',
+    });
+  }
+  const { rows } = computeSchedule(state);
+  assert.ok(rows[0].errors.some((e) => e.includes('3 candidats simultanés')), rows[0].errors.join('; '));
+});
+
+test('théorie renseignée en double signalée', () => {
+  const state = defaultState();
+  for (const testStart of [780, 840]) {
+    addInscription(state, {
+      stagiaire: 'A Un', formation: testStart === 780 ? 'R489-1A' : 'R489-3', type: 'Initial',
+      datePratique: '2026-09-01', debutPratique: testStart === 780 ? 480 : 570, formateurId: 'p1',
+      dateTheorie: '2026-09-01',
+      dateTestPratique: '2026-09-01', debutTestPratique: testStart, testeurId: 'p2',
+    });
+  }
+  const { rows } = computeSchedule(state);
+  assert.ok(rows[0].errors.some((e) => e.includes('plusieurs lignes')), rows[0].errors.join('; '));
+});
+
+test('comptage théorie par stagiaire unique', () => {
+  const state = seedExamples(defaultState());
+  const sched = computeSchedule(state);
+  assert.equal(sched.theoryCandidates('2026-09-01'), 2); // DUPONT + MARTIN
+});
+
+test('suggestion automatique de créneaux sans conflit', async () => {
+  const { suggestSlots } = await import('../js/engine.js');
+  const state = seedExamples(defaultState());
+  const found = suggestSlots(state, { stagiaire: 'NOUVEAU Paul', formation: 'R489-1A', type: 'Initial' });
+  assert.ok(found, 'aucune proposition');
+  // Vérifie que la proposition est réellement sans anomalie
+  addInscription(state, found);
+  const { rows } = computeSchedule(state);
+  assert.deepEqual(rows[rows.length - 1].errors, [], rows[rows.length - 1].errors.join('; '));
+});
+
+test('suggestion : théorie omise si déjà planifiée pour la recommandation', async () => {
+  const { suggestSlots } = await import('../js/engine.js');
+  const state = seedExamples(defaultState());
+  const found = suggestSlots(state, { stagiaire: 'EXEMPLE - DUPONT Jean', formation: 'R489-5', type: 'Initial' });
+  assert.ok(found);
+  assert.equal(found.dateTheorie, null); // théorie R489 déjà posée le 01/09
+});
+
+test('testeur théorie non habilité signalé (affectation manuelle du jour)', () => {
+  const state = defaultState();
+  state.team.push({ id: 'p3', name: 'AUTRE A', quals: {} });
+  state.dayAssignments['2026-09-01'] = { testeur: 'p3' };
+  addInscription(state, {
+    stagiaire: 'A Un', formation: 'R489-1A', type: 'Initial',
+    datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p2',
+    dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 600, testeurId: 'p1',
+  });
+  const { rows } = computeSchedule(state);
+  assert.ok(rows[0].errors.some((e) => e.includes('Testeur théorie non habilité')), rows[0].errors.join('; '));
+});
+
+test('suggestion : le test pratique proposé suit la formation pratique', async () => {
+  const { suggestSlots } = await import('../js/engine.js');
+  const state = seedExamples(defaultState());
+  const found = suggestSlots(state, { stagiaire: 'NOUVEAU Paul', formation: 'R489-1A', type: 'Initial' });
+  assert.ok(found);
+  if (found.dateTestPratique === found.datePratique) {
+    assert.ok(found.debutTestPratique >= found.debutPratique + 90,
+      `test à ${found.debutTestPratique} avant fin de pratique ${found.debutPratique + 90}`);
+  }
+});
+
+test('affectation auto : le testeur évite le formateur du candidat', () => {
+  const state = defaultState();
+  // Tout en automatique : p1 formera (1er de la liste), le testeur doit être p2
+  addInscription(state, {
+    stagiaire: 'A Un', formation: 'R489-1A', type: 'Initial',
+    datePratique: '2026-09-01', debutPratique: 480,
+    dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 600,
+  });
+  const { rows } = computeSchedule(state);
+  assert.equal(rows[0].formateurEffectif, 'p1');
+  assert.equal(rows[0].testeurEffectif, 'p2');
+  assert.equal(rows[0].testeurTheorie, 'p2');
+  assert.deepEqual(rows[0].errors, []);
+});
+
+test('intervenant en formation et en test en même temps détecté (choix manuels)', () => {
+  const state = defaultState();
+  addInscription(state, {
+    stagiaire: 'A Un', formation: 'R489-1A', type: 'Initial',
+    datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p1',
+    dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 780, testeurId: 'p2',
+  });
+  addInscription(state, {
+    stagiaire: 'B Deux', formation: 'R489-1B', type: 'Initial',
+    datePratique: '2026-09-02', debutPratique: 480, formateurId: 'p2',
+    dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 510, testeurId: 'p1', // p1 forme A 08:00-09:30
+  });
+  const { rows } = computeSchedule(state);
+  assert.ok(rows[1].errors.some((e) => e.includes('formation et en test en même temps')), rows[1].errors.join('; '));
+});

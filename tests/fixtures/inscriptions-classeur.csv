@@ -1,0 +1,27 @@
+N°;Stagiaire (NOM Prénom);Formation;Type;"Durée
+pratique";"Date pratique
+(formateur)";"Début
+pratique";"Fin
+pratique";"Date test
+théorique";"Heure
+théorie";"Date test
+pratique";"Début test
+pratique";"Fin test
+pratique";"Formateur
+(si ≠ jour)";"Testeur
+(si ≠ jour)";STATUT;"Ctrl
+formateur";"Ctrl
+testeur";"Ctrl
+horaires";"Ctrl
+tests";"Ctrl
+stagiaire";"Ctrl charge
+jour";Reco;Sem.;"Ctrl
+EFI";"Ctrl
+form=test";"Formateur
+effectif";"Testeur
+effectif";"Ctrl
+habilit."
+1;EXEMPLE - DUPONT Jean;Pratique R489 Cat 1A;Initial;1.5;2026-09-01;08:00:00;09:30:00;2026-09-01;11:00:00;2026-09-01;09:30:00;10:30:00;garcia Thierry ;Medan Dominique ;✓ OK;;;;;;;R489;36;;;garcia Thierry ;Medan Dominique ;
+2;EXEMPLE - DUPONT Jean;Pratique R489 Cat 3;Initial;1.5;2026-09-01;13:00:00;14:30:00;;;2026-09-01;14:30:00;15:30:00;garcia Thierry ;Medan Dominique ;✓ OK;;;;;;;R489;36;;;garcia Thierry ;Medan Dominique ;
+3;EXEMPLE - MARTIN Claire;Pratique R489 Cat 3;Initial;1.5;2026-09-01;13:00:00;14:30:00;2026-09-01;11:00:00;2026-09-01;15:30:00;16:30:00;garcia Thierry ;Medan Dominique ;✓ OK;;;;;;;R489;36;;;garcia Thierry ;Medan Dominique ;
+4;EXEMPLE - BERNARD Luc;Habilitation électrique;Initial;2;2026-09-02;08:00:00;10:00:00;;;;;;Medan Dominique ;;✓ OK;;;;;;;HAB ELEC;36;;;Medan Dominique ;;
