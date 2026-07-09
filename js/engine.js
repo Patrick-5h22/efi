@@ -364,6 +364,64 @@ export function statutOf(row) {
 }
 
 // ---------------------------------------------------------------------------
+// Proposition automatique de créneaux : première combinaison
+// pratique (+ test pratique + théorie si obligatoires) sans anomalie.
+// ---------------------------------------------------------------------------
+export function suggestSlots(state, { stagiaire, formation: code, type }) {
+  const { params } = state;
+  const formation = formationByCode(state.formations, code);
+  if (!formation || !stagiaire) return null;
+  const duree = dureeFor(formation, type);
+  const openDays = workingDays(params).filter((d) => state.openDays.includes(d));
+  const slots = [];
+  for (let t = params.dayStart; t + params.slotMinutes <= params.dayEnd; t += params.slotMinutes) slots.push(t);
+
+  // La théorie de la recommandation est-elle déjà planifiée pour ce stagiaire ?
+  const hasTheory = state.inscriptions.some((i) => {
+    const f = formationByCode(state.formations, i.formation);
+    return i.stagiaire.toLowerCase() === stagiaire.toLowerCase() && f?.reco === formation.reco && i.dateTheorie;
+  });
+
+  const trial = (draft, ignorable = null) => {
+    const sim = structuredClone(state);
+    sim.inscriptions.push({ id: sim.nextId++, ...draft });
+    const { rows } = computeSchedule(sim);
+    const errors = rows.find((r) => r.insc.id === sim.nextId - 1).errors;
+    return ignorable ? errors.every((e) => ignorable.test(e)) : errors.length === 0;
+  };
+
+  const IGNORE_MISSING_TESTS = /Test (pratique|théorique).*manquant/;
+  const maxTrials = 2000;
+  let trials = 0;
+
+  for (const day of openDays) {
+    for (const start of slots) {
+      if (start + duree > params.dayEnd) continue;
+      const base = { stagiaire, formation: code, type, datePratique: day, debutPratique: start };
+      if (++trials > maxTrials) return null;
+      if (!formation.tests) {
+        if (trial(base)) return base;
+        continue;
+      }
+      // Pré-vérification : la pratique seule doit passer (seuls les tests manquants sont tolérés)
+      const withTheory = { ...base, dateTheorie: hasTheory ? null : day };
+      if (!trial(withTheory, IGNORE_MISSING_TESTS)) continue;
+      // Test pratique : même jour de préférence, sinon jours suivants
+      for (const testDay of openDays.filter((d) => d >= day)) {
+        for (const testStart of slots) {
+          if (testStart + params.practicalTestDuration > params.dayEnd) continue;
+          if (testDay === day && overlaps(start, start + duree, testStart, testStart + params.practicalTestDuration)) continue;
+          const draft = { ...withTheory, dateTestPratique: testDay, debutTestPratique: testStart };
+          if (++trials > maxTrials) return null;
+          if (trial(draft)) return draft;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Disponibilités (équivalent de l'onglet « Dispo (auto) ») : pour un brouillon
 // d'inscription, indique pour chaque intervenant s'il est habilité et libre
 // sur le créneau de pratique (rôle F) et de test pratique (rôle T).

@@ -275,3 +275,22 @@ test('comptage théorie par stagiaire unique', () => {
   const sched = computeSchedule(state);
   assert.equal(sched.theoryCandidates('2026-09-01'), 2); // DUPONT + MARTIN
 });
+
+test('suggestion automatique de créneaux sans conflit', async () => {
+  const { suggestSlots } = await import('../js/engine.js');
+  const state = seedExamples(defaultState());
+  const found = suggestSlots(state, { stagiaire: 'NOUVEAU Paul', formation: 'R489-1A', type: 'Initial' });
+  assert.ok(found, 'aucune proposition');
+  // Vérifie que la proposition est réellement sans anomalie
+  addInscription(state, found);
+  const { rows } = computeSchedule(state);
+  assert.deepEqual(rows[rows.length - 1].errors, [], rows[rows.length - 1].errors.join('; '));
+});
+
+test('suggestion : théorie omise si déjà planifiée pour la recommandation', async () => {
+  const { suggestSlots } = await import('../js/engine.js');
+  const state = seedExamples(defaultState());
+  const found = suggestSlots(state, { stagiaire: 'EXEMPLE - DUPONT Jean', formation: 'R489-5', type: 'Initial' });
+  assert.ok(found);
+  assert.equal(found.dateTheorie, null); // théorie R489 déjà posée le 01/09
+});

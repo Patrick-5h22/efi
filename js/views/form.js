@@ -5,7 +5,7 @@ import { app, esc, toast, render } from '../app.js';
 import { addInscription, updateInscription } from '../store.js';
 import { formationByCode, dureeFor, TYPES } from '../config.js';
 import { daySlots, fmtTime, workingDays, fmtDateDay } from '../dates.js';
-import { computeSchedule, memberAvailability } from '../engine.js';
+import { computeSchedule, memberAvailability, suggestSlots } from '../engine.js';
 
 let dialog = null;
 
@@ -71,6 +71,10 @@ export function openInscriptionForm(options = {}) {
           </label>
         </div>
         <p class="muted" id="duree-info"></p>
+        <div class="form-row no-print">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-suggest" title="Chercher la première combinaison pratique + tests sans conflit">💡 Proposer des créneaux</button>
+          <span class="muted" id="suggest-info"></span>
+        </div>
 
         <h2 style="font-size:14px; margin: 14px 0 8px;">Formation pratique</h2>
         <div class="form-grid">
@@ -172,6 +176,26 @@ export function openInscriptionForm(options = {}) {
   };
   form.addEventListener('input', refresh);
   refresh();
+
+  dialog.querySelector('#btn-suggest').addEventListener('click', () => {
+    const draft = readDraft();
+    if (!draft.stagiaire || !draft.formation) {
+      dialog.querySelector('#suggest-info').textContent = 'Renseignez d’abord le stagiaire et la formation.';
+      return;
+    }
+    const found = suggestSlots(state, draft);
+    if (!found) {
+      dialog.querySelector('#suggest-info').textContent = 'Aucune combinaison libre trouvée sur les jours EFI ouverts.';
+      return;
+    }
+    $('datePratique').value = found.datePratique;
+    $('debutPratique').value = found.debutPratique;
+    $('dateTestPratique').value = found.dateTestPratique || '';
+    $('debutTestPratique').value = found.debutTestPratique ?? '';
+    $('dateTheorie').value = found.dateTheorie || '';
+    dialog.querySelector('#suggest-info').textContent = 'Créneaux proposés — vérifiez et ajustez si besoin.';
+    refresh();
+  });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
