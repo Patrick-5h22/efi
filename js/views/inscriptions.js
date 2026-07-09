@@ -7,6 +7,17 @@ import { fmtTime, fmtDateShort, periodWeeks } from '../dates.js';
 import { openInscriptionForm } from './form.js';
 
 const filters = { search: '', week: '', status: '' };
+let sortKey = 'id';
+let sortDir = 1;
+
+const SORTERS = {
+  id: (r) => r.insc.id,
+  stagiaire: (r) => r.insc.stagiaire.toLowerCase(),
+  formation: (r) => r.formation?.label || '',
+  date: (r) => `${r.insc.datePratique || '9999'}|${String(r.insc.debutPratique ?? 0).padStart(4, '0')}`,
+  semaine: (r) => r.semaine ?? 99,
+  statut: (r) => -r.errors.length,
+};
 
 export function renderInscriptions(main) {
   const state = app.state;
@@ -19,6 +30,9 @@ export function renderInscriptions(main) {
     if (filters.status === 'ok' && row.errors.length) return false;
     if (filters.status === 'error' && !row.errors.length) return false;
     return true;
+  }).sort((a, b) => {
+    const ka = SORTERS[sortKey](a); const kb = SORTERS[sortKey](b);
+    return (ka < kb ? -1 : ka > kb ? 1 : 0) * sortDir;
   });
 
   const errCount = rows.filter((r) => r.errors.length).length;
@@ -57,9 +71,9 @@ export function renderInscriptions(main) {
         <table class="data">
           <thead>
             <tr>
-              <th>N°</th><th>Stagiaire</th><th>Formation</th><th>Type</th><th>Durée</th>
-              <th>Pratique</th><th>Théorie</th><th>Test pratique</th>
-              <th>Formateur</th><th>Testeur</th><th>Reco</th><th>Sem.</th><th>Statut</th><th></th>
+              ${sortableTh('id', 'N°')}${sortableTh('stagiaire', 'Stagiaire')}${sortableTh('formation', 'Formation')}<th>Type</th><th>Durée</th>
+              ${sortableTh('date', 'Pratique')}<th>Théorie</th><th>Test pratique</th>
+              <th>Formateur</th><th>Testeur</th><th>Reco</th>${sortableTh('semaine', 'Sem.')}${sortableTh('statut', 'Statut')}<th></th>
             </tr>
           </thead>
           <tbody>
@@ -76,7 +90,19 @@ export function renderInscriptions(main) {
   main.querySelector('#f-status').addEventListener('change', (e) => { filters.status = e.target.value; renderInscriptions(main); });
   main.querySelector('#btn-csv').addEventListener('click', () => exportCSV(state, rows));
 
+  main.querySelectorAll('th[data-sort]').forEach((th) => th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortDir = -sortDir;
+    else { sortKey = key; sortDir = 1; }
+    renderInscriptions(main);
+  }));
+
   main.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => openInscriptionForm({ id: Number(b.dataset.edit) })));
+  main.querySelectorAll('[data-dup]').forEach((b) => b.addEventListener('click', () => {
+    const src = state.inscriptions.find((i) => i.id === Number(b.dataset.dup));
+    // Duplication : même stagiaire, formation/horaires à préciser (cas multi-catégories)
+    openInscriptionForm({ stagiaire: src.stagiaire, type: src.type, datePratique: src.datePratique });
+  }));
   main.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => {
     const id = Number(b.dataset.del);
     const insc = state.inscriptions.find((i) => i.id === id);
@@ -86,6 +112,11 @@ export function renderInscriptions(main) {
       toast(`Inscription n°${id} supprimée.`, 'ok');
     }
   }));
+}
+
+function sortableTh(key, label) {
+  const arrow = sortKey === key ? (sortDir === 1 ? ' ▲' : ' ▼') : '';
+  return `<th data-sort="${key}" style="cursor:pointer" title="Trier">${label}${arrow}</th>`;
 }
 
 function focusEnd(main, sel) {
@@ -121,6 +152,7 @@ function rowHTML(state, row) {
         : '<span class="badge badge-ok">✓ OK</span>'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-secondary btn-sm" data-edit="${insc.id}" title="Modifier">✏️</button>
+        <button class="btn btn-secondary btn-sm" data-dup="${insc.id}" title="Nouvelle ligne pour ce stagiaire (autre catégorie)">⧉</button>
         <button class="btn btn-danger btn-sm" data-del="${insc.id}" title="Supprimer">🗑</button>
       </td>
     </tr>

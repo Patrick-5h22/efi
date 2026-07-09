@@ -25,6 +25,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 2 | 64/100 | 18/11/7/11/6/6/3/1/1 | Application complète : 10 vues (tableau de bord, inscriptions + formulaire avec aperçu des conflits en direct, grilles semaine cliquables, synthèse imprimable, plannings globaux, équipe, jours EFI, paramètres, mode d'emploi), export JSON/CSV, smoke test Playwright sans erreur |
 | 3 | 67/100 | 19/11/7/12/8/6/3/1/1 | Grilles semaine : jours hors période distingués, intervenant du jour déduit de l'activité (auto), clic sur créneau occupé = édition de l'inscription |
 | 4 | 70/100 | 20/13/7/12/8/7/3/1/1 | Contrôle de dépassement de capacité (3 candidats / 2 chariots), théorie en double signalée, comptage théorie par stagiaire unique, 25 tests |
+| 5 | 72/100 | 20/13/7/12/10/7/3/1/1 | Tableau des inscriptions : tri par colonne, bouton de duplication pour les stagiaires multi-catégories |
 
 ## Prochaines pistes
 
