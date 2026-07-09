@@ -409,9 +409,13 @@ export function suggestSlots(state, { stagiaire, formation: code, type }) {
       // Pré-vérification : la pratique seule doit passer (seuls les tests manquants sont tolérés)
       const withTheory = { ...base, dateTheorie: hasTheory ? null : day };
       if (!trial(withTheory, IGNORE_MISSING_TESTS)) continue;
-      // Test pratique : même jour de préférence, sinon jours suivants
+      // Test pratique : même jour de préférence, sinon jours suivants.
+      // Le même jour, on privilégie un créneau APRÈS la formation pratique.
       for (const testDay of openDays.filter((d) => d >= day)) {
-        for (const testStart of slots) {
+        const ordered = testDay === day
+          ? [...slots.filter((t) => t >= start + duree), ...slots.filter((t) => t < start + duree)]
+          : slots;
+        for (const testStart of ordered) {
           if (testStart + params.practicalTestDuration > params.dayEnd) continue;
           if (testDay === day && overlaps(start, start + duree, testStart, testStart + params.practicalTestDuration)) continue;
           const draft = { ...withTheory, dateTestPratique: testDay, debutTestPratique: testStart };

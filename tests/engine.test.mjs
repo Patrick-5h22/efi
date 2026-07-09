@@ -308,3 +308,14 @@ test('testeur théorie non habilité signalé (affectation manuelle du jour)', (
   const { rows } = computeSchedule(state);
   assert.ok(rows[0].errors.some((e) => e.includes('Testeur théorie non habilité')), rows[0].errors.join('; '));
 });
+
+test('suggestion : le test pratique proposé suit la formation pratique', async () => {
+  const { suggestSlots } = await import('../js/engine.js');
+  const state = seedExamples(defaultState());
+  const found = suggestSlots(state, { stagiaire: 'NOUVEAU Paul', formation: 'R489-1A', type: 'Initial' });
+  assert.ok(found);
+  if (found.dateTestPratique === found.datePratique) {
+    assert.ok(found.debutTestPratique >= found.debutPratique + 90,
+      `test à ${found.debutTestPratique} avant fin de pratique ${found.debutPratique + 90}`);
+  }
+});

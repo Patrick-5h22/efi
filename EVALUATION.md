@@ -37,6 +37,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 14 | 89/100 | 24/14/10/14/16/8/3/4/1 | Intégration continue GitHub Actions : les 30 tests du moteur s'exécutent à chaque push |
 | 15 | 90/100 | 24/14/10/14/16/8/4/4/1 | Export calendrier .ics (Europe/Paris) : toutes les réservations ou une semaine, importable dans Outlook / Google Agenda, 31 tests |
 | 16 | 92/100 | 24/14/10/14/16/8/4/4/4 | Documentation illustrée : 7 captures d'écran, guide de démarrage en 5 étapes dans le README |
+| 17 | 92,5/100 | 24/14/10,5/14/16/8/4/4/4 | Suggestion : le test pratique proposé suit la formation pratique le même jour (ordre pédagogique), 32 tests |
 
 ## Prochaines pistes
 
