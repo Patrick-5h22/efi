@@ -362,3 +362,58 @@ function crossChecks(a, b, params) {
 export function statutOf(row) {
   return row.errors.length ? row.errors : null;
 }
+
+// ---------------------------------------------------------------------------
+// Disponibilités (équivalent de l'onglet « Dispo (auto) ») : pour un brouillon
+// d'inscription, indique pour chaque intervenant s'il est habilité et libre
+// sur le créneau de pratique (rôle F) et de test pratique (rôle T).
+// ---------------------------------------------------------------------------
+export function memberAvailability(state, draft, excludeId = null) {
+  const { params, formations, team } = state;
+  const formation = formationByCode(formations, draft.formation);
+  const { rows, theoryTesters } = computeSchedule(state);
+  const theoryEnd = params.theoryTime + params.theoryDuration;
+
+  // Intervalles occupés par intervenant (hors ligne en cours d'édition)
+  const busy = new Map(team.map((m) => [m.id, []]));
+  const add = (id, date, start, end, kind, code) => {
+    if (id && busy.has(id)) busy.get(id).push({ date, start, end, kind, code });
+  };
+  for (const r of rows) {
+    if (excludeId != null && r.insc.id === excludeId) continue;
+    if (r.insc.datePratique && r.insc.debutPratique != null) {
+      add(r.formateurEffectif, r.insc.datePratique, r.insc.debutPratique, r.finPratique, 'formation', r.formation?.code);
+    }
+    if (r.insc.dateTestPratique && r.insc.debutTestPratique != null) {
+      add(r.testeurEffectif, r.insc.dateTestPratique, r.insc.debutTestPratique, r.finTestPratique, 'test', r.formation?.code);
+    }
+  }
+  for (const [date, id] of theoryTesters) add(id, date, params.theoryTime, theoryEnd, 'theorie', null);
+
+  const freeOn = (id, date, start, end, allowSameCat) => {
+    const conflicts = (busy.get(id) || []).filter((b) => b.date === date && overlaps(b.start, b.end, start, end));
+    if (!conflicts.length) return true;
+    if (allowSameCat && formation && (formation.capacite || 1) > 1) {
+      return conflicts.every((b) => b.kind === 'formation' && b.code === formation.code)
+        && conflicts.length < formation.capacite;
+    }
+    return false;
+  };
+
+  return team.filter((m) => m.name.trim()).map((m) => {
+    const out = { id: m.id, name: m.name, F: null, T: null };
+    if (formation) {
+      if (draft.datePratique && draft.debutPratique != null) {
+        const end = draft.debutPratique + dureeFor(formation, draft.type);
+        out.F = !m.quals?.[formation.code]?.F ? 'non-habilite'
+          : freeOn(m.id, draft.datePratique, draft.debutPratique, end, true) ? 'libre' : 'occupe';
+      }
+      if (draft.dateTestPratique && draft.debutTestPratique != null) {
+        const end = draft.debutTestPratique + params.practicalTestDuration;
+        out.T = !m.quals?.[formation.code]?.T ? 'non-habilite'
+          : freeOn(m.id, draft.dateTestPratique, draft.debutTestPratique, end, false) ? 'libre' : 'occupe';
+      }
+    }
+    return out;
+  });
+}

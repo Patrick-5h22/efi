@@ -5,7 +5,7 @@ import { app, esc, toast, render } from '../app.js';
 import { addInscription, updateInscription } from '../store.js';
 import { formationByCode, dureeFor, TYPES } from '../config.js';
 import { daySlots, fmtTime, workingDays, fmtDateDay } from '../dates.js';
-import { computeSchedule } from '../engine.js';
+import { computeSchedule, memberAvailability } from '../engine.js';
 
 let dialog = null;
 
@@ -122,11 +122,29 @@ export function openInscriptionForm(options = {}) {
     testeurId: $('testeurId').value || null,
   });
 
+  // Annotation des intervenants : habilité / occupé / libre sur les créneaux choisis
+  const annotateMembers = (draft) => {
+    if (!draft.formation) return;
+    const avail = memberAvailability(state, draft, editing ? editing.id : null);
+    const mark = { libre: '✓', occupe: ' (occupé)', 'non-habilite': ' (non habilité)' };
+    for (const [selName, role] of [['formateurId', 'F'], ['testeurId', 'T']]) {
+      const sel = $(selName);
+      for (const opt of sel.options) {
+        if (!opt.value) continue;
+        const a = avail.find((x) => x.id === opt.value);
+        const status = a?.[role];
+        const base = opt.textContent.replace(/ \((occupé|non habilité)\)| ✓$/g, '');
+        opt.textContent = status ? base + (status === 'libre' ? ' ✓' : mark[status]) : base;
+      }
+    }
+  };
+
   // Aperçu en direct : durée, fin, contrôles
   const refresh = () => {
     const draft = readDraft();
     const formation = formationByCode(state.formations, draft.formation);
     const duree = dureeFor(formation, draft.type);
+    annotateMembers(draft);
     $('finPratique').value = draft.debutPratique != null && formation ? fmtTime(draft.debutPratique + duree) : '';
     dialog.querySelector('#duree-info').textContent = formation
       ? `Durée de la pratique : ${fmtTime(duree).replace(':', 'h')}${formation.tests ? ` — tests obligatoires (${formation.reco})` : ' — pas de test planifié dans cet outil'}${formation.capacite > 1 ? ` — capacité simultanée : ${formation.capacite}` : ''}`
