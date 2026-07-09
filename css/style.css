@@ -69,7 +69,10 @@ body {
   margin-left: auto; background: var(--error); color: #fff;
   border-radius: 10px; font-size: 10.5px; padding: 1px 7px; font-weight: 700;
 }
-.sidebar-footer { padding: 10px 14px; border-top: 1px solid #263751; display: flex; gap: 8px; }
+.sidebar-footer { padding: 10px 14px; border-top: 1px solid #263751; display: flex; gap: 8px; flex-wrap: wrap; }
+#cloud-status[data-status="idle"] { color: #7fd6a4; border-color: #2e6b4a; }
+#cloud-status[data-status="error"] { color: #f2a097; border-color: #8a4038; }
+#cloud-status[data-status="saving"] { color: #f6d55c; }
 
 /* ---------- Main ---------- */
 #main { flex: 1; padding: 22px 26px 60px; min-width: 0; }

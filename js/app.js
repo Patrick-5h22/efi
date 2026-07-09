@@ -1,6 +1,7 @@
 // Point d'entrée de l'application : état global, routeur, rendu.
 
-import { loadState, saveState, defaultState, seedExamples, exportJSON, importJSON } from './store.js';
+import { loadState, saveState, defaultState, seedExamples, exportJSON, importJSON, migrate } from './store.js';
+import { createSyncer, loadRemoteState, getAccessCode, setAccessCode } from './db.js';
 import { computeSchedule } from './engine.js';
 import { periodWeeks } from './dates.js';
 import { renderDashboard } from './views/dashboard.js';
@@ -29,6 +30,7 @@ export const app = {
     saveState(localStorage, this.state);
     this.schedule = computeSchedule(this.state);
   },
+  syncer: null,
   commit() {
     // mutation + historique + sauvegarde + re-rendu
     if (this.snapshot != null) {
@@ -38,6 +40,7 @@ export const app = {
     }
     this.save();
     this.snapshot = JSON.stringify(this.state);
+    this.syncer?.schedule();
     render();
   },
   undo() {
@@ -46,6 +49,7 @@ export const app = {
     this.state = JSON.parse(this.undoStack.pop());
     this.save();
     this.snapshot = JSON.stringify(this.state);
+    this.syncer?.schedule();
     render();
     toast('Action annulée.', 'ok');
   },
@@ -55,6 +59,7 @@ export const app = {
     this.state = JSON.parse(this.redoStack.pop());
     this.save();
     this.snapshot = JSON.stringify(this.state);
+    this.syncer?.schedule();
     render();
     toast('Action rétablie.', 'ok');
   },
@@ -69,6 +74,68 @@ function boot() {
   app.state = state;
   app.schedule = computeSchedule(state);
   app.snapshot = JSON.stringify(state);
+}
+
+// --- Base partagée (Supabase) ----------------------------------------------
+function setCloudStatus(status, detail) {
+  const el = document.getElementById('cloud-status');
+  if (!el) return;
+  const labels = {
+    off: ['☁', 'Base partagée non connectée — cliquer pour saisir le code d’accès'],
+    idle: ['☁✓', 'Base partagée synchronisée' + (detail ? ' — ' + detail : '')],
+    saving: ['☁…', 'Sauvegarde vers la base partagée…'],
+    error: ['☁⚠', 'Erreur de synchronisation : ' + (detail || 'inconnue')],
+  };
+  const [icon, title] = labels[status] || labels.off;
+  el.textContent = icon;
+  el.title = title;
+  el.dataset.status = status;
+}
+
+async function connectCloud(code) {
+  try {
+    const remote = await loadRemoteState(code);
+    setAccessCode(localStorage, code);
+    app.state = migrate(remote);
+    app.save();
+    app.snapshot = JSON.stringify(app.state);
+    app.undoStack = [];
+    app.redoStack = [];
+    app.syncer.setStatus('idle');
+    render();
+    toast('Connecté à la base partagée — planning chargé.', 'ok');
+  } catch (e) {
+    if (e.badCode) {
+      setAccessCode(localStorage, null);
+      toast('Code d’accès refusé.', 'error');
+      app.syncer.setStatus('off');
+    } else {
+      toast('Base partagée injoignable : ' + e.message + ' — mode local conservé.', 'error');
+      app.syncer.setStatus('error', e.message);
+    }
+  }
+}
+
+function setupCloud() {
+  app.syncer = createSyncer({
+    getState: () => app.state,
+    onStatus: setCloudStatus,
+  });
+  document.getElementById('cloud-status').addEventListener('click', async () => {
+    const current = getAccessCode(localStorage);
+    if (current) {
+      if (confirm('Se déconnecter de la base partagée ? (les données restent en local)')) {
+        setAccessCode(localStorage, null);
+        app.syncer.setStatus('off');
+        toast('Déconnecté — les modifications restent locales.', 'ok');
+      }
+      return;
+    }
+    const code = prompt('Code d’accès de la base partagée EFI :');
+    if (code?.trim()) await connectCloud(code.trim());
+  });
+  // Reconnexion automatique au démarrage
+  if (getAccessCode(localStorage)) connectCloud(getAccessCode(localStorage));
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +250,7 @@ function setupImportExport() {
 // ---------------------------------------------------------------------------
 boot();
 setupImportExport();
+setupCloud();
 document.getElementById('btn-undo').addEventListener('click', () => app.undo());
 document.getElementById('btn-redo').addEventListener('click', () => app.redo());
 window.addEventListener('keydown', (e) => {
