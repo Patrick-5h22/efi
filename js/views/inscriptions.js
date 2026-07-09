@@ -5,6 +5,7 @@ import { app, esc, toast } from '../app.js';
 import { removeInscription, memberName } from '../store.js';
 import { fmtTime, fmtDateShort, periodWeeks } from '../dates.js';
 import { openInscriptionForm } from './form.js';
+import { buildICS, downloadICS } from '../ics.js';
 
 const filters = { search: '', week: '', status: '' };
 let sortKey = 'id';
@@ -44,6 +45,7 @@ export function renderInscriptions(main) {
       <div class="page-actions">
         <button class="btn" id="btn-add">➕ Inscrire un stagiaire</button>
         <button class="btn btn-secondary" id="btn-csv">⬇ CSV</button>
+        <button class="btn btn-secondary" id="btn-ics" title="Exporter toutes les réservations au format calendrier (.ics)">📅 .ics</button>
       </div>
     </div>
 
@@ -89,6 +91,7 @@ export function renderInscriptions(main) {
   main.querySelector('#f-week').addEventListener('change', (e) => { filters.week = e.target.value; renderInscriptions(main); });
   main.querySelector('#f-status').addEventListener('change', (e) => { filters.status = e.target.value; renderInscriptions(main); });
   main.querySelector('#btn-csv').addEventListener('click', () => exportCSV(state, rows));
+  main.querySelector('#btn-ics').addEventListener('click', () => downloadICS(buildICS(state, app.schedule), 'efi-planning.ics'));
 
   main.querySelectorAll('th[data-sort]').forEach((th) => th.addEventListener('click', () => {
     const key = th.dataset.sort;

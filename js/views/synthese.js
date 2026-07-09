@@ -4,6 +4,7 @@
 import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
 import { periodWeeks, weekDays, fmtTime, fmtDateLong, fmtDateShort } from '../dates.js';
+import { buildICS, downloadICS } from '../ics.js';
 
 export function renderSynthese(main, args) {
   const state = app.state;
@@ -21,6 +22,7 @@ export function renderSynthese(main, args) {
       <div class="page-actions">
         <select id="w-select">${weeks.map((w) => `<option value="${w.week}" ${w.week === week.week ? 'selected' : ''}>Semaine ${w.week}</option>`).join('')}</select>
         <a class="btn btn-secondary" href="#/semaine/${week.week}">🗓 Grilles</a>
+        <button class="btn btn-secondary" id="btn-ics" title="Exporter la semaine au format calendrier (.ics)">📅 .ics</button>
         <button class="btn" id="btn-print">🖨 Imprimer</button>
       </div>
     </div>
@@ -32,6 +34,10 @@ export function renderSynthese(main, args) {
 
   main.querySelector('#w-select').addEventListener('change', (e) => navigate(`synthese/${e.target.value}`));
   main.querySelector('#btn-print').addEventListener('click', () => window.print());
+  main.querySelector('#btn-ics').addEventListener('click', () => {
+    const ics = buildICS(state, app.schedule, { onlyDates: new Set(days) });
+    downloadICS(ics, `efi-semaine-${week.week}.ics`);
+  });
 }
 
 function buildEvents(state, days) {
