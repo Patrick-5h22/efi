@@ -212,9 +212,21 @@ table.cal td.cal-empty { background: #fafbfd; }
   #sidebar, .page-actions, .no-print, #toast-zone { display: none !important; }
   #main { padding: 0; }
   body { background: #fff; }
-  .card { box-shadow: none; border: none; padding: 0; }
-  table.synthese th, table.synthese td { font-size: 11px; }
+  .card { box-shadow: none; border: 1px solid #ccc; padding: 8px; break-inside: avoid; }
+  .page-header h1 { font-size: 16px; }
+  table.synthese th, table.synthese td { font-size: 11px; padding: 4px 6px; }
+  /* Conserver les couleurs des grilles (vert/rouge/jaune) à l'impression */
+  table.planning td, table.synthese td, .badge {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  table.planning { font-size: 8.5px; }
+  table.planning th, table.planning td { min-width: 0; padding: 1px 2px; }
+  .grid-wrap, .table-wrap { overflow: visible; }
+  a { color: inherit; text-decoration: none; }
 }
+
+@page { size: A4 landscape; margin: 10mm; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 860px) {

@@ -23,6 +23,7 @@ export function renderSemaine(main, args) {
         <select id="w-select">${weeks.map((w) => `<option value="${w.week}" ${w.week === week.week ? 'selected' : ''}>Semaine ${w.week}</option>`).join('')}</select>
         <button class="btn btn-secondary" id="w-next" ${idx === weeks.length - 1 ? 'disabled' : ''}>S${idx < weeks.length - 1 ? weeks[idx + 1].week : ''} →</button>
         <a class="btn btn-secondary" href="#/synthese/${week.week}">📋 Synthèse</a>
+        <button class="btn btn-secondary" onclick="window.print()">🖨</button>
         <button class="btn" id="btn-add">➕ Inscrire</button>
       </div>
     </div>
