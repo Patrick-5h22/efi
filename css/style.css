@@ -210,6 +210,33 @@ table.cal td.cal-closed:focus-visible, table.cal td.cal-open:focus-visible { out
 table.cal td.cal-holiday { background: var(--closed); color: #9aa7b8; text-decoration: line-through; }
 table.cal td.cal-empty { background: #fafbfd; }
 
+/* ---------- Heatmap d'occupation ---------- */
+/* Rampe séquentielle bleue mono-teinte (référentiel dataviz, pas 100/250/400/550) */
+.hm-wrap { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.hm-days { display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; color: var(--text-dim); }
+.hm-days span { height: 18px; line-height: 18px; }
+.hm-grid { display: flex; gap: 3px; }
+.hm-col { display: flex; flex-direction: column; gap: 3px; }
+.hm-cell { width: 18px; height: 18px; border-radius: 4px; display: block; }
+.hm-cell[data-week] { cursor: pointer; }
+.hm-cell[data-week]:hover, .hm-cell[data-week]:focus-visible { outline: 2px solid var(--primary-dark); outline-offset: 1px; }
+.hm-0 { background: #e9edf3; }
+.hm-1 { background: #cde2fb; }
+.hm-2 { background: #86b6ef; }
+.hm-3 { background: #3987e5; }
+.hm-4 { background: #1c5cab; }
+.hm-closed { background: #f6f7fa; border: 1px dashed #c9d2e0; }
+.hm-holiday { background: repeating-linear-gradient(45deg, #e8ebf0, #e8ebf0 3px, #f6f7fa 3px, #f6f7fa 6px); }
+.hm-out { background: transparent; }
+.hm-alert { box-shadow: inset 0 0 0 2px #d03b3b; }
+.hm-week { font-size: 10px; color: var(--text-dim); text-align: center; height: 14px; cursor: pointer; }
+.hm-week:hover { color: var(--primary); font-weight: 700; }
+
+/* ---------- Dossiers ---------- */
+.badge-cancel { background: #eceff3; color: #5b6b7d; text-decoration: line-through; }
+tr.row-cancelled td { opacity: .55; }
+tr.row-cancelled td b { text-decoration: line-through; }
+
 /* ---------- Print ---------- */
 @media print {
   #sidebar, .page-actions, .no-print, #toast-zone { display: none !important; }

@@ -39,6 +39,7 @@ export function buildICS(state, schedule, { onlyDates = null } = {}) {
   ];
 
   for (const row of schedule.rows) {
+    if (row.cancelled) continue;
     const i = row.insc;
     const cat = row.formation ? row.formation.label.replace('Pratique ', '') : '?';
     if (keep(i.datePratique) && i.debutPratique != null) {

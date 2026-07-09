@@ -93,6 +93,7 @@ function gridHTML(state, days, kind) {
     else {
       const autoIds = new Set();
       for (const r of rows) {
+        if (r.cancelled) continue;
         if (kind === 'F' && r.insc.datePratique === date && r.formateurEffectif) autoIds.add(r.formateurEffectif);
         if (kind === 'T' && r.insc.dateTestPratique === date && r.testeurEffectif) autoIds.add(r.testeurEffectif);
       }
@@ -117,6 +118,7 @@ function gridHTML(state, days, kind) {
 
       // Occupations
       const occupants = rows.filter((r) => {
+        if (r.cancelled) return false;
         const i = r.insc;
         if (kind === 'F') {
           return i.datePratique === date && i.debutPratique != null
@@ -138,7 +140,7 @@ function gridHTML(state, days, kind) {
     // Charge de formation pratique du jour (grille formateur)
     let loadInfo = '';
     if (kind === 'F' && open && inPeriod) {
-      const load = rows.reduce((sum, r) => sum + (r.insc.datePratique === date && r.insc.debutPratique != null ? r.duree : 0), 0);
+      const load = rows.reduce((sum, r) => sum + (!r.cancelled && r.insc.datePratique === date && r.insc.debutPratique != null ? r.duree : 0), 0);
       if (load > 0) {
         const over = load > state.params.maxDailyLoad;
         loadInfo = `<br><span style="font-weight:400;font-size:10px;color:${over ? 'var(--error)' : 'var(--text-dim)'}">${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''} / ${fmtTime(state.params.maxDailyLoad).replace(':', 'h')}</span>`;

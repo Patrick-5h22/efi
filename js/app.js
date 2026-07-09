@@ -194,7 +194,7 @@ function renderNav() {
   document.getElementById('nav').innerHTML = `
     ${link('dashboard', '🏠 Tableau de bord', page === 'dashboard')}
     ${link('inscriptions', `📝 Inscriptions ${errorCount ? `<span class="nav-badge">${errorCount}</span>` : ''}`, page === 'inscriptions')}
-    ${link('stagiaires', '🧑‍🎓 Stagiaires', page === 'stagiaires')}
+    ${link('stagiaires', '🗂 Dossiers', page === 'stagiaires')}
     ${link('synthese', '📋 Synthèse semaine', page === 'synthese')}
     <div class="nav-section">Plannings</div>
     ${link(`semaine/${currentWeek || weeks[0].week}`, '🗓 Grilles semaine', page === 'semaine')}

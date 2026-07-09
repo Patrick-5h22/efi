@@ -36,6 +36,7 @@ export function renderPlanning(main, args, kind) {
       }
 
       const occupants = rows.filter((r) => {
+        if (r.cancelled) return false;
         const i = r.insc;
         if (kind === 'F') return i.datePratique === date && i.debutPratique != null && i.debutPratique < slotEnd && r.finPratique > t;
         return i.dateTestPratique === date && i.debutTestPratique != null && i.debutTestPratique < slotEnd && r.finTestPratique > t;

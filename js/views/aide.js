@@ -81,6 +81,11 @@ export function renderAide(main) {
         <li><b>Import CSV</b> (page Inscriptions) : reprend un export CSV de l'onglet « Inscriptions » du classeur Excel —
           en-têtes reconnues automatiquement, formations et intervenants résolus par libellé, lignes invalides ignorées avec raison.</li>
         <li><b>Import JSON</b> : restaure une sauvegarde complète (paramètres, équipe, jours, inscriptions).</li>
+        <li><b>🔥 Heatmap</b> (tableau de bord) : occupation de chaque jour de la période en un coup d'œil
+          (plus le bleu est foncé, plus le jour est chargé ; liseré rouge = anomalie ; cliquer ouvre la semaine).</li>
+        <li><b>🗂 Dossiers</b> : chaque inscription porte une entreprise/SIRET et un statut —
+          🕐 pré-réservée, ✓ confirmée, ✕ annulée (avec motif). Une ligne annulée libère immédiatement
+          ses créneaux et sort des contrôles, tout en restant visible dans les listes.</li>
         <li><b>☁ Base partagée</b> : cliquer sur le nuage de la barre latérale et saisir le code d'accès pour
           charger le planning commun et synchroniser automatiquement chaque modification entre les postes
           (☁✓ synchronisé, ☁⚠ erreur — les données restent aussi en local).</li>

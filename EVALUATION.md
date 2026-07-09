@@ -47,6 +47,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 24 | 98,5/100 | 25/15/11/15/17/10/5/4,5/5 | Documentation complète : outils pratiques (suggestion, undo, exports, imports) dans le mode d'emploi intégré, procédure de migration Excel dans le README |
 | 25 | 99/100 | 25/15/11/15/17/10/5/5/5 | Audit final : 38 tests unitaires + 10 vérifications e2e + smoke 11 vues + mobile + PDF, zéro résidu de debug, captures d'écran à jour |
 | 26 | 99,5/100 | 25/15/11,5/15/17/10,5/5/5/5 | Suite d'intégration : 7 scénarios de bout en bout (cycle de vie, multi-catégories, testing croisé, migration classeur→ICS/JSON, reconfiguration, équipe réduite, montée en charge 40 stagiaires). A révélé et corrigé 2 vrais bugs : replanification perdant la théorie, et nouvelle réservation dégradant une réservation existante (la suggestion garantit désormais la non-régression du planning) |
+| 27 | — (phase 1 fusion efi-placement) | | Heatmap d'occupation sur le tableau de bord (rampe séquentielle validée, clic → semaine, anomalies signalées) ; dossiers de réservation (entreprise, SIRET, statuts pré-réservée/confirmée/annulée avec motif — une annulation libère les créneaux) ; base Supabase étendue ; 47 tests + 11 vérifications navigateur |
 
 ## Bilan
 

@@ -24,6 +24,10 @@ export function openInscriptionForm(options = {}) {
     debutTestPratique: options.debutTestPratique ?? null,
     formateurId: null,
     testeurId: null,
+    entreprise: options.entreprise || '',
+    siret: options.siret || '',
+    statut: options.statut || 'confirmee',
+    motifAnnulation: '',
   };
 
   if (dialog) dialog.remove();
@@ -70,6 +74,19 @@ export function openInscriptionForm(options = {}) {
             <select name="type">${TYPES.map((t) => `<option ${t === init.type ? 'selected' : ''}>${t}</option>`).join('')}</select>
           </label>
         </div>
+        <div class="form-grid" style="margin-top:10px">
+          <label class="field">Entreprise <input name="entreprise" value="${esc(init.entreprise || '')}" placeholder="(facultatif)"></label>
+          <label class="field">SIRET <input name="siret" value="${esc(init.siret || '')}" placeholder="(facultatif)" maxlength="14"></label>
+          <label class="field">Statut du dossier
+            <select name="statut">
+              <option value="pre" ${init.statut === 'pre' ? 'selected' : ''}>🕐 Pré-réservée</option>
+              <option value="confirmee" ${(init.statut || 'confirmee') === 'confirmee' ? 'selected' : ''}>✓ Confirmée</option>
+              <option value="annulee" ${init.statut === 'annulee' ? 'selected' : ''}>✕ Annulée</option>
+            </select>
+          </label>
+          <label class="field" id="motif-field" style="display:${init.statut === 'annulee' ? '' : 'none'}">Motif d'annulation
+            <input name="motifAnnulation" value="${esc(init.motifAnnulation || '')}" placeholder="Report client…"></label>
+        </div>
         <p class="muted" id="duree-info"></p>
         <div class="form-row no-print">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-suggest" title="Chercher la première combinaison pratique + tests sans conflit">💡 Proposer des créneaux</button>
@@ -115,6 +132,10 @@ export function openInscriptionForm(options = {}) {
 
   const readDraft = () => ({
     stagiaire: $('stagiaire').value.trim(),
+    entreprise: $('entreprise').value.trim() || null,
+    siret: $('siret').value.trim() || null,
+    statut: $('statut').value,
+    motifAnnulation: $('motifAnnulation').value.trim() || null,
     formation: $('formation').value || null,
     type: $('type').value,
     datePratique: $('datePratique').value || null,
@@ -146,6 +167,7 @@ export function openInscriptionForm(options = {}) {
   // Aperçu en direct : durée, fin, contrôles
   const refresh = () => {
     const draft = readDraft();
+    dialog.querySelector('#motif-field').style.display = draft.statut === 'annulee' ? '' : 'none';
     const formation = formationByCode(state.formations, draft.formation);
     const duree = dureeFor(formation, draft.type);
     annotateMembers(draft);
