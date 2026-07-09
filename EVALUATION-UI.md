@@ -25,6 +25,8 @@ Score sur 100, mis à jour à chaque itération.
 |-------|-------|------------------|
 | 1 | 38/100 | Système de tokens OKLCH repris à l'identique de la référence (css/tokens.css) : 9 presets + sombre + variables sémantiques planning clair/sombre ; feuille de style entièrement réécrite dessus (sidebar claire à tokens sidebar, cartes bordées radius 0.45rem, boutons/inputs shadcn, tables à lignes horizontales, KPI à liseré primary, dialog/toast popover) |
 | 2 | 55/100 | Sélecteur de thème 🎨 (pastilles OKLCH + check, 10 presets dont Néon, modes clair/sombre/système), persistance localStorage, application anti-flash avant premier rendu, suivi de prefers-color-scheme, preset Néon (fond profond + halo cyan) opérationnel |
+| 3 | 60/100 | Rampe heatmap corrigée (color-mix en srgb — plus de dérive violette), dérivée du --primary du preset actif comme le prévoyait la référence, vérifiée en clair et en sombre |
+| 4 | 63/100 | Contrôle visuel de 6 combinaisons preset×mode + formulaire sombre + menu thème : rendus conformes ; correction :user-invalid (plus de bordure rouge avant saisie) |
 
 ## Référence (extraite de efi-placement)
 

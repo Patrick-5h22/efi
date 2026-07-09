@@ -127,7 +127,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible,
 .btn:focus-visible, a:focus-visible {
   outline: 2px solid var(--ring); outline-offset: 1px;
 }
-input:invalid { border-color: var(--destructive); }
+input:user-invalid { border-color: var(--destructive); }
 
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
@@ -146,7 +146,7 @@ table.data th {
   background: var(--card); position: sticky; top: 0;
 }
 table.data tbody tr:hover { background: var(--muted); }
-table.data tr.row-error { background: color-mix(in oklch, var(--error-bg) 45%, var(--card)); }
+table.data tr.row-error { background: color-mix(in srgb, var(--error-bg) 45%, var(--card)); }
 table.data tr.row-error:hover { background: var(--error-bg); }
 tr.row-cancelled td { opacity: .5; }
 tr.row-cancelled td b { text-decoration: line-through; }
@@ -272,9 +272,9 @@ table.cal td.cal-empty { background: var(--background); }
 .hm-cell[data-week]:hover, .hm-cell[data-week]:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 /* « Si une heatmap Phase 4.2 consomme --primary, c'est voulu » (référence) */
 .hm-0 { background: var(--muted); }
-.hm-1 { background: color-mix(in oklch, var(--primary) 25%, var(--background)); }
-.hm-2 { background: color-mix(in oklch, var(--primary) 50%, var(--background)); }
-.hm-3 { background: color-mix(in oklch, var(--primary) 75%, var(--background)); }
+.hm-1 { background: color-mix(in srgb, var(--primary) 25%, var(--background)); }
+.hm-2 { background: color-mix(in srgb, var(--primary) 50%, var(--background)); }
+.hm-3 { background: color-mix(in srgb, var(--primary) 75%, var(--background)); }
 .hm-4 { background: var(--primary); box-shadow: var(--neon-glow, none); }
 .hm-closed { background: var(--background); border: 1px dashed var(--grid-line); }
 .hm-holiday { background: repeating-linear-gradient(45deg, var(--closed), var(--closed) 3px, var(--background) 3px, var(--background) 6px); }
