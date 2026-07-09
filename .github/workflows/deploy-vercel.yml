@@ -1,0 +1,33 @@
+name: Déploiement Vercel (production)
+
+# Chaque push sur main déploie l'application en production sur Vercel.
+# Prérequis (une seule fois) : créer un token sur https://vercel.com/account/tokens
+# et l'ajouter au dépôt comme secret VERCEL_TOKEN
+# (Settings → Secrets and variables → Actions → New repository secret).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_SqbmusZ2yoVj29XvP7LfWarp
+      VERCEL_PROJECT_ID: prj_sU6F7MlHJlAKIMRzTeUUiUZJmEDz
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier la présence du secret VERCEL_TOKEN
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "::error::Secret VERCEL_TOKEN manquant — créez un token sur https://vercel.com/account/tokens puis ajoutez-le dans Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - name: Tests avant mise en production
+        run: node --test tests/*.test.mjs
+
+      - name: Déployer en production
+        run: npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
