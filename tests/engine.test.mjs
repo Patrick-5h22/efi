@@ -241,3 +241,37 @@ test('test pratique pendant le créneau théorie interdit (même testeur)', () =
   const { rows } = computeSchedule(state);
   assert.ok(rows[1].errors.some((e) => e.includes('pendant le créneau théorie')), rows[1].errors.join('; '));
 });
+
+test('capacité dépassée : 3 candidats simultanés sur 2 chariots R489 Cat 3', () => {
+  const state = defaultState();
+  for (const [nom, testStart] of [['A Un', 780], ['B Deux', 840], ['C Trois', 900]]) {
+    addInscription(state, {
+      stagiaire: nom, formation: 'R489-3', type: 'Initial',
+      datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p1',
+      dateTheorie: '2026-09-01',
+      dateTestPratique: '2026-09-01', debutTestPratique: testStart, testeurId: 'p2',
+    });
+  }
+  const { rows } = computeSchedule(state);
+  assert.ok(rows[0].errors.some((e) => e.includes('3 candidats simultanés')), rows[0].errors.join('; '));
+});
+
+test('théorie renseignée en double signalée', () => {
+  const state = defaultState();
+  for (const testStart of [780, 840]) {
+    addInscription(state, {
+      stagiaire: 'A Un', formation: testStart === 780 ? 'R489-1A' : 'R489-3', type: 'Initial',
+      datePratique: '2026-09-01', debutPratique: testStart === 780 ? 480 : 570, formateurId: 'p1',
+      dateTheorie: '2026-09-01',
+      dateTestPratique: '2026-09-01', debutTestPratique: testStart, testeurId: 'p2',
+    });
+  }
+  const { rows } = computeSchedule(state);
+  assert.ok(rows[0].errors.some((e) => e.includes('plusieurs lignes')), rows[0].errors.join('; '));
+});
+
+test('comptage théorie par stagiaire unique', () => {
+  const state = seedExamples(defaultState());
+  const sched = computeSchedule(state);
+  assert.equal(sched.theoryCandidates('2026-09-01'), 2); // DUPONT + MARTIN
+});

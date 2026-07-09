@@ -31,7 +31,7 @@ export function renderPlanning(main, args, kind) {
       const slotEnd = t + state.params.slotMinutes;
 
       if (kind === 'T' && theoryTesters.has(date) && t < theoryEnd && slotEnd > state.params.theoryTime) {
-        const n = rows.filter((r) => r.insc.dateTheorie === date).length;
+        const n = app.schedule.theoryCandidates(date);
         return `<td class="slot-theory">THÉORIE (${n} cand.)</td>`;
       }
 

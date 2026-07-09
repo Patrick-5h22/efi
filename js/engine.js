@@ -137,7 +137,10 @@ export function computeSchedule(state) {
     rows,
     theoryDays,
     theoryTesters,
-    theoryCandidates: (date) => rows.filter((r) => r.insc.dateTheorie === date).length,
+    // Nombre de candidats au test théorique du jour (stagiaires uniques)
+    theoryCandidates: (date) => new Set(
+      rows.filter((r) => r.insc.dateTheorie === date).map((r) => r.insc.stagiaire.toLowerCase())
+    ).size,
   };
 }
 
@@ -236,6 +239,38 @@ function validateRows(rows, ctx) {
     }
   }
 
+  // Dépassement de la capacité simultanée (ex. 3 candidats sur 2 chariots R489 Cat 3)
+  for (const row of rows) {
+    const { insc, formation } = row;
+    if (!formation || (formation.capacite || 1) < 2) continue;
+    if (!insc.datePratique || insc.debutPratique == null || !row.formateurEffectif) continue;
+    const simultaneous = rows.filter((r) =>
+      r.formation?.code === formation.code
+      && r.formateurEffectif === row.formateurEffectif
+      && r.insc.datePratique === insc.datePratique
+      && r.insc.debutPratique != null
+      && overlapsRow(r, row));
+    if (simultaneous.length > formation.capacite) {
+      const msg = `Formateur : ${simultaneous.length} candidats simultanés en ${formation.label} (capacité ${formation.capacite})`;
+      if (!row.errors.includes(msg)) row.errors.push(msg);
+    }
+  }
+
+  // Théorie renseignée en double pour un même stagiaire × recommandation
+  const theoryLines = new Map();
+  for (const r of rows) {
+    if (!r.insc.dateTheorie || !r.formation) continue;
+    const key = `${r.insc.stagiaire.toLowerCase()}|${r.formation.reco}`;
+    theoryLines.set(key, (theoryLines.get(key) || 0) + 1);
+  }
+  for (const r of rows) {
+    if (!r.insc.dateTheorie || !r.formation) continue;
+    const key = `${r.insc.stagiaire.toLowerCase()}|${r.formation.reco}`;
+    if (theoryLines.get(key) > 1) {
+      r.errors.push(`Théorie ${r.formation.reco} renseignée sur plusieurs lignes (une seule suffit)`);
+    }
+  }
+
   // Charge : formation pratique ≤ max / jour / formateur effectif
   const loadByDayTrainer = new Map();
   for (const row of rows) {
@@ -267,6 +302,10 @@ function validateRows(rows, ctx) {
       row.errors.push('Test pratique en même temps que la théorie');
     }
   }
+}
+
+function overlapsRow(a, b) {
+  return overlaps(a.insc.debutPratique, a.finPratique, b.insc.debutPratique, b.finPratique);
 }
 
 function crossChecks(a, b, params) {

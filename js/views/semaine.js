@@ -109,7 +109,7 @@ function gridHTML(state, days, kind) {
       // Théorie (grille testeur uniquement)
       if (kind === 'T' && theoryTesters.has(date)
         && t < theoryEnd && slotEnd > state.params.theoryTime) {
-        const n = rows.filter((r) => r.insc.dateTheorie === date).length;
+        const n = app.schedule.theoryCandidates(date);
         return `<td class="slot-theory"><span class="slot-name">THÉORIE (${n} cand.)</span><span class="slot-detail">Testeur : ${esc(memberName(state, theoryTesters.get(date)) || '?')}</span></td>`;
       }
 
