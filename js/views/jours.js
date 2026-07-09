@@ -38,13 +38,17 @@ export function renderJours(main) {
   `;
 
   main.querySelectorAll('[data-toggle]').forEach((td) => {
-    td.addEventListener('click', () => {
+    const toggle = () => {
       const d = td.dataset.toggle;
       if (openSet.has(d)) state.openDays = state.openDays.filter((x) => x !== d);
       else state.openDays.push(d);
       state.openDays.sort();
       app.commit();
-    });
+      // Rendre le focus au jour cliqué après re-rendu
+      main.querySelector(`[data-toggle="${d}"]`)?.focus();
+    };
+    td.addEventListener('click', toggle);
+    td.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
   });
 
   main.querySelectorAll('select[data-assign]').forEach((sel) => {
@@ -90,7 +94,7 @@ function monthsHTML(state, days, openSet) {
         const num = parseISO(d).getUTCDate();
         if (holidays.has(d)) return `<td class="cal-holiday" title="Férié">${num}</td>`;
         const open = openSet.has(d);
-        return `<td class="${open ? 'cal-open' : 'cal-closed'}" data-toggle="${d}" title="${fmtDateShort(d)} — cliquer pour ${open ? 'fermer' : 'ouvrir'}">${num}${open ? ' ✓' : ''}</td>`;
+        return `<td class="${open ? 'cal-open' : 'cal-closed'}" data-toggle="${d}" tabindex="0" role="button" aria-pressed="${open}" title="${fmtDateShort(d)} — cliquer pour ${open ? 'fermer' : 'ouvrir'}">${num}${open ? ' ✓' : ''}</td>`;
       }).join('') + '</tr>';
     }).join('');
 

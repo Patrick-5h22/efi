@@ -29,6 +29,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 6 | 75/100 | 21/13/9/12/11/7/3/1/1 | Disponibilités « Dispo (auto) » intégrées au formulaire : chaque intervenant annoté ✓ libre / occupé / non habilité sur les créneaux choisis, 27 tests |
 | 7 | 78/100 | 21/13/10/12/13/7/3/1/1 | Bouton « 💡 Proposer des créneaux » : recherche automatique de la première combinaison pratique + test + théorie sans conflit (théorie omise si déjà planifiée pour la recommandation), 29 tests |
 | 8 | 80/100 | 22/13/10/13/14/7/3/1/1 | Vue Stagiaires : parcours chronologique complet par personne (formations, tests, théorie, intervenants), ajout rapide d'une autre catégorie |
+| 9 | 82/100 | 22/13/10/13/14/7/3/4/1 | Accessibilité : créneaux et calendrier utilisables au clavier (Enter/Espace), focus visible, rôles ARIA, landmarks |
 
 ## Prochaines pistes
 

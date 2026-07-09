@@ -144,7 +144,7 @@ table.planning th { background: #eef2f8; font-size: 10.5px; }
 table.planning th.day-col, table.planning td.day-col { text-align: left; min-width: 96px; font-weight: 600; background: #f6f8fc; position: sticky; left: 0; z-index: 1; }
 table.planning th.who-col, table.planning td.who-col { text-align: left; min-width: 105px; background: #f6f8fc; font-size: 11px; }
 td.slot-free { background: var(--free); cursor: pointer; }
-td.slot-free:hover { background: #b8e6cb; outline: 2px solid var(--ok); outline-offset: -2px; }
+td.slot-free:hover, td.slot-free:focus-visible { background: #b8e6cb; outline: 2px solid var(--ok); outline-offset: -2px; }
 td.slot-busy { background: var(--busy); white-space: normal; }
 td.slot-theory { background: var(--theory-bg); border-color: #e2c14d; white-space: normal; }
 td.slot-closed { background: var(--closed); color: #9aa7b8; }
@@ -202,7 +202,8 @@ table.cal th, table.cal td { border: 1px solid var(--border); padding: 4px; text
 table.cal th { background: #eef2f8; font-size: 10.5px; }
 table.cal td.cal-open { background: var(--free); font-weight: 700; cursor: pointer; }
 table.cal td.cal-closed { cursor: pointer; }
-table.cal td.cal-closed:hover, table.cal td.cal-open:hover { outline: 2px solid var(--primary); outline-offset: -2px; }
+table.cal td.cal-closed:hover, table.cal td.cal-open:hover,
+table.cal td.cal-closed:focus-visible, table.cal td.cal-open:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 table.cal td.cal-holiday { background: var(--closed); color: #9aa7b8; text-decoration: line-through; }
 table.cal td.cal-empty { background: #fafbfd; }
 

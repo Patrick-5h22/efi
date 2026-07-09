@@ -50,11 +50,11 @@ export function renderSemaine(main, args) {
   main.querySelector('#btn-add').addEventListener('click', () => openInscriptionForm());
 
   main.querySelectorAll('td.slot-free').forEach((td) => {
-    td.addEventListener('click', () => {
-      openInscriptionForm(td.dataset.kind === 'F'
-        ? { datePratique: td.dataset.date, debutPratique: Number(td.dataset.time) }
-        : { dateTestPratique: td.dataset.date, debutTestPratique: Number(td.dataset.time) });
-    });
+    const open = () => openInscriptionForm(td.dataset.kind === 'F'
+      ? { datePratique: td.dataset.date, debutPratique: Number(td.dataset.time) }
+      : { dateTestPratique: td.dataset.date, debutTestPratique: Number(td.dataset.time) });
+    td.addEventListener('click', open);
+    td.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
     td.title = td.dataset.kind === 'F'
       ? 'Inscrire une formation pratique sur ce créneau'
       : 'Réserver un test pratique sur ce créneau';
@@ -130,7 +130,7 @@ function gridHTML(state, days, kind) {
         return `<td class="slot-busy"${inscAttr}>${label}</td>`;
       }
 
-      return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}"></td>`;
+      return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button" aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"></td>`;
     }).join('');
 
     return `<tr><td class="day-col">${fmtDateDay(date)}</td><td class="who-col">${who}</td>${cells}</tr>`;
