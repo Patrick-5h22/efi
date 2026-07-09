@@ -1,5 +1,5 @@
-// Vue Stagiaires : regroupe les inscriptions par stagiaire pour suivre
-// son parcours complet (catégories, tests, théorie, anomalies).
+// Vue Dossiers : regroupe les inscriptions par stagiaire pour suivre
+// son dossier complet (entreprise, statut, catégories, tests, théorie).
 
 import { app, esc } from '../app.js';
 import { memberName } from '../store.js';
@@ -24,8 +24,8 @@ export function renderStagiaires(main) {
 
   main.innerHTML = `
     <div class="page-header">
-      <h1>Stagiaires</h1>
-      <span class="sub">${groups.size} stagiaire(s) — parcours complet par personne</span>
+      <h1>Dossiers</h1>
+      <span class="sub">${groups.size} dossier(s) — parcours complet par stagiaire, statut et entreprise</span>
       <div class="page-actions">
         <button class="btn" id="btn-add">➕ Inscrire un stagiaire</button>
       </div>
@@ -55,12 +55,20 @@ export function renderStagiaires(main) {
 function groupCard(state, g) {
   const errCount = g.rows.reduce((n, r) => n + r.errors.length, 0);
   const recos = [...new Set(g.rows.map((r) => r.formation?.reco).filter(Boolean))];
+  const entreprise = g.rows.map((r) => r.insc.entreprise).find(Boolean);
+  const statuts = new Set(g.rows.map((r) => r.insc.statut || 'confirmee'));
+  const statutBadges = [
+    statuts.has('pre') ? '<span class="badge badge-warn">🕐 pré-réservé</span>' : '',
+    statuts.has('annulee') ? '<span class="badge badge-cancel">✕ annulé (partiel)</span>' : '',
+    !statuts.has('pre') && !statuts.has('annulee') ? '<span class="badge badge-ok">✓ confirmé</span>' : '',
+  ].filter(Boolean).join(' ');
 
   // Parcours chronologique
   const steps = [];
   for (const r of g.rows) {
     const i = r.insc;
-    if (i.datePratique) steps.push({ date: i.datePratique, start: i.debutPratique ?? 0, label: `Formation ${short(r)}`, time: `${fmtTime(i.debutPratique)} → ${fmtTime(r.finPratique)}`, who: memberName(state, r.formateurEffectif), id: i.id, err: r.errors.length });
+    const cancelled = r.cancelled;
+    if (i.datePratique) steps.push({ date: i.datePratique, start: i.debutPratique ?? 0, label: `Formation ${short(r)}${cancelled ? ' (annulée)' : ''}`, time: `${fmtTime(i.debutPratique)} → ${fmtTime(r.finPratique)}`, who: memberName(state, r.formateurEffectif), id: i.id, err: r.errors.length, cancelled });
     if (i.dateTheorie) steps.push({ date: i.dateTheorie, start: state.params.theoryTime, label: `Test théorique ${r.formation?.reco || ''}`, time: `${fmtTime(state.params.theoryTime)} → ${fmtTime(state.params.theoryTime + state.params.theoryDuration)}`, who: memberName(state, r.testeurTheorie), id: i.id, err: 0 });
     if (i.dateTestPratique && r.formation?.tests) steps.push({ date: i.dateTestPratique, start: i.debutTestPratique ?? 0, label: `Test pratique ${short(r)}`, time: `${fmtTime(i.debutTestPratique)} → ${fmtTime(r.finTestPratique)}`, who: memberName(state, r.testeurEffectif), id: i.id, err: 0 });
   }
@@ -70,8 +78,10 @@ function groupCard(state, g) {
     <div class="card">
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
         <h2 style="margin:0">${esc(g.name)}</h2>
+        ${entreprise ? `<span class="muted">${esc(entreprise)}</span>` : ''}
+        ${statutBadges}
         ${recos.map((r) => `<span class="badge badge-info">${esc(r)}</span>`).join('')}
-        ${errCount ? `<span class="badge badge-error">⚠ ${errCount} anomalie(s)</span>` : '<span class="badge badge-ok">✓ OK</span>'}
+        ${errCount ? `<span class="badge badge-error">⚠ ${errCount} anomalie(s)</span>` : ''}
         <span class="muted">${g.rows.length} catégorie(s)</span>
         <button class="btn btn-secondary btn-sm" style="margin-left:auto" data-addcat="${esc(g.name)}">➕ Autre catégorie</button>
       </div>
@@ -80,7 +90,7 @@ function groupCard(state, g) {
           <thead><tr><th>Date</th><th>Horaire</th><th>Étape</th><th>Intervenant</th><th></th></tr></thead>
           <tbody>
             ${steps.map((s) => `
-              <tr class="${s.err ? 'row-error' : ''}">
+              <tr class="${s.err ? 'row-error' : ''} ${s.cancelled ? 'row-cancelled' : ''}">
                 <td>${fmtDateShort(s.date)}</td>
                 <td>${s.time}</td>
                 <td>${esc(s.label)}</td>

@@ -48,6 +48,7 @@ function buildEvents(state, days) {
   const daySet = new Set(days);
 
   for (const row of rows) {
+    if (row.cancelled) continue;
     const i = row.insc;
     if (daySet.has(i.datePratique) && i.debutPratique != null) {
       events.push({
@@ -68,7 +69,7 @@ function buildEvents(state, days) {
   // Théorie : un événement de groupe par jour concerné
   for (const date of days) {
     if (!theoryTesters.has(date)) continue;
-    const candidates = [...new Set(rows.filter((r) => r.insc.dateTheorie === date).map((r) => r.insc.stagiaire))];
+    const candidates = [...new Set(rows.filter((r) => !r.cancelled && r.insc.dateTheorie === date).map((r) => r.insc.stagiaire))];
     if (!candidates.length) continue;
     events.push({
       date, start: state.params.theoryTime, end: state.params.theoryTime + state.params.theoryDuration,

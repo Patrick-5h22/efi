@@ -22,6 +22,7 @@ export function computeSchedule(state) {
       insc,
       formation,
       duree,
+      cancelled: insc.statut === 'annulee',
       finPratique: insc.debutPratique != null ? insc.debutPratique + duree : null,
       finTestPratique: insc.debutTestPratique != null ? insc.debutTestPratique + params.practicalTestDuration : null,
       heureTheorie: insc.dateTheorie ? params.theoryTime : null,
@@ -34,7 +35,8 @@ export function computeSchedule(state) {
   });
 
   // --- Théorie : jours où au moins un candidat a un test théorique ---
-  const theoryDays = new Set(rows.filter((r) => r.insc.dateTheorie).map((r) => r.insc.dateTheorie));
+  const active = rows.filter((r) => !r.cancelled);
+  const theoryDays = new Set(active.filter((r) => r.insc.dateTheorie).map((r) => r.insc.dateTheorie));
 
   // --- Affectation automatique -------------------------------------------
   // busy[personId] = liste d'intervalles { date, start, end, kind, formation, inscId }
@@ -87,7 +89,7 @@ export function computeSchedule(state) {
   // évite ensuite le formateur du candidat)
   for (const row of rows) {
     const { insc, formation } = row;
-    if (!formation || !insc.datePratique || insc.debutPratique == null) continue;
+    if (row.cancelled || !formation || !insc.datePratique || insc.debutPratique == null) continue;
     const { datePratique: date, debutPratique: start } = insc;
     const end = row.finPratique;
     if (insc.formateurId) {
@@ -106,7 +108,7 @@ export function computeSchedule(state) {
   for (const date of theoryDays) {
     let tester = dayAssign(date).testeur || null;
     if (!tester) {
-      const candidatesRows = rows.filter((r) => r.insc.dateTheorie === date && r.formation?.tests);
+      const candidatesRows = active.filter((r) => r.insc.dateTheorie === date && r.formation?.tests);
       const codes = candidatesRows.map((r) => r.formation.code);
       const trainerIds = new Set(candidatesRows.map((r) => r.formateurEffectif).filter(Boolean));
       const okFor = (m) => codes.length ? codes.some((c) => qualified(m.id, c, 'T'))
@@ -122,7 +124,7 @@ export function computeSchedule(state) {
   // Passe 3 — testeurs effectifs des tests pratiques (ordre des inscriptions)
   for (const row of rows) {
     const { insc, formation } = row;
-    if (!formation) continue;
+    if (row.cancelled || !formation) continue;
 
     if (insc.dateTestPratique && insc.debutTestPratique != null && formation.tests) {
       const { dateTestPratique: date, debutTestPratique: start } = insc;
@@ -143,7 +145,7 @@ export function computeSchedule(state) {
   }
 
   // --- Contrôles ----------------------------------------------------------
-  validateRows(rows, { state, params, openDays, validDays, theoryDays, theoryTesters, qualified });
+  validateRows(active, { state, params, openDays, validDays, theoryDays, theoryTesters, qualified });
 
   return {
     rows,
@@ -151,7 +153,7 @@ export function computeSchedule(state) {
     theoryTesters,
     // Nombre de candidats au test théorique du jour (stagiaires uniques)
     theoryCandidates: (date) => new Set(
-      rows.filter((r) => r.insc.dateTheorie === date).map((r) => r.insc.stagiaire.toLowerCase())
+      rows.filter((r) => !r.cancelled && r.insc.dateTheorie === date).map((r) => r.insc.stagiaire.toLowerCase())
     ).size,
   };
 }
@@ -397,6 +399,49 @@ function crossChecks(a, b, params) {
 
 export function statutOf(row) {
   return row.errors.length ? row.errors : null;
+}
+
+// ---------------------------------------------------------------------------
+// Occupation par jour (heatmap) : créneaux réservés / créneaux offerts
+// (2 ressources — formateur et testeur — × créneaux de la journée).
+// ---------------------------------------------------------------------------
+export function occupancyByDay(state, schedule) {
+  const { params } = state;
+  const slotsPerDay = Math.floor((params.dayEnd - params.dayStart) / params.slotMinutes);
+  const openSet = new Set(state.openDays);
+  const out = new Map(); // date -> { busy, total, ratio, errors }
+
+  const ensure = (date) => {
+    if (!out.has(date)) {
+      out.set(date, { busy: 0, total: openSet.has(date) ? slotsPerDay * 2 : 0, ratio: 0, errors: 0 });
+    }
+    return out.get(date);
+  };
+
+  for (const day of state.openDays) ensure(day);
+
+  for (const r of schedule.rows) {
+    if (r.cancelled) continue;
+    const i = r.insc;
+    if (i.datePratique && i.debutPratique != null) {
+      ensure(i.datePratique).busy += r.duree / params.slotMinutes;
+    }
+    if (i.dateTestPratique && i.debutTestPratique != null && r.formation?.tests) {
+      ensure(i.dateTestPratique).busy += params.practicalTestDuration / params.slotMinutes;
+    }
+    if (r.errors.length && i.datePratique) ensure(i.datePratique).errors += 1;
+  }
+  // Théorie : un créneau testeur par jour concerné
+  for (const [date] of schedule.theoryTesters) {
+    if (schedule.theoryCandidates(date) > 0) {
+      ensure(date).busy += state.params.theoryDuration / params.slotMinutes;
+    }
+  }
+
+  for (const v of out.values()) {
+    v.ratio = v.total ? v.busy / v.total : 0;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

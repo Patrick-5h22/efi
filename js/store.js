@@ -68,6 +68,11 @@ export function addInscription(state, data) {
     debutTestPratique: data.debutTestPratique ?? null,
     formateurId: data.formateurId || null, // choix manuel (sinon affectation auto)
     testeurId: data.testeurId || null,
+    // Dossier de réservation
+    entreprise: (data.entreprise || '').trim() || null,
+    siret: (data.siret || '').trim() || null,
+    statut: data.statut || 'confirmee', // pre | confirmee | annulee
+    motifAnnulation: (data.motifAnnulation || '').trim() || null,
   };
   state.inscriptions.push(insc);
   return insc;
@@ -120,6 +125,9 @@ export function migrate(state) {
   state.openDays = state.openDays || [];
   state.dayAssignments = state.dayAssignments || {};
   state.inscriptions = state.inscriptions || [];
+  for (const i of state.inscriptions) {
+    if (!i.statut) i.statut = 'confirmee';
+  }
   state.nextId = state.nextId || (Math.max(0, ...state.inscriptions.map((i) => i.id)) + 1);
   return state;
 }

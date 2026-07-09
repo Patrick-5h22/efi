@@ -9,7 +9,7 @@ import { buildICS, downloadICS } from '../ics.js';
 import { importInscriptionsCSV } from '../csv.js';
 import { addInscription } from '../store.js';
 
-const filters = { search: '', week: '', status: '' };
+const filters = { search: '', week: '', status: '', dossier: '' };
 let sortKey = 'id';
 let sortDir = 1;
 
@@ -32,6 +32,7 @@ export function renderInscriptions(main) {
     if (filters.week && String(row.semaine) !== filters.week) return false;
     if (filters.status === 'ok' && row.errors.length) return false;
     if (filters.status === 'error' && !row.errors.length) return false;
+    if (filters.dossier && (row.insc.statut || 'confirmee') !== filters.dossier) return false;
     return true;
   }).sort((a, b) => {
     const ka = SORTERS[sortKey](a); const kb = SORTERS[sortKey](b);
@@ -69,6 +70,14 @@ export function renderInscriptions(main) {
             <option value="error" ${filters.status === 'error' ? 'selected' : ''}>⚠ Anomalies</option>
           </select>
         </label>
+        <label class="field">Dossier
+          <select id="f-dossier">
+            <option value="">Tous</option>
+            <option value="pre" ${filters.dossier === 'pre' ? 'selected' : ''}>🕐 Pré-réservés</option>
+            <option value="confirmee" ${filters.dossier === 'confirmee' ? 'selected' : ''}>✓ Confirmés</option>
+            <option value="annulee" ${filters.dossier === 'annulee' ? 'selected' : ''}>✕ Annulés</option>
+          </select>
+        </label>
       </div>
     </div>
 
@@ -94,6 +103,7 @@ export function renderInscriptions(main) {
   main.querySelector('#f-search').addEventListener('input', (e) => { filters.search = e.target.value; renderInscriptions(main); focusEnd(main, '#f-search'); });
   main.querySelector('#f-week').addEventListener('change', (e) => { filters.week = e.target.value; renderInscriptions(main); });
   main.querySelector('#f-status').addEventListener('change', (e) => { filters.status = e.target.value; renderInscriptions(main); });
+  main.querySelector('#f-dossier').addEventListener('change', (e) => { filters.dossier = e.target.value; renderInscriptions(main); });
   main.querySelector('#btn-csv').addEventListener('click', () => exportCSV(state, rows));
   main.querySelector('#btn-ics').addEventListener('click', () => downloadICS(buildICS(state, app.schedule), 'efi-planning.ics'));
   const csvInput = main.querySelector('#csv-file');
@@ -157,10 +167,13 @@ function rowHTML(state, row) {
     ? (row.testeurEffectif ? esc(memberName(state, row.testeurEffectif)) + (insc.testeurId ? manuel : '') : '<span class="badge badge-warn">—</span>')
     : '<span class="muted">n/a</span>';
 
+  const statutBadge = insc.statut === 'annulee'
+    ? `<span class="badge badge-cancel" title="${esc(insc.motifAnnulation || '')}">✕ annulée</span>`
+    : insc.statut === 'pre' ? '<span class="badge badge-warn">🕐 pré-rés.</span>' : '';
   return `
-    <tr class="${row.errors.length ? 'row-error' : ''}">
+    <tr class="${row.errors.length ? 'row-error' : ''} ${row.cancelled ? 'row-cancelled' : ''}">
       <td>${insc.id}</td>
-      <td><b>${esc(insc.stagiaire)}</b></td>
+      <td><b>${esc(insc.stagiaire)}</b>${insc.entreprise ? `<br><span class="muted">${esc(insc.entreprise)}</span>` : ''}${statutBadge ? '<br>' + statutBadge : ''}</td>
       <td>${esc(formation?.label || insc.formation || '?')}</td>
       <td>${esc(insc.type)}</td>
       <td>${fmtTime(row.duree).replace(':', 'h')}</td>

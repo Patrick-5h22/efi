@@ -119,8 +119,8 @@ function assignRowsHTML(state, days, openSet) {
     const open = openSet.has(date);
     const a = state.dayAssignments[date] || {};
     const sameBoth = a.formateur && a.formateur === a.testeur;
-    const nPratique = rows.filter((r) => r.insc.datePratique === date).length;
-    const nTests = rows.filter((r) => r.insc.dateTestPratique === date).length;
+    const nPratique = rows.filter((r) => !r.cancelled && r.insc.datePratique === date).length;
+    const nTests = rows.filter((r) => !r.cancelled && r.insc.dateTestPratique === date).length;
     const nTheorie = app.schedule.theoryCandidates(date);
     const activity = [
       nPratique ? `${nPratique} pratique(s)` : '',

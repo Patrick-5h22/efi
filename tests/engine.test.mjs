@@ -353,3 +353,39 @@ test('intervenant en formation et en test en même temps détecté (choix manuel
   const { rows } = computeSchedule(state);
   assert.ok(rows[1].errors.some((e) => e.includes('formation et en test en même temps')), rows[1].errors.join('; '));
 });
+
+test('dossier annulé : libère le créneau et sort des contrôles', () => {
+  const state = defaultState();
+  // Deux pratiques identiques avec le même formateur : conflit…
+  for (const [nom, statut] of [['A Un', 'confirmee'], ['B Deux', 'confirmee']]) {
+    addInscription(state, {
+      stagiaire: nom, formation: 'R489-1A', type: 'Initial', statut,
+      datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p1',
+      dateTheorie: '2026-09-01',
+      dateTestPratique: '2026-09-01', debutTestPratique: nom === 'A Un' ? 600 : 780, testeurId: 'p2',
+    });
+  }
+  let { rows } = computeSchedule(state);
+  assert.ok(rows[0].errors.some((e) => e.includes('simultanés')));
+  // … qui disparaît quand B est annulé
+  state.inscriptions[1].statut = 'annulee';
+  ({ rows } = computeSchedule(state));
+  assert.deepEqual(rows[0].errors, [], rows[0].errors.join('; '));
+  assert.ok(rows[1].cancelled);
+  assert.deepEqual(rows[1].errors, []);
+  assert.equal(rows[1].formateurEffectif, null);
+});
+
+test('occupation par jour : calcul de la heatmap', async () => {
+  const { occupancyByDay } = await import('../js/engine.js');
+  const state = seedExamples(defaultState());
+  const schedule = computeSchedule(state);
+  const occ = occupancyByDay(state, schedule);
+  // 01/09 : pratiques 1h30+1h30+1h30 (9 créneaux) + tests 1h×3 (6) + théorie 1h (2) = 17 / 36
+  const d1 = occ.get('2026-09-01');
+  assert.equal(d1.total, 36);
+  assert.equal(d1.busy, 17);
+  assert.ok(Math.abs(d1.ratio - 17 / 36) < 1e-9);
+  // 02/09 : 2h de pratique = 4 créneaux
+  assert.equal(occ.get('2026-09-02').busy, 4);
+});

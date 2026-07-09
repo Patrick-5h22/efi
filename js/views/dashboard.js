@@ -2,7 +2,8 @@
 
 import { app, esc } from '../app.js';
 import { memberName } from '../store.js';
-import { workingDays, periodWeeks, fmtDateShort, fmtTime, isoWeek } from '../dates.js';
+import { workingDays, periodWeeks, fmtDateShort, fmtTime, isoWeek, weekDays, fmtDateDay } from '../dates.js';
+import { occupancyByDay } from '../engine.js';
 import { openInscriptionForm } from './form.js';
 
 export function renderDashboard(main) {
@@ -93,15 +94,61 @@ export function renderDashboard(main) {
     </div>
 
     <div class="card">
-      <h2>🗓 Accès rapide aux semaines</h2>
-      <div class="form-row">
-        ${weeks.map((w) => {
-          const n = rows.filter((r) => r.semaine === w.week).length;
-          return `<a class="btn ${n ? '' : 'btn-secondary'}" href="#/semaine/${w.week}" style="font-size:12px">S${w.week}${n ? ` (${n})` : ''}</a>`;
-        }).join('')}
-      </div>
+      <h2>🔥 Occupation de la période</h2>
+      ${heatmapHTML(state, weeks)}
     </div>
   `;
 
   main.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => openInscriptionForm({ id: Number(b.dataset.edit) })));
+  main.querySelectorAll('.hm-cell[data-week], .hm-week').forEach((el) => {
+    const go = () => { location.hash = '#/semaine/' + el.dataset.week; };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Heatmap : 1 colonne par semaine, 1 ligne par jour (lun-ven), couleur =
+// taux d'occupation des créneaux offerts (formateur + testeur).
+// ---------------------------------------------------------------------------
+const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven'];
+
+function heatmapHTML(state, weeks) {
+  const occ = occupancyByDay(state, app.schedule);
+  const openSet = new Set(state.openDays);
+  const holidays = new Set((state.params.holidays || []).map((h) => h.date || h));
+  const level = (ratio) => ratio <= 0 ? 0 : ratio <= 0.25 ? 1 : ratio <= 0.5 ? 2 : ratio <= 0.75 ? 3 : 4;
+
+  const cols = weeks.map(({ week, monday }) => {
+    const cells = weekDays(monday).map((date) => {
+      const inPeriod = date >= state.params.periodStart && date <= state.params.periodEnd;
+      if (!inPeriod) return '<span class="hm-cell hm-out"></span>';
+      if (holidays.has(date)) return `<span class="hm-cell hm-holiday" title="${fmtDateDay(date)} — férié"></span>`;
+      if (!openSet.has(date)) return `<span class="hm-cell hm-closed" title="${fmtDateDay(date)} — fermé (EFI)"></span>`;
+      const d = occ.get(date) || { busy: 0, total: 0, ratio: 0, errors: 0 };
+      const pct = Math.round(d.ratio * 100);
+      const hours = (d.busy * state.params.slotMinutes / 60).toFixed(1).replace('.', ',').replace(',0', '');
+      const title = `${fmtDateDay(date)} — ${pct} % (${hours} h réservées)${d.errors ? ` — ⚠ ${d.errors} anomalie(s)` : ''}`;
+      return `<span class="hm-cell hm-${level(d.ratio)} ${d.errors ? 'hm-alert' : ''}" data-week="${week}"
+        tabindex="0" role="button" title="${title}" aria-label="${title}"></span>`;
+    }).join('');
+    return `<div class="hm-col">${cells}<span class="hm-week" data-week="${week}">${week}</span></div>`;
+  }).join('');
+
+  return `
+    <div class="hm-wrap">
+      <div class="hm-days">${DAY_LABELS.map((d) => `<span>${d}</span>`).join('')}<span></span></div>
+      <div class="hm-grid">${cols}</div>
+    </div>
+    <div class="legend" style="margin-top:10px">
+      <span>Occupation :</span>
+      <span>0 %</span>
+      ${[0, 1, 2, 3, 4].map((l) => `<span class="chip hm-${l}" style="border-radius:3px"></span>`).join('')}
+      <span>100 %</span>
+      <span style="margin-left:12px"><span class="chip hm-closed"></span>Fermé</span>
+      <span><span class="chip hm-holiday"></span>Férié</span>
+      <span><span class="chip hm-1 hm-alert"></span>Anomalie</span>
+      <span class="muted">— cliquer sur un jour ou un n° ouvre la semaine</span>
+    </div>
+  `;
 }
