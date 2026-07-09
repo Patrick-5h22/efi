@@ -134,7 +134,16 @@ function gridHTML(state, days, kind) {
       return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button" aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"></td>`;
     }).join('');
 
-    return `<tr><td class="day-col">${fmtDateDay(date)}</td><td class="who-col">${who}</td>${cells}</tr>`;
+    // Charge de formation pratique du jour (grille formateur)
+    let loadInfo = '';
+    if (kind === 'F' && open && inPeriod) {
+      const load = rows.reduce((sum, r) => sum + (r.insc.datePratique === date && r.insc.debutPratique != null ? r.duree : 0), 0);
+      if (load > 0) {
+        const over = load > state.params.maxDailyLoad;
+        loadInfo = `<br><span style="font-weight:400;font-size:10px;color:${over ? 'var(--error)' : 'var(--text-dim)'}">${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''} / ${fmtTime(state.params.maxDailyLoad).replace(':', 'h')}</span>`;
+      }
+    }
+    return `<tr><td class="day-col">${fmtDateDay(date)}${loadInfo}</td><td class="who-col">${who}</td>${cells}</tr>`;
   }).join('');
 
   return `<table class="planning">${head}${body}</table>`;
