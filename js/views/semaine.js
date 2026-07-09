@@ -58,9 +58,9 @@ export function renderSemaine(main, args) {
       : { dateTestPratique: td.dataset.date, debutTestPratique: Number(td.dataset.time) });
     td.addEventListener('click', open);
     td.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
-    td.title = td.dataset.kind === 'F'
-      ? 'Inscrire une formation pratique sur ce créneau'
-      : 'Réserver un test pratique sur ce créneau';
+    td.title = `${fmtDateDay(td.dataset.date)} ${fmtTime(Number(td.dataset.time))} — ` + (td.dataset.kind === 'F'
+      ? 'inscrire une formation pratique'
+      : 'réserver un test pratique');
   });
 
   // Clic sur un créneau occupé = éditer l'inscription
@@ -133,7 +133,8 @@ function gridHTML(state, days, kind) {
         const label = occupants.map((r) => `<span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || ''))}</span><span class="slot-detail">${esc(kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?') : 'Testeur : ' + (memberName(state, r.testeurEffectif) || '?'))}</span>`).join('<hr style="margin:2px 0;border:none;border-top:1px dashed var(--grid-line)">');
         const inscAttr = occupants.length === 1 ? ` data-insc="${occupants[0].insc.id}"` : '';
         const pre = occupants.every((r) => r.insc.statut === 'pre') ? ' slot-pre' : '';
-        return `<td class="slot-busy${pre}"${inscAttr}>${label}</td>`;
+        const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`).join(' | ');
+        return `<td class="slot-busy${pre}"${inscAttr} title="${esc(tip)}">${label}</td>`;
       }
 
       return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button" aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"></td>`;

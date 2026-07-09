@@ -313,6 +313,11 @@ table.cal td.cal-empty { background: var(--background); }
 .theme-check { margin-left: auto; color: var(--primary); font-weight: 700; }
 .theme-sep { border-top: 1px solid var(--border); margin: 5px 0; }
 
+/* ---------- Touches néon (uniquement si le preset définit --neon-glow) ---------- */
+.dark[data-theme="neon"] .kpi-value { text-shadow: 0 0 14px oklch(0.82 0.15 195 / 35%); }
+.dark[data-theme="neon"] dialog { box-shadow: 0 0 0 1px var(--border), 0 0 28px oklch(0.82 0.15 195 / 18%); }
+.dark[data-theme="neon"] td.slot-free:hover { box-shadow: inset 0 0 12px oklch(0.82 0.15 195 / 25%); }
+
 /* ---------- Palette de commandes (Ctrl+K) ---------- */
 dialog.cmdk {
   width: min(560px, 94vw); max-width: 560px;
@@ -375,4 +380,6 @@ dialog.cmdk {
   .page-header h1 { font-size: 17px; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   dialog { width: 96vw; }
+  .theme-pop { bottom: auto; top: calc(100% + 6px); }
+  dialog.cmdk { margin-top: 6vh; }
 }

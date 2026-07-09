@@ -36,6 +36,12 @@ Score sur 100, mis à jour à chaque itération.
 | 11 | 80/100 | Cartes Dossiers façon card-jour : liseré primary quand le dossier est actif, atténuées quand tout est annulé |
 | 12 | 81/100 | Heatmap : jours 100 % pré-réservés cerclés de pointillés (cohérent avec les grilles) |
 | 13 | 85/100 | Palette de commandes Ctrl+K (composant « command » de la référence) : navigation, semaines, dossiers, thèmes et actions, filtrage accent-insensible, clavier complet — 7 vérifications navigateur ; le preset Néon force le sombre depuis tout mode |
+| 14 | 86/100 | Mobile : menu thème repositionné sous le bouton (sidebar en haut), palette Ctrl+K remontée, zéro débordement re-vérifié |
+| 15 | 87/100 | Revue sombre systématique des 6 vues restantes (équipe, paramètres, jours, planning global, dossiers, aide) : calendriers, champs, badges et selects tous lisibles |
+| 16 | 88/100 | Audit : correction du script de vérification (le hash routing ne recharge pas le thème) — les captures sombres attestent maintenant du vrai rendu |
+| 17 | 89/100 | Touches néon finales : halo sur valeurs KPI, lueur des dialogs, hover lumineux des créneaux libres (uniquement quand le preset définit --neon-glow) |
+| 18 | 90/100 | Tooltips enrichis des grilles : date + heure sur créneaux libres, stagiaires + formation + statut sur créneaux occupés |
+| 19 | 92/100 | Batterie complète verte : 47 tests Node, e2e 10/10, sync 8/8, palette 7/7, phase 1 11/11, mobile ; captures docs régénérées dans la nouvelle interface (dont thème sombre et néon) |
 
 ## Référence (extraite de efi-placement)
 
