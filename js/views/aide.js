@@ -81,6 +81,9 @@ export function renderAide(main) {
         <li><b>Import CSV</b> (page Inscriptions) : reprend un export CSV de l'onglet « Inscriptions » du classeur Excel —
           en-têtes reconnues automatiquement, formations et intervenants résolus par libellé, lignes invalides ignorées avec raison.</li>
         <li><b>Import JSON</b> : restaure une sauvegarde complète (paramètres, équipe, jours, inscriptions).</li>
+        <li><b>☁ Base partagée</b> : cliquer sur le nuage de la barre latérale et saisir le code d'accès pour
+          charger le planning commun et synchroniser automatiquement chaque modification entre les postes
+          (☁✓ synchronisé, ☁⚠ erreur — les données restent aussi en local).</li>
       </ul>
     </div>
 

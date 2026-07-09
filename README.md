@@ -24,6 +24,9 @@ python3 -m http.server 8080
 
 Les données sont sauvegardées automatiquement dans le navigateur
 (localStorage) et peuvent être exportées/importées en JSON.
+Une **base partagée Supabase** permet de synchroniser le planning entre
+plusieurs postes : bouton ☁ de la barre latérale + code d'accès
+(voir [docs/SUPABASE.md](docs/SUPABASE.md)).
 
 **Migration depuis le classeur Excel** : enregistrer l'onglet
 « Inscriptions » au format CSV puis l'importer depuis la page
