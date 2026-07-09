@@ -1,0 +1,10 @@
+{
+  "name": "efi-planning",
+  "version": "1.0.0",
+  "description": "Planification des formations pratiques & tests EFI",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "start": "python3 -m http.server 8080"
+  }
+}
