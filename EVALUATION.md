@@ -44,6 +44,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 21 | 95/100 | 24/14/10,5/15/17/9,5/4/4,5/4 | Correction directe depuis les anomalies du tableau de bord, semaine par défaut = première semaine avec activité (grilles + synthèse) |
 | 22 | 96/100 | 24/14/10,5/15/17/9,5/5/4,5/4 | Import CSV des inscriptions (migration depuis le classeur) : en-têtes reconnues par mots-clés, dates JJ/MM/AAAA ou ISO, lignes invalides ignorées avec raison, 35 tests |
 | 23 | 98/100 | 25/15/11/15/17/10/5/4,5/4 | Migration réelle validée : le CSV exporté du classeur s'importe 4/4 ✓ OK avec les mêmes intervenants (fixture en test d'intégration) ; affectation auto en 3 passes qui évite formateur=testeur du candidat ; nouveau contrôle « intervenant en formation et en test en même temps » ; heures HH:MM:SS acceptées ; 38 tests |
+| 24 | 98,5/100 | 25/15/11/15/17/10/5/4,5/5 | Documentation complète : outils pratiques (suggestion, undo, exports, imports) dans le mode d'emploi intégré, procédure de migration Excel dans le README |
 
 ## Prochaines pistes
 

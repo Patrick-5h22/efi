@@ -73,6 +73,18 @@ export function renderAide(main) {
     </div>
 
     <div class="card">
+      <h2>Outils pratiques</h2>
+      <ul>
+        <li><b>💡 Proposer des créneaux</b> (formulaire d'inscription) : trouve la première combinaison pratique + test + théorie sans conflit.</li>
+        <li><b>Annuler / Rétablir</b> : Ctrl+Z / Ctrl+Y (ou les boutons ↩ ↪ de la barre latérale), 50 niveaux.</li>
+        <li><b>Exports</b> : sauvegarde JSON complète (barre latérale), CSV des inscriptions, calendrier .ics (Outlook / Google Agenda).</li>
+        <li><b>Import CSV</b> (page Inscriptions) : reprend un export CSV de l'onglet « Inscriptions » du classeur Excel —
+          en-têtes reconnues automatiquement, formations et intervenants résolus par libellé, lignes invalides ignorées avec raison.</li>
+        <li><b>Import JSON</b> : restaure une sauvegarde complète (paramètres, équipe, jours, inscriptions).</li>
+      </ul>
+    </div>
+
+    <div class="card">
       <h2>Remarques</h2>
       <ul>
         <li>La théorie e-learning en autonomie (3h, tablettes) ne mobilise ni formateur ni testeur : elle n'est pas planifiée dans cet outil.</li>

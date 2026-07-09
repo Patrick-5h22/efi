@@ -25,6 +25,11 @@ python3 -m http.server 8080
 Les données sont sauvegardées automatiquement dans le navigateur
 (localStorage) et peuvent être exportées/importées en JSON.
 
+**Migration depuis le classeur Excel** : enregistrer l'onglet
+« Inscriptions » au format CSV puis l'importer depuis la page
+Inscriptions (bouton « ⬆ CSV ») — les en-têtes, formations et
+intervenants sont reconnus automatiquement.
+
 ## Principe
 
 - Deux ressources gérées en parallèle : le **FORMATEUR** (formations
