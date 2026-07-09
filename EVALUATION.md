@@ -36,6 +36,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 13 | 88/100 | 24/14/10/14/16/7/3/4/1 | Contrôle « Testeur théorie non habilité » (affectation manuelle du jour hors habilitations), 30 tests |
 | 14 | 89/100 | 24/14/10/14/16/8/3/4/1 | Intégration continue GitHub Actions : les 30 tests du moteur s'exécutent à chaque push |
 | 15 | 90/100 | 24/14/10/14/16/8/4/4/1 | Export calendrier .ics (Europe/Paris) : toutes les réservations ou une semaine, importable dans Outlook / Google Agenda, 31 tests |
+| 16 | 92/100 | 24/14/10/14/16/8/4/4/4 | Documentation illustrée : 7 captures d'écran, guide de démarrage en 5 étapes dans le README |
 
 ## Prochaines pistes
 

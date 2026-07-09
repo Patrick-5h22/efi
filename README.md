@@ -2,12 +2,15 @@
 
 Application web de gestion des réservations du plateau technique EFI :
 formations pratiques et tests CACES (R489, R486) et Habilitation électrique,
-sur la période du **01/09/2026 au 31/12/2026** (86 jours ouvrés).
+sur la période du **01/09/2026 au 31/12/2026** (86 jours ouvrés, période
+modifiable).
 
 Transposition fidèle du classeur Excel « Planification EFI v4.2 » :
 même principe (1 ligne = 1 stagiaire × 1 catégorie), mêmes contrôles
 automatiques, mêmes vues (grilles semaine, synthèse imprimable, plannings
 formateur/testeur), avec en plus le confort d'une vraie application.
+
+![Grille semaine](docs/screenshots/grille-semaine.png)
 
 ## Lancer l'application
 
@@ -36,11 +39,33 @@ Les données sont sauvegardées automatiquement dans le navigateur
 - Affectation automatique d'un intervenant habilité et libre (priorité à
   l'intervenant du jour), testing croisé possible.
 
+## Guide de démarrage
+
+1. **Équipe** : saisir les intervenants et cocher leurs habilitations
+   (F = former, T = tester) par spécialité.
+2. **Jours EFI** : cliquer sur le calendrier pour ouvrir les jours du
+   plateau technique ; affecter éventuellement un formateur/testeur du jour.
+3. **Inscrire** : depuis la page Inscriptions, un créneau vert d'une grille
+   semaine, ou le bouton « ➕ » — le bouton « 💡 Proposer des créneaux »
+   trouve automatiquement la première combinaison sans conflit.
+4. **Vérifier** : la colonne STATUT signale toute anomalie en rouge
+   (conflits d'intervenants, capacité, charge, jours fermés…).
+5. **Distribuer** : imprimer la Synthèse semaine (feuille de route) ou
+   exporter en `.ics` vers Outlook / Google Agenda.
+
+| | |
+|---|---|
+| ![Tableau de bord](docs/screenshots/tableau-de-bord.png) | ![Inscriptions](docs/screenshots/inscriptions.png) |
+| ![Formulaire](docs/screenshots/formulaire.png) | ![Stagiaires](docs/screenshots/stagiaires.png) |
+| ![Synthèse](docs/screenshots/synthese.png) | ![Jours EFI](docs/screenshots/jours-efi.png) |
+
 ## Tests
 
 ```bash
 node --test tests/*.test.mjs
 ```
+
+Les tests s'exécutent aussi en CI (GitHub Actions) à chaque push.
 
 ## Architecture
 
