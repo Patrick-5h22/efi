@@ -30,6 +30,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 7 | 78/100 | 21/13/10/12/13/7/3/1/1 | Bouton « 💡 Proposer des créneaux » : recherche automatique de la première combinaison pratique + test + théorie sans conflit (théorie omise si déjà planifiée pour la recommandation), 29 tests |
 | 8 | 80/100 | 22/13/10/13/14/7/3/1/1 | Vue Stagiaires : parcours chronologique complet par personne (formations, tests, théorie, intervenants), ajout rapide d'une autre catégorie |
 | 9 | 82/100 | 22/13/10/13/14/7/3/4/1 | Accessibilité : créneaux et calendrier utilisables au clavier (Enter/Espace), focus visible, rôles ARIA, landmarks |
+| 10 | 84/100 | 22/13/10/13/16/7/3/4/1 | Annuler/Rétablir (Ctrl+Z / Ctrl+Y, 50 niveaux) vérifié par test navigateur |
 
 ## Prochaines pistes
 

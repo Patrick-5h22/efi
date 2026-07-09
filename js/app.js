@@ -17,17 +17,46 @@ import { renderAide } from './views/aide.js';
 // ---------------------------------------------------------------------------
 // État global
 // ---------------------------------------------------------------------------
+const HISTORY_MAX = 50;
+
 export const app = {
   state: null,
   schedule: null, // résultat de computeSchedule, recalculé à chaque mutation
+  undoStack: [],
+  redoStack: [],
+  snapshot: null, // état sérialisé AVANT la mutation en cours
   save() {
     saveState(localStorage, this.state);
     this.schedule = computeSchedule(this.state);
   },
   commit() {
-    // mutation + sauvegarde + re-rendu
+    // mutation + historique + sauvegarde + re-rendu
+    if (this.snapshot != null) {
+      this.undoStack.push(this.snapshot);
+      if (this.undoStack.length > HISTORY_MAX) this.undoStack.shift();
+      this.redoStack = [];
+    }
     this.save();
+    this.snapshot = JSON.stringify(this.state);
     render();
+  },
+  undo() {
+    if (!this.undoStack.length) return toast('Rien à annuler.');
+    this.redoStack.push(JSON.stringify(this.state));
+    this.state = JSON.parse(this.undoStack.pop());
+    this.save();
+    this.snapshot = JSON.stringify(this.state);
+    render();
+    toast('Action annulée.', 'ok');
+  },
+  redo() {
+    if (!this.redoStack.length) return toast('Rien à rétablir.');
+    this.undoStack.push(JSON.stringify(this.state));
+    this.state = JSON.parse(this.redoStack.pop());
+    this.save();
+    this.snapshot = JSON.stringify(this.state);
+    render();
+    toast('Action rétablie.', 'ok');
   },
 };
 
@@ -39,6 +68,7 @@ function boot() {
   }
   app.state = state;
   app.schedule = computeSchedule(state);
+  app.snapshot = JSON.stringify(state);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,5 +183,12 @@ function setupImportExport() {
 // ---------------------------------------------------------------------------
 boot();
 setupImportExport();
+document.getElementById('btn-undo').addEventListener('click', () => app.undo());
+document.getElementById('btn-redo').addEventListener('click', () => app.redo());
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.target.closest('input, textarea, select, dialog')) return;
+  if (e.key === 'z') { e.preventDefault(); app.undo(); }
+  if (e.key === 'y' || (e.key === 'Z' && e.shiftKey)) { e.preventDefault(); app.redo(); }
+});
 window.addEventListener('hashchange', render);
 render();
