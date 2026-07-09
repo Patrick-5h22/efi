@@ -2,6 +2,7 @@
 
 import { loadState, saveState, defaultState, seedExamples, exportJSON, importJSON, migrate } from './store.js';
 import { createSyncer, loadRemoteState, getAccessCode, setAccessCode } from './db.js';
+import { applyTheme, watchSystemTheme, setupThemeMenu } from './theme.js';
 import { computeSchedule } from './engine.js';
 import { periodWeeks } from './dates.js';
 import { renderDashboard } from './views/dashboard.js';
@@ -249,6 +250,9 @@ function setupImportExport() {
 
 // ---------------------------------------------------------------------------
 boot();
+applyTheme();
+watchSystemTheme();
+setupThemeMenu(document.getElementById('theme-btn'), esc);
 setupImportExport();
 setupCloud();
 document.getElementById('btn-undo').addEventListener('click', () => app.undo());
