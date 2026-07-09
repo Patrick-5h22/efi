@@ -34,6 +34,7 @@ Auto-évaluation de la plateforme par rapport au classeur Excel « Planification
 | 11 | 85/100 | 22/13/10/14/16/7/3/4/1 | Impression : A4 paysage, couleurs des grilles conservées, feuille de route vérifiée en PDF, bouton imprimer sur les grilles semaine |
 | 12 | 87/100 | 24/13/10/14/16/7/3/4/1 | Période et jours fériés modifiables dans Paramètres : l'outil devient réutilisable pour les sessions suivantes (le classeur était figé sur sept–déc 2026) |
 | 13 | 88/100 | 24/14/10/14/16/7/3/4/1 | Contrôle « Testeur théorie non habilité » (affectation manuelle du jour hors habilitations), 30 tests |
+| 14 | 89/100 | 24/14/10/14/16/8/3/4/1 | Intégration continue GitHub Actions : les 30 tests du moteur s'exécutent à chaque push |
 
 ## Prochaines pistes
 
