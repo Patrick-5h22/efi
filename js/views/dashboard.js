@@ -50,6 +50,11 @@ export function renderDashboard(main) {
       <div class="kpi"><div class="kpi-value">${occupation}%<span style="font-size:13px;color:var(--muted-foreground)"> · ${heuresReservees.toFixed(0)} h</span></div><div class="kpi-label">🔥 Occupation des jours ouverts</div></div>
     </div>
 
+    <div class="card">
+      <h2>🔥 Occupation de la période</h2>
+      ${heatmapHTML(state, weeks)}
+    </div>
+
     ${errRows.length ? `
     <div class="card">
       <h2>⚠ Anomalies à corriger</h2>
@@ -93,11 +98,6 @@ export function renderDashboard(main) {
         </table>
       </div>` : `<p class="muted">Aucune inscription. Commencez par <a href="#/inscriptions">inscrire un stagiaire</a>
         ou ouvrez des <a href="#/jours">jours EFI</a>, puis cliquez sur un créneau vert d'une <a href="#/semaine/${weeks[0].week}">grille semaine</a>.</p>`}
-    </div>
-
-    <div class="card">
-      <h2>🔥 Occupation de la période</h2>
-      ${heatmapHTML(state, weeks)}
     </div>
   `;
 
@@ -143,7 +143,9 @@ function heatmapHTML(state, weeks) {
   // Ligne des mois : un label au début de chaque mois (au moins 2 semaines visibles)
   let lastMonth = null;
   const monthCells = weeks.map(({ monday }) => {
-    const m = Number(monday.slice(5, 7));
+    // Mois du jeudi de la semaine (représentatif, évite les chevauchements en bord de mois)
+    const thursday = weekDays(monday)[3];
+    const m = Number(thursday.slice(5, 7));
     if (m !== lastMonth) { lastMonth = m; return `<span class="hm-month">${MONTHS_SHORT[m - 1]}</span>`; }
     return '<span class="hm-month"></span>';
   }).join('');
