@@ -29,5 +29,16 @@ jobs:
       - name: Tests avant mise en production
         run: node --test tests/*.test.mjs
 
+      - name: Injecter le code d'accès (auto-connexion à la base partagée)
+        env:
+          EFI_ACCESS_CODE: ${{ secrets.EFI_ACCESS_CODE }}
+        run: |
+          if [ -n "$EFI_ACCESS_CODE" ]; then
+            printf 'globalThis.EFI_ACCESS_CODE = %s;\n' "$(node -e 'console.log(JSON.stringify(process.env.EFI_ACCESS_CODE))')" > js/access.js
+            echo "Auto-connexion activée."
+          else
+            echo "Secret EFI_ACCESS_CODE absent — l'application demandera le code (bouton ☁)."
+          fi
+
       - name: Déployer en production
         run: npx vercel@latest deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"

@@ -94,34 +94,49 @@ function setCloudStatus(status, detail) {
   el.dataset.status = status;
 }
 
-async function connectCloud(code) {
+async function connectCloud(code, { silent = false } = {}) {
   try {
     const remote = await loadRemoteState(code);
     setAccessCode(localStorage, code);
-    app.state = migrate(remote);
-    app.save();
-    app.snapshot = JSON.stringify(app.state);
-    app.undoStack = [];
-    app.redoStack = [];
+    app.syncer.seenSavedAt(remote.savedAt);
+    applyRemoteState(remote);
     app.syncer.setStatus('idle');
-    render();
-    toast('Connecté à la base partagée — planning chargé.', 'ok');
+    app.syncer.startPolling();
+    if (!silent) toast('Connecté à la base partagée — planning chargé.', 'ok');
   } catch (e) {
     if (e.badCode) {
       setAccessCode(localStorage, null);
-      toast('Code d’accès refusé.', 'error');
+      if (!silent) toast('Code d’accès refusé.', 'error');
       app.syncer.setStatus('off');
     } else {
-      toast('Base partagée injoignable : ' + e.message + ' — mode local conservé.', 'error');
+      if (!silent) toast('Base partagée injoignable : ' + e.message + ' — mode local conservé.', 'error');
       app.syncer.setStatus('error', e.message);
+      app.syncer.startPolling(); // retentera et se reconnectera dès le retour du réseau
     }
   }
+}
+
+// Remplace l'état local par l'état distant (modification venue d'un autre poste)
+function applyRemoteState(remote) {
+  app.state = migrate(structuredClone(remote));
+  app.save();
+  app.snapshot = JSON.stringify(app.state);
+  app.undoStack = [];
+  app.redoStack = [];
+  render();
 }
 
 function setupCloud() {
   app.syncer = createSyncer({
     getState: () => app.state,
     onStatus: setCloudStatus,
+    onRemoteChange: (remote) => {
+      // Ne pas écraser un formulaire en cours de saisie : réappliqué au tour suivant
+      if (document.querySelector('dialog[open]')) return false;
+      applyRemoteState(remote);
+      toast('Planning mis à jour depuis la base partagée.', 'ok');
+      return true;
+    },
   });
   document.getElementById('cloud-status').addEventListener('click', async () => {
     const current = getAccessCode(localStorage);
@@ -136,8 +151,9 @@ function setupCloud() {
     const code = prompt('Code d’accès de la base partagée EFI :');
     if (code?.trim()) await connectCloud(code.trim());
   });
-  // Reconnexion automatique au démarrage
-  if (getAccessCode(localStorage)) connectCloud(getAccessCode(localStorage));
+  // Connexion permanente : code du poste, sinon code injecté au déploiement
+  const code = getAccessCode(localStorage);
+  if (code) connectCloud(code, { silent: !!globalThis.EFI_ACCESS_CODE && !localStorage.getItem('efi-cloud-code') });
 }
 
 // ---------------------------------------------------------------------------
