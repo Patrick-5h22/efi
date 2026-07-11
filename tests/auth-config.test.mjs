@@ -27,6 +27,17 @@ test('better-auth : options conformes à la référence efi-placement', () => {
   assert.equal(o.user.additionalFields.role.input, false, 'rôle non modifiable par le client');
 });
 
+test('better-auth : colonnes mappées en snake_case (tables drizzle d’efi-placement)', () => {
+  const o = auth.options;
+  assert.equal(o.user.fields.emailVerified, 'email_verified');
+  assert.equal(o.user.fields.createdAt, 'created_at');
+  assert.equal(o.session.fields.userId, 'user_id');
+  assert.equal(o.session.fields.expiresAt, 'expires_at');
+  assert.equal(o.account.fields.providerId, 'provider_id');
+  assert.equal(o.account.fields.accessTokenExpiresAt, 'access_token_expires_at');
+  assert.equal(o.verification.fields.expiresAt, 'expires_at');
+});
+
 test('routes serverless : modules importables', async () => {
   const authRoute = await import('../api/auth/[...all].js');
   assert.equal(typeof authRoute.default, 'function', 'handler /api/auth/* présent');
