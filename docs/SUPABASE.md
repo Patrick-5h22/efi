@@ -19,15 +19,46 @@ local du navigateur).
   `planning.settings` (jamais dans le dépôt). RLS activé sur toutes les
   tables, sans politique : accès direct impossible, même avec la clé anon.
 
+## Authentification (Better Auth)
+
+Sur le site déployé (Vercel), l'accès au planning exige un **compte
+nominatif** :
+
+- Les comptes sont ceux de l'application **EFI Placement** — mêmes tables
+  better-auth (`user`, `session`, `account`, `verification`) dans le même
+  Postgres. Un compte créé dans EFI Placement fonctionne ici immédiatement
+  (l'inscription est désactivée côté EFI Planning : `disableSignUp`).
+- Le navigateur ne parle plus directement à Supabase : il passe par le
+  proxy serverless **`/api/state`** (GET = chargement, PUT = sauvegarde),
+  qui vérifie la session Better Auth puis relaie vers les RPC avec le code
+  d'accès `EFI_ACCESS_CODE` conservé **côté serveur uniquement**.
+- Session de 7 jours (cookie `efi-planning.*`), déconnexion par le bouton
+  ⏻ de la barre latérale. Le thème préféré du compte (partagé avec EFI
+  Placement) est appliqué à la première connexion.
+
+Secrets GitHub requis (Settings → Secrets and variables → Actions,
+*Repository secrets*) — le workflow les recopie dans les variables
+d'environnement Vercel à chaque déploiement :
+
+| Secret | Rôle |
+|---|---|
+| `VERCEL_TOKEN` | déploiement (déjà requis) |
+| `DATABASE_URL` | chaîne Postgres du **pooler de session** Supabase (Settings → Database → Connection string) |
+| `BETTER_AUTH_SECRET` | signature des sessions — `openssl rand -base64 32` (peut différer de celui d'EFI Placement : les comptes restent communs) |
+| `EFI_ACCESS_CODE` | code d'accès aux RPC planning (reste côté serveur) |
+
+Sans `DATABASE_URL` + `BETTER_AUTH_SECRET`, le déploiement retombe sur le
+mode secours historique : code injecté dans `js/access.js` (auto-connexion
+sans compte).
+
 ## Connexion permanente
 
 L'application est conçue pour rester connectée en continu :
 
-- **Auto-connexion** : sur le site déployé, le code d'accès est injecté au
-  déploiement (secret GitHub `EFI_ACCESS_CODE` → `js/access.js`, le dépôt ne
-  contient qu'un gabarit vide). Aucune saisie : l'application démarre
-  connectée. Sur un poste sans code injecté, premier clic sur **☁** + code,
-  mémorisé ensuite.
+- **Auto-connexion** : sur le site déployé, la connexion s'établit dès que
+  la session Better Auth est vérifiée (ou, en mode secours, via le code
+  injecté au déploiement). Sur un poste local sans API, premier clic sur
+  **☁** + code, mémorisé ensuite.
 - **Synchronisation continue** : la base est interrogée toutes les 45 s ;
   une modification faite sur un autre poste apparaît automatiquement
   (jamais pendant une saisie en cours — elle est appliquée juste après).
@@ -46,10 +77,12 @@ Dans l'éditeur SQL de Supabase :
 update planning.settings set value = 'NOUVEAU-CODE' where key = 'access_code';
 ```
 
-## Limites connues (v1)
+## Limites connues
 
 - Écriture « dernier sauvé gagne » : pas de fusion si deux postes
   modifient en même temps (usage prévu : un planificateur à la fois).
-- Le code d'accès est partagé (pas de comptes individuels). Pour des
-  comptes nominatifs et un historique par utilisateur, brancher
-  Supabase Auth serait l'étape suivante.
+- Les rôles (`commercial`, `assistante`, `gestionnaire`) sont lus depuis le
+  compte mais pas encore différenciés dans l'interface : tout utilisateur
+  connecté a les mêmes droits sur le planning.
+- En local (hébergement statique sans fonctions serverless), le mode
+  historique par code d'accès partagé reste utilisé.

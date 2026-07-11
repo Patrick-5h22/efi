@@ -12,5 +12,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - name: Installer les dépendances (better-auth, pg)
+        run: npm ci
       - name: Tests unitaires du moteur
         run: node --test tests/*.test.mjs

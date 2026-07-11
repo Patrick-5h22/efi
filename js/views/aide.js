@@ -91,8 +91,9 @@ export function renderAide(main) {
         <li><b>☁ Base partagée (connexion permanente)</b> : l'application reste connectée en continu —
           les modifications des autres postes apparaissent automatiquement (toutes les 45 s), la reconnexion
           après coupure est automatique, et la sauvegarde est forcée à la fermeture de l'onglet
-          (☁✓ synchronisé, ☁… sauvegarde, ☁⚠ erreur). Sur le site déployé, aucun code à saisir ;
-          ailleurs, premier clic sur le nuage + code, mémorisé ensuite.</li>
+          (☁✓ synchronisé, ☁… sauvegarde, ☁⚠ erreur). Sur le site déployé, connexion par
+          <b>compte nominatif</b> (le même que l'application EFI Placement, bouton ⏻ pour se
+          déconnecter) ; en local, premier clic sur le nuage + code, mémorisé ensuite.</li>
       </ul>
     </div>
 
