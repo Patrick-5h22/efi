@@ -36,28 +36,36 @@ nominatif** :
   ⏻ de la barre latérale. Le thème préféré du compte (partagé avec EFI
   Placement) est appliqué à la première connexion.
 
-Secrets GitHub requis (Settings → Secrets and variables → Actions,
-*Repository secrets*) — le workflow les recopie dans les variables
-d'environnement Vercel à chaque déploiement :
+## Déploiement (intégration Git Vercel)
 
-| Secret | Rôle |
+Le dépôt est connecté au projet Vercel `efi` : **chaque push sur `main`
+déclenche automatiquement un déploiement en production** (et chaque pull
+request obtient une URL de prévisualisation). Les tests tournent en
+parallèle via GitHub Actions (`tests.yml`) — un échec s'affiche en rouge
+sur le commit mais ne bloque pas le déploiement Vercel.
+
+Variables d'environnement à renseigner **directement dans Vercel**
+(projet `efi` → Settings → Environment Variables, environnement
+*Production* — cocher aussi *Preview* pour tester l'auth sur les PR) :
+
+| Variable | Rôle |
 |---|---|
-| `VERCEL_TOKEN` | déploiement (déjà requis) |
-| `DATABASE_URL` | chaîne Postgres du **pooler de session** Supabase (Settings → Database → Connection string) |
+| `DATABASE_URL` | chaîne Postgres du **pooler de session** Supabase (Dashboard → Connect → Session pooler) |
 | `BETTER_AUTH_SECRET` | signature des sessions — `openssl rand -base64 32` (peut différer de celui d'EFI Placement : les comptes restent communs) |
+| `BETTER_AUTH_URL` | `https://efi-sand.vercel.app` |
 | `EFI_ACCESS_CODE` | code d'accès aux RPC planning (reste côté serveur) |
 
-Sans `DATABASE_URL` + `BETTER_AUTH_SECRET`, le déploiement retombe sur le
-mode secours historique : code injecté dans `js/access.js` (auto-connexion
-sans compte).
+Sans ces variables, les fonctions d'authentification répondent en erreur
+et l'application retombe en mode local : bouton ☁ + saisie manuelle du
+code d'accès.
 
 ## Connexion permanente
 
 L'application est conçue pour rester connectée en continu :
 
 - **Auto-connexion** : sur le site déployé, la connexion s'établit dès que
-  la session Better Auth est vérifiée (ou, en mode secours, via le code
-  injecté au déploiement). Sur un poste local sans API, premier clic sur
+  la session Better Auth est vérifiée (session de 7 jours — pas de
+  re-saisie quotidienne). Sur un poste local sans API, premier clic sur
   **☁** + code, mémorisé ensuite.
 - **Synchronisation continue** : la base est interrogée toutes les 45 s ;
   une modification faite sur un autre poste apparaît automatiquement
