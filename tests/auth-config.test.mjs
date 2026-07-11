@@ -7,6 +7,10 @@ import assert from 'node:assert/strict';
 process.env.BETTER_AUTH_SECRET ||= 'secret-de-test-0123456789abcdef';
 process.env.BETTER_AUTH_URL ||= 'https://exemple.test';
 process.env.DATABASE_URL ||= 'postgresql://test:test@localhost:5432/test';
+// Variables système Vercel simulées : le domaine de production doit être
+// automatiquement de confiance (connexion depuis l'alias public, ex. efi-rho)
+process.env.VERCEL_PROJECT_PRODUCTION_URL ||= 'efi-prod.test';
+process.env.VERCEL_URL ||= 'efi-abc123-team.test';
 
 const { auth } = await import('../api/_auth.js');
 
@@ -25,6 +29,13 @@ test('better-auth : options conformes à la référence efi-placement', () => {
   assert.equal(o.session.expiresIn, 60 * 60 * 24 * 7);
   assert.deepEqual(Object.keys(o.user.additionalFields).sort(), ['role', 'theme']);
   assert.equal(o.user.additionalFields.role.input, false, 'rôle non modifiable par le client');
+});
+
+test('better-auth : origines de confiance (URL configurée, production, déploiement)', () => {
+  const origins = auth.options.trustedOrigins;
+  assert.ok(origins.includes('https://exemple.test'), 'BETTER_AUTH_URL de confiance');
+  assert.ok(origins.includes('https://efi-prod.test'), 'domaine de production Vercel de confiance');
+  assert.ok(origins.includes('https://efi-abc123-team.test'), 'URL du déploiement courant de confiance');
 });
 
 test('better-auth : colonnes mappées en snake_case (tables drizzle d’efi-placement)', () => {

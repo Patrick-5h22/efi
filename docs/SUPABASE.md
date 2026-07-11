@@ -52,8 +52,8 @@ Variables d'environnement à renseigner **directement dans Vercel**
 |---|---|
 | `DATABASE_URL` | chaîne Postgres du **pooler de session** Supabase (Dashboard → Connect → Session pooler) |
 | `BETTER_AUTH_SECRET` | signature des sessions — `openssl rand -base64 32` (peut différer de celui d'EFI Placement : les comptes restent communs) |
-| `BETTER_AUTH_URL` | `https://efi-sand.vercel.app` |
 | `EFI_ACCESS_CODE` | code d'accès aux RPC planning (reste côté serveur) |
+| `BETTER_AUTH_URL` | *(optionnelle)* URL publique — déduite automatiquement du domaine de production Vercel si absente |
 
 Sans ces variables, les fonctions d'authentification répondent en erreur
 et l'application retombe en mode local : bouton ☁ + saisie manuelle du
