@@ -32,8 +32,16 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
   },
 
-  // Champs additionnels identiques à efi-placement (lecture seule ici)
+  // efi-placement écrit ces tables via drizzle en colonnes snake_case ;
+  // better-auth branché en direct sur Postgres attend du camelCase →
+  // mapping explicite de chaque champ vers la colonne réelle.
   user: {
+    fields: {
+      emailVerified: 'email_verified',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
+    // Champs additionnels identiques à efi-placement (lecture seule ici)
     additionalFields: {
       role: {
         type: ['commercial', 'assistante', 'gestionnaire'],
@@ -50,7 +58,38 @@ export const auth = betterAuth({
     },
   },
 
+  account: {
+    fields: {
+      userId: 'user_id',
+      accountId: 'account_id',
+      providerId: 'provider_id',
+      accessToken: 'access_token',
+      refreshToken: 'refresh_token',
+      idToken: 'id_token',
+      accessTokenExpiresAt: 'access_token_expires_at',
+      refreshTokenExpiresAt: 'refresh_token_expires_at',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
+  },
+
+  verification: {
+    fields: {
+      expiresAt: 'expires_at',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
+  },
+
   session: {
+    fields: {
+      userId: 'user_id',
+      expiresAt: 'expires_at',
+      ipAddress: 'ip_address',
+      userAgent: 'user_agent',
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
     expiresIn: 60 * 60 * 24 * 7, // 7 jours, comme la référence
     updateAge: 60 * 60 * 24,
     cookieCache: { enabled: true, maxAge: 30 },
