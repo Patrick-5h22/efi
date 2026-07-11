@@ -39,12 +39,21 @@ test('better-auth : colonnes mappées en snake_case (tables drizzle d’efi-plac
 });
 
 test('routes serverless : modules importables', async () => {
-  const authRoute = await import('../api/auth/[...all].js');
+  const authRoute = await import('../api/auth.js');
   assert.equal(typeof authRoute.default, 'function', 'handler /api/auth/* présent');
   assert.equal(authRoute.config.api.bodyParser, false, 'parseur de corps désactivé pour better-auth');
 
   const stateRoute = await import('../api/state.js');
   assert.equal(typeof stateRoute.default, 'function', 'handler /api/state présent');
+});
+
+test('vercel.json : toutes les routes /api/auth/* réécrites vers la fonction', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const cfg = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+  assert.ok(
+    cfg.rewrites?.some((r) => r.source === '/api/auth/:path*' && r.destination === '/api/auth'),
+    'réécriture /api/auth/:path* → /api/auth présente (les segments multiples comme sign-in/email en dépendent)',
+  );
 });
 
 test('/api/state : refuse sans session (401)', async () => {
