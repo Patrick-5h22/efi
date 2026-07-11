@@ -8,9 +8,9 @@ export const SUPABASE_KEY = 'sb_publishable_6lJ88JCHt4n_lvxQ0UC3qg_c7zz-TV7';
 
 const CODE_KEY = 'efi-cloud-code';
 
-// Code d'accès : celui saisi sur le poste, sinon celui injecté au déploiement
-// (js/access.js, généré par le workflow Vercel à partir d'un secret GitHub —
-// le fichier du dépôt est un gabarit vide).
+// Code d'accès : celui saisi sur le poste, sinon celui éventuellement
+// renseigné dans js/access.js (gabarit vide dans le dépôt — utile seulement
+// pour un hébergement statique privé sans fonctions serverless).
 export function getAccessCode(storage) {
   return storage.getItem(CODE_KEY) || globalThis.EFI_ACCESS_CODE || null;
 }
