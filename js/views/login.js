@@ -2,6 +2,10 @@
 // l'utilisateur n'est pas authentifié via Better Auth. Les comptes sont les
 // mêmes que ceux de l'application EFI Placement (base partagée).
 
+import { fetchAuthConfig, signInSocial } from '../auth-client.js';
+
+const MS_LOGO = `<svg width="15" height="15" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>`;
+
 export function showLoginOverlay({ onLogin }) {
   if (document.getElementById('login-overlay')) return;
 
@@ -27,8 +31,29 @@ export function showLoginOverlay({ onLogin }) {
       </label>
       <p class="login-error" role="alert" hidden></p>
       <button type="submit" class="btn btn-primary login-submit">Se connecter</button>
+      <div class="login-divider" hidden><span>ou</span></div>
+      <button type="button" class="btn login-ms" hidden>${MS_LOGO} Se connecter avec Microsoft</button>
     </form>`;
   document.body.appendChild(ov);
+
+  // Bouton Microsoft : seulement si le déploiement a une application Entra ID
+  const msBtn = ov.querySelector('.login-ms');
+  fetchAuthConfig().then((cfg) => {
+    if (!cfg.microsoftAuth || !ov.isConnected) return;
+    ov.querySelector('.login-divider').hidden = false;
+    msBtn.hidden = false;
+  });
+  msBtn.addEventListener('click', async () => {
+    msBtn.disabled = true;
+    try {
+      await signInSocial('microsoft'); // redirige le navigateur
+    } catch (err) {
+      const errZone = ov.querySelector('.login-error');
+      errZone.textContent = 'Connexion Microsoft impossible : ' + err.message;
+      errZone.hidden = false;
+      msBtn.disabled = false;
+    }
+  });
 
   const form = ov.querySelector('form');
   const errEl = ov.querySelector('.login-error');

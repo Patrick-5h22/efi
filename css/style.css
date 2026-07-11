@@ -123,6 +123,18 @@ body {
 .login-field input:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .login-error { margin: 0; font-size: 13px; color: var(--destructive); }
 .login-submit { justify-content: center; padding: 10px 14px; font-size: 14px; }
+.login-divider {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--muted-foreground); font-size: 12px;
+}
+.login-divider::before, .login-divider::after {
+  content: ''; flex: 1; border-top: 1px solid var(--border);
+}
+.login-ms {
+  justify-content: center; padding: 10px 14px; font-size: 14px;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.login-ms[hidden], .login-divider[hidden] { display: none; }
 
 /* ---------- Main ---------- */
 #main { flex: 1; padding: 20px 26px 60px; min-width: 0; }

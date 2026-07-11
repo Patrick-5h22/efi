@@ -37,6 +37,31 @@ nominatif** :
   ⏻ de la barre latérale. Le thème préféré du compte (partagé avec EFI
   Placement) est appliqué à la première connexion.
 
+### Connexion Microsoft (Entra ID)
+
+Un bouton « Se connecter avec Microsoft » apparaît sur l'écran de
+connexion dès que l'application Azure est configurée. Un utilisateur
+existant (même email vérifié) est **rattaché** à son identité Microsoft —
+pas de doublon ; un membre du tenant sans compte en obtient un
+automatiquement (rôle `commercial` par défaut).
+
+Mise en place (une fois) :
+
+1. [portal.azure.com](https://portal.azure.com) → Microsoft Entra ID →
+   **App registrations** → *New registration* :
+   nom « EFI Planning », comptes du **tenant seul** (single tenant),
+   Redirect URI type **Web** : `https://efi-rho.vercel.app/api/auth/callback/microsoft`
+2. Noter l'**Application (client) ID** et le **Directory (tenant) ID**
+   (page Overview).
+3. **Certificates & secrets** → *New client secret* → copier la **valeur**
+   (visible une seule fois).
+4. Variables d'environnement Vercel (puis *Redeploy*) :
+   `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`.
+
+Sans ces variables, le bouton n'apparaît pas et rien ne change.
+Pour offrir la même connexion dans EFI Placement, ajouter une seconde
+Redirect URI à la même application Azure et la même config better-auth.
+
 ## Déploiement (intégration Git Vercel)
 
 Le dépôt est connecté au projet Vercel `efi` : **chaque push sur `main`
@@ -55,6 +80,7 @@ Variables d'environnement à renseigner **directement dans Vercel**
 | `BETTER_AUTH_SECRET` | signature des sessions — `openssl rand -base64 32` (peut différer de celui d'EFI Placement : les comptes restent communs) |
 | `EFI_ACCESS_CODE` | code d'accès aux RPC planning (reste côté serveur) |
 | `BETTER_AUTH_URL` | *(optionnelle)* URL publique — déduite automatiquement du domaine de production Vercel si absente |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` / `MICROSOFT_TENANT_ID` | *(optionnelles)* connexion Microsoft Entra ID — voir section dédiée |
 
 Sans ces variables, les fonctions d'authentification répondent en erreur
 et l'application retombe en mode local : bouton ☁ + saisie manuelle du

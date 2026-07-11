@@ -11,6 +11,10 @@ process.env.DATABASE_URL ||= 'postgresql://test:test@localhost:5432/test';
 // automatiquement de confiance (connexion depuis l'alias public, ex. efi-rho)
 process.env.VERCEL_PROJECT_PRODUCTION_URL ||= 'efi-prod.test';
 process.env.VERCEL_URL ||= 'efi-abc123-team.test';
+// Application Entra ID simulée : la connexion Microsoft doit être configurée
+process.env.MICROSOFT_CLIENT_ID ||= 'client-id-test';
+process.env.MICROSOFT_CLIENT_SECRET ||= 'client-secret-test';
+process.env.MICROSOFT_TENANT_ID ||= 'tenant-test';
 
 const { auth } = await import('../api/_auth.js');
 
@@ -36,6 +40,23 @@ test('better-auth : origines de confiance (URL configurée, production, déploie
   assert.ok(origins.includes('https://exemple.test'), 'BETTER_AUTH_URL de confiance');
   assert.ok(origins.includes('https://efi-prod.test'), 'domaine de production Vercel de confiance');
   assert.ok(origins.includes('https://efi-abc123-team.test'), 'URL du déploiement courant de confiance');
+});
+
+test('better-auth : connexion Microsoft (Entra ID) configurée', () => {
+  const o = auth.options;
+  assert.equal(o.socialProviders.microsoft.clientId, 'client-id-test');
+  assert.equal(o.socialProviders.microsoft.tenantId, 'tenant-test');
+  assert.equal(o.account.accountLinking.enabled, true, 'liaison de comptes activée');
+  assert.ok(o.account.accountLinking.trustedProviders.includes('microsoft'),
+    'un compte existant (même email) est rattaché à son identité Microsoft');
+});
+
+test('/api/config : expose la disponibilité de la connexion Microsoft', async () => {
+  const { default: configHandler } = await import('../api/config.js');
+  let payload = null;
+  const res = { status() { return this; }, json(p) { payload = p; return this; }, setHeader() {} };
+  configHandler({ method: 'GET' }, res);
+  assert.equal(payload.microsoftAuth, true);
 });
 
 test('better-auth : colonnes mappées en snake_case (tables drizzle d’efi-placement)', () => {

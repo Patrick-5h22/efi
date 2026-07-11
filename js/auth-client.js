@@ -39,6 +39,35 @@ export async function signIn(email, password) {
   return readJSON(res);
 }
 
+// Connexion via un fournisseur externe (Microsoft) : better-auth renvoie
+// l'URL d'autorisation, on y envoie le navigateur ; au retour, le cookie de
+// session est posé et l'application démarre connectée.
+export async function signInSocial(provider) {
+  const res = await fetch('/api/auth/sign-in/social', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider, callbackURL: '/' }),
+  });
+  const data = await readJSON(res);
+  if (!res.ok || !data?.url) {
+    const err = new Error(data?.message || `Erreur ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  window.location.href = data.url;
+}
+
+// Méthodes d'authentification disponibles sur ce déploiement
+export async function fetchAuthConfig() {
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) return {};
+    return (await readJSON(res)) || {};
+  } catch {
+    return {};
+  }
+}
+
 export async function signOut() {
   try {
     await fetch('/api/auth/sign-out', {
