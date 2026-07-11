@@ -6,7 +6,7 @@ import { fetchAuthConfig, signInSocial } from '../auth-client.js';
 
 const MS_LOGO = `<svg width="15" height="15" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>`;
 
-export function showLoginOverlay({ onLogin }) {
+export function showLoginOverlay({ onLogin, error }) {
   if (document.getElementById('login-overlay')) return;
 
   const ov = document.createElement('div');
@@ -58,6 +58,12 @@ export function showLoginOverlay({ onLogin }) {
   const form = ov.querySelector('form');
   const errEl = ov.querySelector('.login-error');
   const btn = ov.querySelector('.login-submit');
+
+  // Message initial (ex. retour d'un refus Microsoft via ?error=…)
+  if (error) {
+    errEl.textContent = error;
+    errEl.hidden = false;
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

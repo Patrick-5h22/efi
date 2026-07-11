@@ -11,7 +11,9 @@
 //                      domaine de production Vercel si absente
 
 import { betterAuth } from 'better-auth';
+import { APIError } from 'better-auth/api';
 import pg from 'pg';
+import { parseAllowedGroups, parseGroupRoles, isAllowed, roleFromGroups } from './_groups.js';
 
 // Domaine de production (alias public, ex. efi-rho.vercel.app) et URL du
 // déploiement courant (unique par déploiement) — fournis par Vercel.
@@ -41,6 +43,9 @@ export const auth = betterAuth({
   // Connexion Microsoft (Entra ID) — active seulement si l'application Azure
   // est configurée (variables MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET,
   // et MICROSOFT_TENANT_ID pour restreindre au tenant CIPECMA).
+  // Groupes Entra (optionnels, voir api/_groups.js) : accès réservé aux
+  // membres des groupes autorisés + rôle déduit du groupe, resynchronisé
+  // à chaque connexion.
   ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET ? {
     socialProviders: {
       microsoft: {
@@ -48,6 +53,24 @@ export const auth = betterAuth({
         clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
         tenantId: process.env.MICROSOFT_TENANT_ID || 'common',
         prompt: 'select_account',
+        // Réapplique le mapping (dont le rôle) à chaque connexion, pas
+        // seulement à la création du compte
+        overrideUserInfo: true,
+        mapProfileToUser(profile) {
+          const groups = profile.groups || [];
+          const allowed = parseAllowedGroups(process.env.MICROSOFT_ALLOWED_GROUPS);
+          if (!isAllowed(groups, allowed)) {
+            throw new APIError('FORBIDDEN', {
+              message: 'Accès refusé : votre compte Microsoft n’appartient à aucun groupe autorisé.',
+            });
+          }
+          const role = roleFromGroups(groups, parseGroupRoles(process.env.MICROSOFT_GROUP_ROLES));
+          return {
+            name: profile.name,
+            email: profile.email,
+            ...(role ? { role } : {}),
+          };
+        },
       },
     },
   } : {}),

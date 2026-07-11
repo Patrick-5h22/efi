@@ -143,8 +143,23 @@ function setUserZone(user) {
   }
 }
 
-function requestLogin() {
+// Erreur renvoyée par le fournisseur externe (retour OAuth : ?error=… dans
+// l'URL) : consommée une fois, affichée sur l'écran de connexion.
+function consumeAuthError() {
+  const err = new URLSearchParams(location.search).get('error');
+  if (!err) return null;
+  history.replaceState(null, '', location.pathname + location.hash);
+  const messages = {
+    forbidden: 'Connexion Microsoft refusée : votre compte n’appartient à aucun groupe autorisé.',
+    signup_disabled: 'Connexion refusée : aucun compte associé et l’inscription est désactivée.',
+    access_denied: 'Connexion Microsoft annulée.',
+  };
+  return messages[err] || 'Connexion Microsoft refusée (' + err + ').';
+}
+
+function requestLogin(error) {
   showLoginOverlay({
+    error,
     onLogin: async (email, password) => {
       await signIn(email, password);
       const det = await detectAuth();
@@ -228,11 +243,12 @@ async function setupCloud() {
 
   // Site déployé avec fonctions serverless → authentification obligatoire ;
   // hébergement statique (poste local…) → mode historique par code d'accès.
+  const authError = consumeAuthError();
   const det = await detectAuth();
   if (det.available) {
     setApiMode(true);
     if (det.session) startApiSession(det.session, { silent: true });
-    else requestLogin();
+    else requestLogin(authError);
     return;
   }
   // Connexion permanente : code du poste, sinon code injecté au déploiement

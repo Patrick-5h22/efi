@@ -62,6 +62,35 @@ Sans ces variables, le bouton n'apparaît pas et rien ne change.
 Pour offrir la même connexion dans EFI Placement, ajouter une seconde
 Redirect URI à la même application Azure et la même config better-auth.
 
+### Accès et rôles par groupes Entra
+
+Deux variables optionnelles pilotent l'accès depuis vos groupes Entra
+(les changements de groupe s'appliquent à la connexion suivante, sans
+redéploiement) :
+
+| Variable | Effet |
+|---|---|
+| `MICROSOFT_ALLOWED_GROUPS` | ids de groupes séparés par des virgules — seuls leurs membres peuvent se connecter via Microsoft (message de refus explicite sinon) |
+| `MICROSOFT_GROUP_ROLES` | `id-de-groupe:role,…` (roles : `gestionnaire`, `assistante`, `commercial`) — rôle attribué et **resynchronisé à chaque connexion** ; le plus élevé l'emporte si plusieurs groupes |
+
+Prérequis Azure (une fois) : App registration → **Token configuration** →
+*Add groups claim* → **Security groups**, format **Group ID** — sans quoi
+le jeton ne contient pas les groupes. Les ids de groupes se trouvent dans
+Entra ID → Groups → colonne *Object Id*.
+
+Exemple :
+
+```
+MICROSOFT_ALLOWED_GROUPS=9f1c…-efi-utilisateurs
+MICROSOFT_GROUP_ROLES=3a2b…-efi-gestionnaires:gestionnaire,7c4d…-efi-commerciaux:commercial
+```
+
+Limites : la revendication `groups` est plafonnée (~200 groupes par
+utilisateur chez Microsoft) — largement suffisant ici ; un utilisateur
+retiré des groupes garde sa session en cours (7 jours max) mais sera
+refusé à sa prochaine connexion Microsoft. La connexion par email + mot
+de passe n'est pas concernée par ces règles.
+
 ## Déploiement (intégration Git Vercel)
 
 Le dépôt est connecté au projet Vercel `efi` : **chaque push sur `main`

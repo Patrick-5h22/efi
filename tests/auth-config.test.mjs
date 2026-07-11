@@ -51,6 +51,35 @@ test('better-auth : connexion Microsoft (Entra ID) configurée', () => {
     'un compte existant (même email) est rattaché à son identité Microsoft');
 });
 
+test('better-auth : groupes Entra — accès et rôle appliqués à la connexion Microsoft', () => {
+  const map = auth.options.socialProviders.microsoft.mapProfileToUser;
+  assert.equal(typeof map, 'function');
+  assert.equal(auth.options.socialProviders.microsoft.overrideUserInfo, true,
+    'le rôle est resynchronisé à chaque connexion');
+
+  const G1 = 'groupe-gestionnaires';
+  const G2 = 'groupe-commerciaux';
+  process.env.MICROSOFT_ALLOWED_GROUPS = `${G1},${G2}`;
+  process.env.MICROSOFT_GROUP_ROLES = `${G1}:gestionnaire,${G2}:commercial`;
+  try {
+    // Membre d'un groupe autorisé → accepté, rôle déduit (le plus élevé)
+    const u = map({ name: 'Test', email: 't@cipecma.com', groups: [G2, G1] });
+    assert.equal(u.role, 'gestionnaire');
+    // Membre d'aucun groupe autorisé → refusé
+    assert.throws(() => map({ name: 'Intrus', email: 'i@cipecma.com', groups: ['autre'] }), /groupe autorisé/);
+    assert.throws(() => map({ name: 'Sans groupe', email: 's@cipecma.com' }), /groupe autorisé/);
+    // Sans restriction configurée → accepté, rôle inchangé (pas de champ role)
+    delete process.env.MICROSOFT_ALLOWED_GROUPS;
+    delete process.env.MICROSOFT_GROUP_ROLES;
+    const u2 = map({ name: 'Libre', email: 'l@cipecma.com', groups: ['x'] });
+    assert.equal(u2.role, undefined);
+    assert.equal(u2.email, 'l@cipecma.com');
+  } finally {
+    delete process.env.MICROSOFT_ALLOWED_GROUPS;
+    delete process.env.MICROSOFT_GROUP_ROLES;
+  }
+});
+
 test('/api/config : expose la disponibilité de la connexion Microsoft', async () => {
   const { default: configHandler } = await import('../api/config.js');
   let payload = null;
