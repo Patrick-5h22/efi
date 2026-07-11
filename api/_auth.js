@@ -53,6 +53,9 @@ export const auth = betterAuth({
         clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
         tenantId: process.env.MICROSOFT_TENANT_ID || 'common',
         prompt: 'select_account',
+        // Adresse de retour explicite (doit être déclarée telle quelle dans
+        // l'App registration Azure, type Web)
+        redirectURI: `${baseURL}/api/auth/callback/microsoft`,
         // Réapplique le mapping (dont le rôle) à chaque connexion, pas
         // seulement à la création du compte
         overrideUserInfo: true,
