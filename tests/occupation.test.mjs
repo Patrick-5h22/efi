@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultState } from '../js/store.js';
-import { computeSchedule, occupationSummary } from '../js/engine.js';
+import { computeSchedule, occupationSummary, scopeWindow, rowInScope } from '../js/engine.js';
 
 // État minimal : 2 jours ouverts en septembre (S36 et S37) + 1 en octobre.
 // 18 créneaux de 30 min par jour (08:00 → 17:00).
@@ -61,6 +61,37 @@ test('occupation : ligne annulée libère la portée', () => {
   const occ = occupationSummary(state, computeSchedule(state), 'semaine', '2026-09-01');
   assert.equal(occ.hours, 0);
   assert.equal(occ.pct, 0);
+});
+
+test('portée : fenêtres et appartenance des lignes (toutes les cartes)', () => {
+  const state = fixture();
+  const schedule = computeSchedule(state);
+
+  // Semaine S37 : seul le 08/09 est ouvert ; 5 jours ouvrables
+  const wSem = scopeWindow(state, 'semaine', '2026-09-09');
+  assert.equal(wSem.workingCount, 5);
+  assert.deepEqual(wSem.openDays, ['2026-09-08']);
+  assert.deepEqual(schedule.rows.filter((r) => rowInScope(r, wSem)).map((r) => r.insc.stagiaire), ['DEUX']);
+
+  // Mois de septembre : 2 lignes (UN et DEUX), 2 jours ouverts
+  const wMois = scopeWindow(state, 'mois', '2026-09-20');
+  assert.equal(wMois.openDays.length, 2);
+  assert.deepEqual(schedule.rows.filter((r) => rowInScope(r, wMois)).map((r) => r.insc.stagiaire), ['UN', 'DEUX']);
+
+  // Période : tout, y compris une inscription non planifiée
+  state.inscriptions.push({ id: 4, stagiaire: 'SANS DATE', formation: 'HAB-ELEC', type: 'Initial', statut: 'confirmee' });
+  const schedule2 = computeSchedule(state);
+  const wPer = scopeWindow(state, 'periode', '2026-09-20');
+  assert.equal(schedule2.rows.filter((r) => rowInScope(r, wPer)).length, 4);
+  // …mais pas dans une portée datée
+  assert.equal(schedule2.rows.filter((r) => rowInScope(r, wMois)).length, 2);
+
+  // Un test pratique dans la portée suffit (activité de la semaine)
+  const wS37 = scopeWindow(state, 'semaine', '2026-09-08');
+  const rowUn = schedule2.rows.find((r) => r.insc.stagiaire === 'UN');
+  rowUn.insc.dateTestPratique = '2026-09-08';
+  rowUn.insc.debutTestPratique = 600;
+  assert.equal(rowInScope(rowUn, wS37), true);
 });
 
 test('occupation : portée sans jour ouvert → 0 % sans division par zéro', () => {

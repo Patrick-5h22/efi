@@ -454,24 +454,44 @@ export function occupancyByDay(state, schedule) {
 // ---------------------------------------------------------------------------
 export const OCCUPATION_SCOPES = ['periode', 'semaine', 'mois'];
 
-export function occupationSummary(state, schedule, scope = 'periode', todayISO = null) {
+// Fenêtre temporelle d'une portée : prédicat d'appartenance, jours ouvrables
+// et jours ouverts qu'elle contient. Sert à toutes les cartes du tableau de
+// bord (le même choix de portée gouverne l'ensemble des indicateurs).
+export function scopeWindow(state, scope = 'periode', todayISO = null) {
   const { params } = state;
-  const openDaysAll = state.openDays.filter((d) => workingDays(params).includes(d));
-
   const today = todayISO || toISO(new Date());
   const ref = today < params.periodStart ? params.periodStart
     : today > params.periodEnd ? params.periodEnd : today;
 
-  let inScope = () => true;
+  let isIn = () => true;
   if (scope === 'semaine') {
     const week = new Set(weekDays(mondayOf(ref)));
-    inScope = (d) => week.has(d);
+    isIn = (d) => week.has(d);
   } else if (scope === 'mois') {
     const ym = ref.slice(0, 7);
-    inScope = (d) => d.startsWith(ym);
+    isIn = (d) => !!d && d.startsWith(ym);
   }
 
-  const scopeDays = new Set(openDaysAll.filter(inScope));
+  const working = workingDays(params).filter(isIn);
+  const openDays = state.openDays.filter((d) => working.includes(d));
+  return { scope, ref, isIn, workingCount: working.length, openDays };
+}
+
+// Une ligne appartient à la portée si l'une de ses activités (pratique ou
+// test pratique) y a lieu. Sur la période complète, tout compte — y compris
+// les inscriptions pas encore planifiées.
+export function rowInScope(row, win) {
+  if (win.scope === 'periode') return true;
+  return !!(row.insc.datePratique && win.isIn(row.insc.datePratique))
+    || !!(row.insc.dateTestPratique && win.isIn(row.insc.dateTestPratique));
+}
+
+export function occupationSummary(state, schedule, scope = 'periode', todayISO = null) {
+  const { params } = state;
+  const win = scopeWindow(state, scope, todayISO);
+  const ref = win.ref;
+
+  const scopeDays = new Set(win.openDays);
   const slotsPerDay = (params.dayEnd - params.dayStart) / params.slotMinutes;
   const total = scopeDays.size * slotsPerDay;
 
