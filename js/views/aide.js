@@ -81,6 +81,9 @@ export function renderAide(main) {
         <li><b>Import CSV</b> (page Inscriptions) : reprend un export CSV de l'onglet « Inscriptions » du classeur Excel —
           en-têtes reconnues automatiquement, formations et intervenants résolus par libellé, lignes invalides ignorées avec raison.</li>
         <li><b>Import JSON</b> : restaure une sauvegarde complète (paramètres, équipe, jours, inscriptions).</li>
+        <li><b>🔥 Carte Occupation</b> (tableau de bord) : cliquer dessus alterne la portée du calcul —
+          période complète, semaine en cours, mois en cours — et le choix est mémorisé
+          (sur votre profil quand vous êtes connecté, sur le poste sinon).</li>
         <li><b>🔥 Heatmap</b> (tableau de bord) : occupation de chaque jour de la période en un coup d'œil
           (plus le bleu est foncé, plus le jour est chargé ; liseré rouge = anomalie ; cliquer ouvre la semaine).</li>
         <li><b>🗂 Dossiers</b> : chaque inscription porte une entreprise/SIRET et un statut —

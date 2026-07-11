@@ -3,7 +3,7 @@
 // Reproduit les règles du classeur "Planification EFI v4.2".
 
 import { formationByCode, dureeFor } from './config.js';
-import { isoWeek, overlaps, workingDays, fmtTime } from './dates.js';
+import { isoWeek, overlaps, workingDays, fmtTime, mondayOf, weekDays, toISO } from './dates.js';
 
 // ---------------------------------------------------------------------------
 // Calcul principal : retourne un tableau de "lignes calculées" alignées sur
@@ -442,6 +442,58 @@ export function occupancyByDay(state, schedule) {
     v.ratio = v.total ? v.busy / v.total : 0;
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Occupation agrégée (carte KPI du tableau de bord) sur une portée au choix :
+// 'periode' (tous les jours ouverts), 'semaine' ou 'mois' en cours. La date de
+// référence est ramenée dans la période si on est avant/après (utile avant le
+// démarrage : la « semaine en cours » est alors la première de la période).
+// Même convention que la carte historique : capacité = créneaux d'une journée
+// × jours ouverts de la portée, réservations = pratiques + tests pratiques.
+// ---------------------------------------------------------------------------
+export const OCCUPATION_SCOPES = ['periode', 'semaine', 'mois'];
+
+export function occupationSummary(state, schedule, scope = 'periode', todayISO = null) {
+  const { params } = state;
+  const openDaysAll = state.openDays.filter((d) => workingDays(params).includes(d));
+
+  const today = todayISO || toISO(new Date());
+  const ref = today < params.periodStart ? params.periodStart
+    : today > params.periodEnd ? params.periodEnd : today;
+
+  let inScope = () => true;
+  if (scope === 'semaine') {
+    const week = new Set(weekDays(mondayOf(ref)));
+    inScope = (d) => week.has(d);
+  } else if (scope === 'mois') {
+    const ym = ref.slice(0, 7);
+    inScope = (d) => d.startsWith(ym);
+  }
+
+  const scopeDays = new Set(openDaysAll.filter(inScope));
+  const slotsPerDay = (params.dayEnd - params.dayStart) / params.slotMinutes;
+  const total = scopeDays.size * slotsPerDay;
+
+  let busy = 0;
+  for (const r of schedule.rows) {
+    if (r.cancelled) continue;
+    const i = r.insc;
+    if (i.datePratique && i.debutPratique != null && scopeDays.has(i.datePratique)) {
+      busy += r.duree / params.slotMinutes;
+    }
+    if (i.dateTestPratique && i.debutTestPratique != null && scopeDays.has(i.dateTestPratique)) {
+      busy += params.practicalTestDuration / params.slotMinutes;
+    }
+  }
+
+  return {
+    scope,
+    ref, // date de référence (ramenée dans la période) — pour le libellé
+    days: scopeDays.size,
+    pct: total ? Math.min(100, Math.round((busy / total) * 100)) : 0,
+    hours: busy * params.slotMinutes / 60,
+  };
 }
 
 // ---------------------------------------------------------------------------

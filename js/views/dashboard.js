@@ -1,9 +1,10 @@
 // Tableau de bord : indicateurs clés, anomalies, prochaines activités.
 
-import { app, esc } from '../app.js';
+import { app, esc, render } from '../app.js';
 import { memberName } from '../store.js';
 import { workingDays, periodWeeks, fmtDateShort, fmtTime, isoWeek, weekDays, fmtDateDay } from '../dates.js';
-import { occupancyByDay } from '../engine.js';
+import { occupancyByDay, occupationSummary, OCCUPATION_SCOPES } from '../engine.js';
+import { getKpiScope, setKpiScope } from '../prefs.js';
 import { openInscriptionForm } from './form.js';
 
 export function renderDashboard(main) {
@@ -21,16 +22,13 @@ export function renderDashboard(main) {
     .sort((a, b) => a.insc.datePratique.localeCompare(b.insc.datePratique) || (a.insc.debutPratique ?? 0) - (b.insc.debutPratique ?? 0))
     .slice(0, 8);
 
-  // Occupation : créneaux occupés / disponibles sur jours ouverts
-  const slotsPerDay = (state.params.dayEnd - state.params.dayStart) / state.params.slotMinutes;
-  const totalSlots = openCount * slotsPerDay;
-  let busySlots = 0;
-  for (const r of rows) {
-    if (r.insc.datePratique && r.insc.debutPratique != null) busySlots += r.duree / state.params.slotMinutes;
-    if (r.insc.dateTestPratique && r.insc.debutTestPratique != null) busySlots += state.params.practicalTestDuration / state.params.slotMinutes;
-  }
-  const occupation = totalSlots ? Math.min(100, Math.round((busySlots / totalSlots) * 100)) : 0;
-  const heuresReservees = busySlots * state.params.slotMinutes / 60;
+  // Occupation : créneaux occupés / disponibles, sur la portée choisie
+  // (période / semaine / mois — un clic sur la carte change, choix mémorisé)
+  const scope = getKpiScope();
+  const occ = occupationSummary(state, app.schedule, scope);
+  const occLabel = scope === 'semaine' ? `semaine S${isoWeek(occ.ref)}`
+    : scope === 'mois' ? `${MONTHS_SHORT[Number(occ.ref.slice(5, 7)) - 1]} ${occ.ref.slice(0, 4)}`
+    : 'jours ouverts (période)';
   const nbPre = rows.filter((r) => r.insc.statut === 'pre').length;
 
   main.innerHTML = `
@@ -47,7 +45,11 @@ export function renderDashboard(main) {
       <div class="kpi"><div class="kpi-value">${stagiaires}</div><div class="kpi-label">🧑‍🎓 Stagiaires</div></div>
       <div class="kpi ${errRows.length ? 'kpi-alert' : 'kpi-ok'}"><div class="kpi-value">${errRows.length ? errRows.length : '✓'}</div><div class="kpi-label">${errRows.length ? '⚠ Lignes en anomalie' : 'Aucune anomalie'}</div></div>
       <div class="kpi"><div class="kpi-value">${openCount}<span style="font-size:14px;color:var(--muted-foreground)">/${days.length}</span></div><div class="kpi-label">📆 Jours EFI ouverts</div></div>
-      <div class="kpi"><div class="kpi-value">${occupation}%<span style="font-size:13px;color:var(--muted-foreground)"> · ${heuresReservees.toFixed(0)} h</span></div><div class="kpi-label">🔥 Occupation des jours ouverts</div></div>
+      <div class="kpi kpi-click" id="kpi-occupation" role="button" tabindex="0"
+           title="Portée : ${occLabel} (${occ.days} j ouverts) — cliquer pour alterner période / semaine / mois, choix mémorisé sur votre profil">
+        <div class="kpi-value">${occ.pct}%<span style="font-size:13px;color:var(--muted-foreground)"> · ${occ.hours.toFixed(0)} h</span></div>
+        <div class="kpi-label">🔥 Occupation — ${occLabel} <span class="kpi-cycle">⟳</span></div>
+      </div>
     </div>
 
     <div class="card">
@@ -100,6 +102,18 @@ export function renderDashboard(main) {
         ou ouvrez des <a href="#/jours">jours EFI</a>, puis cliquez sur un créneau vert d'une <a href="#/semaine/${weeks[0].week}">grille semaine</a>.</p>`}
     </div>
   `;
+
+  // Carte occupation : un clic passe à la portée suivante (mémorisée)
+  const kpiOcc = main.querySelector('#kpi-occupation');
+  const cycleScope = () => {
+    const next = OCCUPATION_SCOPES[(OCCUPATION_SCOPES.indexOf(getKpiScope()) + 1) % OCCUPATION_SCOPES.length];
+    setKpiScope(next);
+    render();
+  };
+  kpiOcc.addEventListener('click', cycleScope);
+  kpiOcc.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycleScope(); }
+  });
 
   main.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => openInscriptionForm({ id: Number(b.dataset.edit) })));
   main.querySelectorAll('.hm-cell[data-week], .hm-week').forEach((el) => {
