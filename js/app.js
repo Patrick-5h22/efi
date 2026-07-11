@@ -3,6 +3,7 @@
 import { loadState, saveState, defaultState, seedExamples, exportJSON, importJSON, migrate } from './store.js';
 import { createSyncer, loadRemoteState, getAccessCode, setAccessCode, setApiMode, isApiMode } from './db.js';
 import { detectAuth, signIn, signOut } from './auth-client.js';
+import { loadRemotePrefs } from './prefs.js';
 import { showLoginOverlay } from './views/login.js';
 import { applyTheme, watchSystemTheme, setupThemeMenu, setTheme, THEME_PRESETS } from './theme.js';
 import { setupCommandPalette, openCommandPalette } from './views/command.js';
@@ -167,6 +168,8 @@ async function startApiSession(session, { silent = false } = {}) {
     applyRemoteState(remote);
     app.syncer.setStatus('idle');
     app.syncer.startPolling();
+    // Préférences du profil (portée de la carte d'occupation, …)
+    loadRemotePrefs().then((changed) => { if (changed) render(); });
     if (!silent) toast(`Bienvenue ${session.user.name || session.user.email} — planning chargé.`, 'ok');
   } catch (e) {
     if (e.authExpired) return requestLogin();

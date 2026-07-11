@@ -9,7 +9,8 @@ local du navigateur).
 - Projet Supabase : `efi-placement` (organisation CIPECMA, eu-central-1)
 - Schéma dédié **`planning`**, isolé de l'application existante du projet :
   `params`, `formations`, `team_members`, `open_days`, `day_assignments`,
-  `inscriptions`, `settings`
+  `inscriptions`, `settings`, `user_prefs` (préférences par utilisateur,
+  ex. portée de la carte d'occupation — servie par `/api/prefs`)
 - Les tables ne sont **pas exposées** par l'API REST. La seule surface
   d'accès est constituée de deux fonctions RPC (`SECURITY DEFINER`) :
   - `public.efi_load_state(p_code)` — renvoie l'état complet (jsonb)

@@ -72,6 +72,13 @@ body {
 #cloud-status[data-status="error"] { color: var(--error); border-color: var(--error); }
 #cloud-status[data-status="saving"] { color: var(--warn); border-color: var(--warn); }
 
+/* Carte KPI cliquable (portée de l'occupation) */
+.kpi-click { cursor: pointer; user-select: none; }
+.kpi-click:hover { border-color: var(--primary); }
+.kpi-click:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.kpi-cycle { color: var(--muted-foreground); font-size: 11px; }
+.kpi-click:hover .kpi-cycle { color: var(--primary); }
+
 /* ---------- Utilisateur connecté (Better Auth) ---------- */
 .user-zone {
   flex-basis: 100%;
