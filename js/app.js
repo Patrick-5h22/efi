@@ -160,8 +160,8 @@ function consumeAuthError() {
 function requestLogin(error) {
   showLoginOverlay({
     error,
-    onLogin: async (email, password) => {
-      await signIn(email, password);
+    onLogin: async (email, password, remember) => {
+      await signIn(email, password, remember);
       const det = await detectAuth();
       if (!det.session) throw Object.assign(new Error('Session introuvable après connexion.'), { status: 500 });
       await startApiSession(det.session);

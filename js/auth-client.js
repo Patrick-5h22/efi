@@ -24,11 +24,12 @@ export async function detectAuth() {
   }
 }
 
-export async function signIn(email, password) {
+export async function signIn(email, password, rememberMe = true) {
   const res = await fetch('/api/auth/sign-in/email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    // rememberMe: false → session limitée à l'onglet (cookie de session)
+    body: JSON.stringify({ email, password, rememberMe }),
   });
   if (!res.ok) {
     const body = await readJSON(res);
