@@ -46,7 +46,7 @@ export async function signInSocial(provider) {
   const res = await fetch('/api/auth/sign-in/social', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ provider, callbackURL: '/' }),
+    body: JSON.stringify({ provider, callbackURL: '/', errorCallbackURL: '/' }),
   });
   const data = await readJSON(res);
   if (!res.ok || !data?.url) {
