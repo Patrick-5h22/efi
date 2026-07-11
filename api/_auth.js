@@ -38,6 +38,20 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
   },
 
+  // Connexion Microsoft (Entra ID) — active seulement si l'application Azure
+  // est configurée (variables MICROSOFT_CLIENT_ID / MICROSOFT_CLIENT_SECRET,
+  // et MICROSOFT_TENANT_ID pour restreindre au tenant CIPECMA).
+  ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET ? {
+    socialProviders: {
+      microsoft: {
+        clientId: process.env.MICROSOFT_CLIENT_ID,
+        clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+        tenantId: process.env.MICROSOFT_TENANT_ID || 'common',
+        prompt: 'select_account',
+      },
+    },
+  } : {}),
+
   // efi-placement écrit ces tables via drizzle en colonnes snake_case ;
   // better-auth branché en direct sur Postgres attend du camelCase →
   // mapping explicite de chaque champ vers la colonne réelle.
@@ -65,6 +79,12 @@ export const auth = betterAuth({
   },
 
   account: {
+    // Liaison automatique : un utilisateur existant (email vérifié identique)
+    // qui arrive via Microsoft est rattaché à son compte — pas de doublon.
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ['microsoft'],
+    },
     fields: {
       userId: 'user_id',
       accountId: 'account_id',
