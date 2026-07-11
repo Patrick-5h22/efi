@@ -2,34 +2,41 @@
 
 import { app, esc, render } from '../app.js';
 import { memberName } from '../store.js';
-import { workingDays, periodWeeks, fmtDateShort, fmtTime, isoWeek, weekDays, fmtDateDay } from '../dates.js';
-import { occupancyByDay, occupationSummary, OCCUPATION_SCOPES } from '../engine.js';
+import { periodWeeks, fmtDateShort, fmtTime, isoWeek, weekDays, fmtDateDay } from '../dates.js';
+import { occupancyByDay, occupationSummary, scopeWindow, rowInScope, OCCUPATION_SCOPES } from '../engine.js';
 import { getKpiScope, setKpiScope } from '../prefs.js';
 import { openInscriptionForm } from './form.js';
 
 export function renderDashboard(main) {
   const state = app.state;
-  const { rows, theoryTesters } = app.schedule;
-  const days = workingDays(state.params);
-  const openCount = state.openDays.filter((d) => days.includes(d)).length;
-  const errRows = rows.filter((r) => r.errors.length);
-  const stagiaires = new Set(rows.map((r) => r.insc.stagiaire.toLowerCase())).size;
+  const { rows } = app.schedule;
   const weeks = periodWeeks(state.params);
 
-  // Prochaines activités (à partir du premier jour planifié)
-  const upcoming = rows
+  // Portée commune du tableau de bord : période / semaine / mois — un clic
+  // sur n'importe quelle carte KPI la fait tourner, choix mémorisé (profil
+  // en mode connecté, poste sinon). Toutes les cartes et listes la suivent.
+  const scope = getKpiScope();
+  const win = scopeWindow(state, scope);
+  const scopeName = scope === 'semaine' ? `semaine S${isoWeek(win.ref)}`
+    : scope === 'mois' ? `${MONTHS_SHORT[Number(win.ref.slice(5, 7)) - 1]} ${win.ref.slice(0, 4)}`
+    : null;
+  const suffix = scopeName ? ` — ${scopeName}` : '';
+
+  const scopedRows = rows.filter((r) => rowInScope(r, win));
+  const errRowsAll = rows.filter((r) => r.errors.length);
+  const errRows = scopedRows.filter((r) => r.errors.length);
+  const stagiaires = new Set(scopedRows.map((r) => r.insc.stagiaire.toLowerCase())).size;
+  const nbPre = scopedRows.filter((r) => r.insc.statut === 'pre').length;
+  const openCount = win.openDays.length;
+
+  // Prochaines activités de la portée (à partir du premier jour planifié)
+  const upcoming = scopedRows
     .filter((r) => r.insc.datePratique)
     .sort((a, b) => a.insc.datePratique.localeCompare(b.insc.datePratique) || (a.insc.debutPratique ?? 0) - (b.insc.debutPratique ?? 0))
     .slice(0, 8);
 
-  // Occupation : créneaux occupés / disponibles, sur la portée choisie
-  // (période / semaine / mois — un clic sur la carte change, choix mémorisé)
-  const scope = getKpiScope();
   const occ = occupationSummary(state, app.schedule, scope);
-  const occLabel = scope === 'semaine' ? `semaine S${isoWeek(occ.ref)}`
-    : scope === 'mois' ? `${MONTHS_SHORT[Number(occ.ref.slice(5, 7)) - 1]} ${occ.ref.slice(0, 4)}`
-    : 'jours ouverts (période)';
-  const nbPre = rows.filter((r) => r.insc.statut === 'pre').length;
+  const occLabel = scopeName || 'jours ouverts (période)';
 
   main.innerHTML = `
     <div class="page-header">
@@ -40,13 +47,12 @@ export function renderDashboard(main) {
       </div>
     </div>
 
-    <div class="kpis">
-      <div class="kpi"><div class="kpi-value">${rows.length}</div><div class="kpi-label">📝 Inscriptions${nbPre ? ` — dont ${nbPre} pré-rés.` : ''}</div></div>
-      <div class="kpi"><div class="kpi-value">${stagiaires}</div><div class="kpi-label">🧑‍🎓 Stagiaires</div></div>
-      <div class="kpi ${errRows.length ? 'kpi-alert' : 'kpi-ok'}"><div class="kpi-value">${errRows.length ? errRows.length : '✓'}</div><div class="kpi-label">${errRows.length ? '⚠ Lignes en anomalie' : 'Aucune anomalie'}</div></div>
-      <div class="kpi"><div class="kpi-value">${openCount}<span style="font-size:14px;color:var(--muted-foreground)">/${days.length}</span></div><div class="kpi-label">📆 Jours EFI ouverts</div></div>
-      <div class="kpi kpi-click" id="kpi-occupation" role="button" tabindex="0"
-           title="Portée : ${occLabel} (${occ.days} j ouverts) — cliquer pour alterner période / semaine / mois, choix mémorisé sur votre profil">
+    <div class="kpis" id="kpis" title="Portée : ${occLabel} — cliquer sur une carte pour alterner période / semaine / mois (toutes les cartes suivent), choix mémorisé sur votre profil">
+      <div class="kpi kpi-click" role="button" tabindex="0"><div class="kpi-value">${scopedRows.length}</div><div class="kpi-label">📝 Inscriptions${suffix}${nbPre ? ` — dont ${nbPre} pré-rés.` : ''} <span class="kpi-cycle">⟳</span></div></div>
+      <div class="kpi kpi-click" role="button" tabindex="0"><div class="kpi-value">${stagiaires}</div><div class="kpi-label">🧑‍🎓 Stagiaires${suffix} <span class="kpi-cycle">⟳</span></div></div>
+      <div class="kpi kpi-click ${errRows.length ? 'kpi-alert' : 'kpi-ok'}" role="button" tabindex="0"><div class="kpi-value">${errRows.length ? errRows.length : '✓'}</div><div class="kpi-label">${errRows.length ? '⚠ Lignes en anomalie' : 'Aucune anomalie'}${suffix} <span class="kpi-cycle">⟳</span></div></div>
+      <div class="kpi kpi-click" role="button" tabindex="0"><div class="kpi-value">${openCount}<span style="font-size:14px;color:var(--muted-foreground)">/${win.workingCount}</span></div><div class="kpi-label">📆 Jours EFI ouverts${suffix} <span class="kpi-cycle">⟳</span></div></div>
+      <div class="kpi kpi-click" id="kpi-occupation" role="button" tabindex="0">
         <div class="kpi-value">${occ.pct}%<span style="font-size:13px;color:var(--muted-foreground)"> · ${occ.hours.toFixed(0)} h</span></div>
         <div class="kpi-label">🔥 Occupation — ${occLabel} <span class="kpi-cycle">⟳</span></div>
       </div>
@@ -57,9 +63,10 @@ export function renderDashboard(main) {
       ${heatmapHTML(state, weeks)}
     </div>
 
-    ${errRows.length ? `
+    ${errRowsAll.length ? `
     <div class="card">
-      <h2>⚠ Anomalies à corriger</h2>
+      <h2>⚠ Anomalies à corriger${suffix}</h2>
+      ${errRows.length ? `
       <div class="table-wrap">
         <table class="data">
           <thead><tr><th>N°</th><th>Stagiaire</th><th>Formation</th><th>Date</th><th>Anomalies</th><th></th></tr></thead>
@@ -75,12 +82,13 @@ export function renderDashboard(main) {
               </tr>`).join('')}
           </tbody>
         </table>
-      </div>
+      </div>` : `<p class="muted">Aucune anomalie sur cette portée.</p>`}
       ${errRows.length > 10 ? `<p class="muted">… et ${errRows.length - 10} autre(s) — voir <a href="#/inscriptions">Inscriptions</a>.</p>` : ''}
+      ${errRowsAll.length > errRows.length ? `<p class="muted">${errRowsAll.length - errRows.length} anomalie(s) hors portée — voir <a href="#/inscriptions">Inscriptions</a>.</p>` : ''}
     </div>` : ''}
 
     <div class="card">
-      <h2>📆 Prochaines activités</h2>
+      <h2>📆 Prochaines activités${suffix}</h2>
       ${upcoming.length ? `
       <div class="table-wrap">
         <table class="data">
@@ -98,21 +106,24 @@ export function renderDashboard(main) {
               </tr>`).join('')}
           </tbody>
         </table>
-      </div>` : `<p class="muted">Aucune inscription. Commencez par <a href="#/inscriptions">inscrire un stagiaire</a>
+      </div>` : scopeName && rows.length ? `<p class="muted">Aucune activité sur cette portée (${scopeName}).</p>`
+      : `<p class="muted">Aucune inscription. Commencez par <a href="#/inscriptions">inscrire un stagiaire</a>
         ou ouvrez des <a href="#/jours">jours EFI</a>, puis cliquez sur un créneau vert d'une <a href="#/semaine/${weeks[0].week}">grille semaine</a>.</p>`}
     </div>
   `;
 
-  // Carte occupation : un clic passe à la portée suivante (mémorisée)
-  const kpiOcc = main.querySelector('#kpi-occupation');
+  // Cartes KPI : un clic sur n'importe laquelle passe à la portée suivante
+  // (mémorisée) — toutes les cartes et listes du tableau de bord suivent.
   const cycleScope = () => {
     const next = OCCUPATION_SCOPES[(OCCUPATION_SCOPES.indexOf(getKpiScope()) + 1) % OCCUPATION_SCOPES.length];
     setKpiScope(next);
     render();
   };
-  kpiOcc.addEventListener('click', cycleScope);
-  kpiOcc.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycleScope(); }
+  main.querySelectorAll('.kpi-click').forEach((el) => {
+    el.addEventListener('click', cycleScope);
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycleScope(); }
+    });
   });
 
   main.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => openInscriptionForm({ id: Number(b.dataset.edit) })));
@@ -167,7 +178,7 @@ function heatmapHTML(state, weeks) {
   return `
     <div class="hm-wrap">
       <div class="hm-days"><span></span>${DAY_LABELS.map((d) => `<span>${d}</span>`).join('')}<span></span></div>
-      <div>
+      <div class="hm-body">
         <div class="hm-months">${monthCells}</div>
         <div class="hm-grid">${cols}</div>
       </div>
