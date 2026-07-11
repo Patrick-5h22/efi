@@ -6,14 +6,20 @@
 // Variables d'environnement Vercel requises :
 //   DATABASE_URL       chaîne de connexion Postgres (pooler de session Supabase)
 //   BETTER_AUTH_SECRET secret de signature des sessions
-//   BETTER_AUTH_URL    URL publique du site (ex. https://efi-sand.vercel.app)
 //   EFI_ACCESS_CODE    code d'accès aux RPC planning (utilisé par api/state.js)
+//   BETTER_AUTH_URL    (optionnel) URL publique — déduite automatiquement du
+//                      domaine de production Vercel si absente
 
 import { betterAuth } from 'better-auth';
 import pg from 'pg';
 
-const baseURL = process.env.BETTER_AUTH_URL
-  || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+// Domaine de production (alias public, ex. efi-rho.vercel.app) et URL du
+// déploiement courant (unique par déploiement) — fournis par Vercel.
+const prodURL = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null;
+const deployURL = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
+
+const baseURL = process.env.BETTER_AUTH_URL || prodURL || deployURL || 'http://localhost:3000';
 
 export const auth = betterAuth({
   baseURL,
@@ -100,9 +106,7 @@ export const auth = betterAuth({
     useSecureCookies: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
   },
 
-  trustedOrigins: [
-    baseURL,
-    'https://efi-sand.vercel.app',
-    ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
-  ],
+  // Origines acceptées : URL configurée, domaine de production et URL du
+  // déploiement courant (permet aussi de tester l'auth sur les previews).
+  trustedOrigins: [...new Set([baseURL, prodURL, deployURL].filter(Boolean))],
 });

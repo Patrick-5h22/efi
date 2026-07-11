@@ -50,7 +50,9 @@ export function showLoginOverlay({ onLogin }) {
       await onLogin(email, password);
       ov.remove();
     } catch (err) {
-      errEl.textContent = (err.status === 400 || err.status === 401 || err.status === 403)
+      // 403 = origine/configuration refusée par le serveur, pas un problème
+      // d'identifiants : afficher la vraie cause.
+      errEl.textContent = (err.status === 400 || err.status === 401)
         ? 'Email ou mot de passe incorrect.'
         : 'Connexion impossible : ' + err.message;
       errEl.hidden = false;
