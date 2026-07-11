@@ -1,8 +1,10 @@
 // Point d'entrée de l'application : état global, routeur, rendu.
 
 import { loadState, saveState, defaultState, seedExamples, exportJSON, importJSON, migrate } from './store.js';
-import { createSyncer, loadRemoteState, getAccessCode, setAccessCode } from './db.js';
-import { applyTheme, watchSystemTheme, setupThemeMenu } from './theme.js';
+import { createSyncer, loadRemoteState, getAccessCode, setAccessCode, setApiMode, isApiMode } from './db.js';
+import { detectAuth, signIn, signOut } from './auth-client.js';
+import { showLoginOverlay } from './views/login.js';
+import { applyTheme, watchSystemTheme, setupThemeMenu, setTheme, THEME_PRESETS } from './theme.js';
 import { setupCommandPalette, openCommandPalette } from './views/command.js';
 import { computeSchedule } from './engine.js';
 import { periodWeeks } from './dates.js';
@@ -126,7 +128,66 @@ function applyRemoteState(remote) {
   render();
 }
 
-function setupCloud() {
+// --- Authentification (Better Auth, site déployé) ---------------------------
+function setUserZone(user) {
+  const zone = document.getElementById('user-zone');
+  if (!zone) return;
+  if (user) {
+    zone.hidden = false;
+    document.getElementById('user-name').textContent = user.name || user.email;
+    zone.title = `Connecté : ${user.email}${user.role ? ' (' + user.role + ')' : ''}`;
+  } else {
+    zone.hidden = true;
+    document.getElementById('user-name').textContent = '';
+  }
+}
+
+function requestLogin() {
+  showLoginOverlay({
+    onLogin: async (email, password) => {
+      await signIn(email, password);
+      const det = await detectAuth();
+      if (!det.session) throw Object.assign(new Error('Session introuvable après connexion.'), { status: 500 });
+      await startApiSession(det.session);
+    },
+  });
+}
+
+// Session Better Auth active : chargement du planning via le proxy /api/state
+async function startApiSession(session, { silent = false } = {}) {
+  setUserZone(session.user);
+  // Thème préféré du compte (partagé avec EFI Placement), sauf choix local déjà fait
+  const preset = session.user.theme;
+  if (preset && !localStorage.getItem('efi-theme') && THEME_PRESETS.some((p) => p.id === preset)) {
+    setTheme({ preset });
+  }
+  try {
+    const remote = await loadRemoteState(null);
+    app.syncer.seenSavedAt(remote.savedAt);
+    applyRemoteState(remote);
+    app.syncer.setStatus('idle');
+    app.syncer.startPolling();
+    if (!silent) toast(`Bienvenue ${session.user.name || session.user.email} — planning chargé.`, 'ok');
+  } catch (e) {
+    if (e.authExpired) return requestLogin();
+    toast('Base partagée injoignable : ' + e.message + ' — mode local conservé.', 'error');
+    app.syncer.setStatus('error', e.message);
+    app.syncer.startPolling();
+  }
+}
+
+async function logout() {
+  if (!confirm('Se déconnecter ?')) return;
+  if (app.syncer.pending) await app.syncer.flush(); // ne pas perdre une sauvegarde en attente
+  await signOut();
+  app.syncer.stopPolling();
+  app.syncer.setStatus('off');
+  setUserZone(null);
+  toast('Déconnecté.', 'ok');
+  requestLogin();
+}
+
+async function setupCloud() {
   app.syncer = createSyncer({
     getState: () => app.state,
     onStatus: setCloudStatus,
@@ -137,8 +198,17 @@ function setupCloud() {
       toast('Planning mis à jour depuis la base partagée.', 'ok');
       return true;
     },
+    onAuthError: () => {
+      setUserZone(null);
+      toast('Session expirée — reconnectez-vous.', 'error');
+      requestLogin();
+    },
   });
   document.getElementById('cloud-status').addEventListener('click', async () => {
+    if (isApiMode()) {
+      toast('Base partagée via votre compte — utilisez « Se déconnecter » pour quitter.', 'ok');
+      return;
+    }
     const current = getAccessCode(localStorage);
     if (current) {
       if (confirm('Se déconnecter de la base partagée ? (les données restent en local)')) {
@@ -151,6 +221,17 @@ function setupCloud() {
     const code = prompt('Code d’accès de la base partagée EFI :');
     if (code?.trim()) await connectCloud(code.trim());
   });
+  document.getElementById('btn-logout')?.addEventListener('click', logout);
+
+  // Site déployé avec fonctions serverless → authentification obligatoire ;
+  // hébergement statique (poste local…) → mode historique par code d'accès.
+  const det = await detectAuth();
+  if (det.available) {
+    setApiMode(true);
+    if (det.session) startApiSession(det.session, { silent: true });
+    else requestLogin();
+    return;
+  }
   // Connexion permanente : code du poste, sinon code injecté au déploiement
   const code = getAccessCode(localStorage);
   if (code) connectCloud(code, { silent: !!globalThis.EFI_ACCESS_CODE && !localStorage.getItem('efi-cloud-code') });

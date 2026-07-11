@@ -20,6 +20,40 @@ export function setAccessCode(storage, code) {
   else storage.removeItem(CODE_KEY);
 }
 
+// ---------------------------------------------------------------------------
+// Mode API : sur le site déployé (Vercel), l'accès à la base passe par le
+// proxy authentifié /api/state (session Better Auth obligatoire) — le code
+// d'accès reste côté serveur. Ailleurs (poste local, hébergement statique),
+// le mode historique « code d'accès » reste utilisé.
+// ---------------------------------------------------------------------------
+let apiMode = false;
+export function setApiMode(on) { apiMode = !!on; }
+export function isApiMode() { return apiMode; }
+
+function remoteEnabled(storage) {
+  return apiMode || !!getAccessCode(storage);
+}
+
+async function apiState(method, body) {
+  const res = await fetch('/api/state', {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    let message = `Erreur ${res.status}`;
+    try {
+      const data = await res.json();
+      if (data.message) message = data.message;
+    } catch { /* réponse non JSON */ }
+    const err = new Error(message);
+    err.status = res.status;
+    err.authExpired = res.status === 401;
+    throw err;
+  }
+  return res.json();
+}
+
 async function rpc(name, args) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: 'POST',
@@ -45,16 +79,16 @@ async function rpc(name, args) {
 }
 
 export function loadRemoteState(code) {
+  if (apiMode) return apiState('GET');
   return rpc('efi_load_state', { p_code: code });
 }
 
 export function saveRemoteState(code, state) {
   // On n'envoie que les champs persistés (pas de dérivés)
   const { params, formations, team, openDays, dayAssignments, inscriptions } = state;
-  return rpc('efi_save_state', {
-    p_code: code,
-    p_state: { params, formations, team, openDays, dayAssignments, inscriptions },
-  });
+  const payload = { params, formations, team, openDays, dayAssignments, inscriptions };
+  if (apiMode) return apiState('PUT', payload);
+  return rpc('efi_save_state', { p_code: code, p_state: payload });
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +101,7 @@ export function saveRemoteState(code, state) {
 export const POLL_INTERVAL_MS = 45_000;
 const RETRY_INTERVAL_MS = 20_000;
 
-export function createSyncer({ getState, onStatus, onRemoteChange }) {
+export function createSyncer({ getState, onStatus, onRemoteChange, onAuthError }) {
   let timer = null;
   let pollTimer = null;
   let pending = false;
@@ -78,17 +112,25 @@ export function createSyncer({ getState, onStatus, onRemoteChange }) {
   const set = (s, detail) => { status = s; onStatus(s, detail); };
 
   const flush = async () => {
-    const code = getAccessCode(localStorage);
-    if (!code) { set('off'); return; }
+    if (!remoteEnabled(localStorage)) { set('off'); return; }
     pending = false;
     inFlight = true;
     set('saving');
     try {
-      const res = await saveRemoteState(code, getState());
+      const res = await saveRemoteState(getAccessCode(localStorage), getState());
       lastSavedAt = res.savedAt || lastSavedAt;
       if (!pending) set('idle');
     } catch (e) {
-      set('error', e.message);
+      if (e.authExpired) {
+        // Session expirée : on repasse hors ligne et l'application redemande
+        // la connexion (la sauvegarde repartira après ré-authentification).
+        pending = true;
+        stopPolling();
+        set('off');
+        onAuthError?.();
+      } else {
+        set('error', e.message);
+      }
     } finally {
       inFlight = false;
     }
@@ -98,10 +140,9 @@ export function createSyncer({ getState, onStatus, onRemoteChange }) {
   // changement fait ailleurs. Sans effet si une sauvegarde est en cours
   // ou en attente (nos modifications priment, elles vont écraser).
   const poll = async () => {
-    const code = getAccessCode(localStorage);
-    if (!code || pending || inFlight || document.hidden) return;
+    if (!remoteEnabled(localStorage) || pending || inFlight || document.hidden) return;
     try {
-      const remote = await loadRemoteState(code);
+      const remote = await loadRemoteState(getAccessCode(localStorage));
       const remoteAt = remote.savedAt || null;
       if (lastSavedAt == null) {
         lastSavedAt = remoteAt;
@@ -114,7 +155,13 @@ export function createSyncer({ getState, onStatus, onRemoteChange }) {
       }
       if (status === 'error') set('idle'); // reprise après coupure
     } catch (e) {
-      if (status !== 'error') set('error', e.message);
+      if (e.authExpired) {
+        stopPolling();
+        set('off');
+        onAuthError?.();
+      } else if (status !== 'error') {
+        set('error', e.message);
+      }
     }
   };
 
@@ -136,9 +183,10 @@ export function createSyncer({ getState, onStatus, onRemoteChange }) {
 
   return {
     get status() { return status; },
-    enabled: () => !!getAccessCode(localStorage),
+    get pending() { return pending; },
+    enabled: () => remoteEnabled(localStorage),
     schedule() {
-      if (!getAccessCode(localStorage)) return;
+      if (!remoteEnabled(localStorage)) return;
       pending = true;
       clearTimeout(timer);
       timer = setTimeout(flush, 800);

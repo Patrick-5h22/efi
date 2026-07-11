@@ -1,6 +1,7 @@
+node_modules
 tests
 docs
 .github
 EVALUATION.md
+EVALUATION-UI.md
 README.md
-package.json

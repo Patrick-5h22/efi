@@ -25,7 +25,9 @@ python3 -m http.server 8080
 Les données sont sauvegardées automatiquement dans le navigateur
 (localStorage) et peuvent être exportées/importées en JSON.
 Une **base partagée Supabase** permet de synchroniser le planning entre
-plusieurs postes : bouton ☁ de la barre latérale + code d'accès
+plusieurs postes. Sur le site déployé (Vercel), l'accès est protégé par
+des **comptes nominatifs Better Auth** (les mêmes que l'application
+EFI Placement) ; en local, bouton ☁ + code d'accès
 (voir [docs/SUPABASE.md](docs/SUPABASE.md)).
 
 **Migration depuis le classeur Excel** : enregistrer l'onglet
@@ -91,9 +93,15 @@ js/config.js        Paramètres par défaut (issus du classeur)
 js/dates.js         Dates, semaines ISO, créneaux
 js/store.js         État, persistance, import/export
 js/engine.js        Moteur : affectation auto + contrôles (STATUT)
+js/db.js            Synchronisation base partagée (code d'accès ou API)
+js/auth-client.js   Client Better Auth (session, connexion, déconnexion)
 js/views/…          Vues (inscriptions, semaines, synthèse, plannings…)
+api/                Fonctions serverless Vercel (Better Auth + proxy /api/state)
 tests/              Tests unitaires (node:test)
 ```
+
+Le front reste 100 % statique et sans build ; les seules dépendances npm
+(`better-auth`, `pg`) servent aux fonctions serverless du dossier `api/`.
 
 Voir [EVALUATION.md](EVALUATION.md) pour la grille d'évaluation et
 l'historique des itérations.
