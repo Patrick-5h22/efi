@@ -9,7 +9,7 @@ import { buildICS, downloadICS } from '../ics.js';
 import { importInscriptionsCSV } from '../csv.js';
 import { addInscription } from '../store.js';
 
-const filters = { search: '', week: '', status: '', dossier: '' };
+const filters = { search: '', formation: '', week: '', status: '', dossier: '' };
 let sortKey = 'id';
 let sortDir = 1;
 
@@ -29,6 +29,7 @@ export function renderInscriptions(main) {
 
   const visible = rows.filter((row) => {
     if (filters.search && !row.insc.stagiaire.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (filters.formation && row.insc.formation !== filters.formation) return false;
     if (filters.week && String(row.semaine) !== filters.week) return false;
     if (filters.status === 'ok' && row.errors.length) return false;
     if (filters.status === 'error' && !row.errors.length) return false;
@@ -57,6 +58,12 @@ export function renderInscriptions(main) {
     <div class="card no-print">
       <div class="form-row">
         <label class="field">Recherche stagiaire <input id="f-search" value="${esc(filters.search)}" placeholder="Nom…"></label>
+        <label class="field">Formation
+          <select id="f-formation">
+            <option value="">Toutes</option>
+            ${state.formations.map((f) => `<option value="${esc(f.code)}" ${f.code === filters.formation ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}
+          </select>
+        </label>
         <label class="field">Semaine
           <select id="f-week">
             <option value="">Toutes</option>
@@ -101,6 +108,7 @@ export function renderInscriptions(main) {
 
   main.querySelector('#btn-add').addEventListener('click', () => openInscriptionForm());
   main.querySelector('#f-search').addEventListener('input', (e) => { filters.search = e.target.value; renderInscriptions(main); focusEnd(main, '#f-search'); });
+  main.querySelector('#f-formation').addEventListener('change', (e) => { filters.formation = e.target.value; renderInscriptions(main); });
   main.querySelector('#f-week').addEventListener('change', (e) => { filters.week = e.target.value; renderInscriptions(main); });
   main.querySelector('#f-status').addEventListener('change', (e) => { filters.status = e.target.value; renderInscriptions(main); });
   main.querySelector('#f-dossier').addEventListener('change', (e) => { filters.dossier = e.target.value; renderInscriptions(main); });
