@@ -94,6 +94,22 @@ body {
 #btn-logout { color: var(--muted-foreground); }
 #btn-logout:hover { color: var(--destructive); border-color: var(--destructive); }
 
+/* ---------- Voile de démarrage / verrouillage (avant authentification) ---- */
+#boot-veil { display: none; }
+.auth-pending #app { visibility: hidden; }
+.auth-pending #boot-veil {
+  display: flex; position: fixed; inset: 0; z-index: 250;
+  align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--background) 96%, var(--primary));
+}
+.boot-brand {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 30px; font-weight: 700; color: var(--foreground);
+  animation: boot-pulse 1.6s ease-in-out infinite;
+}
+.boot-dot { color: #e11d48; }
+@keyframes boot-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
 /* ---------- Écran de connexion (maquette Cipecma) ---------- */
 #login-overlay {
   position: fixed; inset: 0; z-index: 300;

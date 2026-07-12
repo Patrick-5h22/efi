@@ -143,6 +143,13 @@ function setUserZone(user) {
   }
 }
 
+// Voile de démarrage : l'application (et ses données) reste masquée tant que
+// la session n'est pas tranchée — pas de flash du planning avant connexion,
+// ni après déconnexion.
+function setAuthPending(on) {
+  document.documentElement.classList.toggle('auth-pending', on);
+}
+
 // Erreur renvoyée par le fournisseur externe (retour OAuth : ?error=… dans
 // l'URL) : consommée une fois, affichée sur l'écran de connexion.
 function consumeAuthError() {
@@ -185,9 +192,11 @@ async function startApiSession(session, { silent = false } = {}) {
     app.syncer.startPolling();
     // Préférences du profil (portée de la carte d'occupation, …)
     loadRemotePrefs().then((changed) => { if (changed) render(); });
+    setAuthPending(false);
     if (!silent) toast(`Bienvenue ${session.user.name || session.user.email} — planning chargé.`, 'ok');
   } catch (e) {
     if (e.authExpired) return requestLogin();
+    setAuthPending(false);
     toast('Base partagée injoignable : ' + e.message + ' — mode local conservé.', 'error');
     app.syncer.setStatus('error', e.message);
     app.syncer.startPolling();
@@ -201,6 +210,7 @@ async function logout() {
   app.syncer.stopPolling();
   app.syncer.setStatus('off');
   setUserZone(null);
+  setAuthPending(true); // remasquer le planning derrière l'écran de connexion
   toast('Déconnecté.', 'ok');
   requestLogin();
 }
@@ -218,6 +228,7 @@ async function setupCloud() {
     },
     onAuthError: () => {
       setUserZone(null);
+      setAuthPending(true);
       toast('Session expirée — reconnectez-vous.', 'error');
       requestLogin();
     },
@@ -247,10 +258,12 @@ async function setupCloud() {
   const det = await detectAuth();
   if (det.available) {
     setApiMode(true);
-    if (det.session) startApiSession(det.session, { silent: true });
-    else requestLogin(authError);
+    if (det.session) startApiSession(det.session, { silent: true }); // lèvera le voile une fois le planning chargé
+    else requestLogin(authError); // le voile reste : l'écran de connexion le recouvre
     return;
   }
+  // Hébergement statique sans authentification : application visible
+  setAuthPending(false);
   // Connexion permanente : code du poste, sinon code injecté au déploiement
   const code = getAccessCode(localStorage);
   if (code) connectCloud(code, { silent: !!globalThis.EFI_ACCESS_CODE && !localStorage.getItem('efi-cloud-code') });
