@@ -14,7 +14,12 @@ async function readJSON(res) {
 //  → { available: true, session: {user,…} }  connecté
 export async function detectAuth() {
   try {
-    const res = await fetch('/api/auth/get-session', { headers: { Accept: 'application/json' } });
+    // Délai borné : au pire, l'application démarre en mode local plutôt
+    // que de rester voilée indéfiniment
+    const res = await fetch('/api/auth/get-session', {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
     const type = res.headers.get('content-type') || '';
     if (!res.ok || !type.includes('application/json')) return { available: false };
     const data = await readJSON(res);

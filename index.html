@@ -6,6 +6,9 @@
   <title>EFI — Planification formations & tests</title>
   <link rel="stylesheet" href="css/style.css">
   <script>
+    // L'application reste voilée tant que l'authentification n'est pas
+    // tranchée (retiré par js/app.js : mode local, ou session vérifiée)
+    document.documentElement.classList.add('auth-pending');
     // Application du thème avant le premier rendu (anti-flash)
     try {
       const t = JSON.parse(localStorage.getItem('efi-theme') || '{}');
@@ -46,6 +49,7 @@
     </aside>
     <main id="main" aria-live="polite"></main>
   </div>
+  <div id="boot-veil" aria-hidden="true"><span class="boot-brand">Cipecma<span class="boot-dot">.</span></span></div>
   <div id="toast-zone" aria-live="polite"></div>
   <script src="js/access.js"></script>
   <script type="module" src="js/app.js"></script>
