@@ -170,8 +170,10 @@ function focusEnd(main, sel) {
 function rowHTML(state, row) {
   const { insc, formation } = row;
   const manuel = ' <span title="Choix manuel">✎</span>';
-  const fmtF = row.formateurEffectif ? esc(memberName(state, row.formateurEffectif)) + (insc.formateurId ? manuel : '') : '<span class="badge badge-warn">—</span>';
-  const fmtT = formation?.tests
+  const fmtF = formation?.testOnly
+    ? '<span class="muted" title="Épreuve tenue par un testeur — pas de formateur">n/a</span>'
+    : row.formateurEffectif ? esc(memberName(state, row.formateurEffectif)) + (insc.formateurId ? manuel : '') : '<span class="badge badge-warn">—</span>';
+  const fmtT = (formation?.tests || formation?.testOnly)
     ? (row.testeurEffectif ? esc(memberName(state, row.testeurEffectif)) + (insc.testeurId ? manuel : '') : '<span class="badge badge-warn">—</span>')
     : '<span class="muted">n/a</span>';
 
@@ -186,7 +188,7 @@ function rowHTML(state, row) {
       <td>${esc(insc.type)}</td>
       <td>${fmtTime(row.duree).replace(':', 'h')}</td>
       <td>${insc.datePratique ? `${fmtDateShort(insc.datePratique)}<br>${fmtTime(insc.debutPratique)} → ${fmtTime(row.finPratique)}` : '<span class="muted">—</span>'}</td>
-      <td>${insc.dateTheorie ? `${fmtDateShort(insc.dateTheorie)}<br>${fmtTime(row.heureTheorie)}` : '<span class="muted">—</span>'}</td>
+      <td>${insc.dateTheorie ? `${fmtDateShort(insc.dateTheorie)}<br>${fmtTime(row.heureTheorie)}` : '<span class="muted">—</span>'}${theorieFormationCell(state, row)}</td>
       <td>${insc.dateTestPratique ? `${fmtDateShort(insc.dateTestPratique)}<br>${fmtTime(insc.debutTestPratique)} → ${fmtTime(row.finTestPratique)}` : '<span class="muted">—</span>'}</td>
       <td>${fmtF}</td>
       <td>${fmtT}</td>
@@ -204,11 +206,27 @@ function rowHTML(state, row) {
   `;
 }
 
+// Théorie de la formation (modes centre / présentiel) — affichée sous le
+// test théorique dans la colonne Théorie
+function theorieFormationCell(state, row) {
+  const i = row.insc;
+  if (!i.modeTheorie || i.modeTheorie === 'distance') return '';
+  const icon = i.modeTheorie === 'presentiel' ? '📖' : '💻';
+  const label = i.modeTheorie === 'presentiel' ? 'présentiel' : 'centre';
+  if (!i.dateTheorieFormation || i.debutTheorieFormation == null) {
+    return `<br><span class="badge badge-warn" title="Théorie ${label} à planifier">${icon} à planifier</span>`;
+  }
+  const who = i.modeTheorie === 'presentiel' ? (memberName(state, row.formateurTheorieEffectif) || '⚠') : 'salle';
+  return `<br><span class="muted" title="Théorie ${label} — ${esc(who)}">${icon} ${fmtDateShort(i.dateTheorieFormation)} ${fmtTime(i.debutTheorieFormation)}</span>`;
+}
+
 function exportCSV(state, rows) {
   const sep = ';';
   const header = ['N°', 'Stagiaire', 'Formation', 'Type', 'Durée pratique', 'Date pratique', 'Début pratique', 'Fin pratique',
     'Date théorie', 'Heure théorie', 'Date test pratique', 'Début test', 'Fin test',
+    'Mode théorie', 'Date théorie formation', 'Début théorie formation', 'Fin théorie formation', 'Formateur théorie',
     'Formateur effectif', 'Testeur effectif', 'Reco', 'Semaine', 'Statut'];
+  const modeLabels = { distance: 'E-learning hors centre', centre: 'E-learning en centre', presentiel: 'Présentiel' };
   const lines = rows.map((row) => {
     const i = row.insc;
     return [
@@ -216,6 +234,9 @@ function exportCSV(state, rows) {
       fmtDateShort(i.datePratique), fmtTime(i.debutPratique), fmtTime(row.finPratique),
       fmtDateShort(i.dateTheorie), i.dateTheorie ? fmtTime(row.heureTheorie) : '',
       fmtDateShort(i.dateTestPratique), fmtTime(i.debutTestPratique), fmtTime(row.finTestPratique),
+      modeLabels[i.modeTheorie] || modeLabels.distance,
+      fmtDateShort(i.dateTheorieFormation), fmtTime(i.debutTheorieFormation), fmtTime(row.finTheorieFormation),
+      i.modeTheorie === 'presentiel' ? memberName(state, row.formateurTheorieEffectif) : '',
       memberName(state, row.formateurEffectif), memberName(state, row.testeurEffectif),
       row.formation?.reco || '', row.semaine ?? '',
       row.errors.length ? row.errors.join(' | ') : '✓ OK',

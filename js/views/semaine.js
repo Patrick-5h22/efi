@@ -97,6 +97,7 @@ function gridHTML(state, days, kind) {
         if (r.cancelled) continue;
         if (kind === 'F' && r.insc.datePratique === date && r.formateurEffectif) autoIds.add(r.formateurEffectif);
         if (kind === 'T' && r.insc.dateTestPratique === date && r.testeurEffectif) autoIds.add(r.testeurEffectif);
+        if (kind === 'T' && r.formation?.testOnly && r.insc.datePratique === date && r.testeurEffectif) autoIds.add(r.testeurEffectif);
       }
       if (kind === 'T' && theoryTesters.get(date)) autoIds.add(theoryTesters.get(date));
       who = autoIds.size
@@ -117,11 +118,27 @@ function gridHTML(state, days, kind) {
         return `<td class="slot-theory"><span class="slot-name">THÉORIE (${n} cand.)</span><span class="slot-detail">Testeur : ${esc(memberName(state, theoryTesters.get(date)) || '?')}</span></td>`;
       }
 
-      // Occupations
+      // Sessions de théorie présentielle (grille formateur)
+      if (kind === 'F') {
+        const sess = (app.schedule.theorySessions || []).filter((s) => s.date === date && t < s.fin && slotEnd > s.debut);
+        if (sess.length) {
+          const label = sess.map((s) => `<span class="slot-name">THÉORIE ${esc(s.reco)} (${s.stagiaires.length})</span><span class="slot-detail">${s.type === 'Initial' ? '7h00' : '3h30'} — Form. : ${esc(memberName(state, s.formateurId) || '⚠')}</span>`).join('');
+          const tip = sess.map((s) => `Théorie ${s.reco} ${s.type} — ${s.stagiaires.join(', ')}`).join(' | ');
+          return `<td class="slot-theory" title="${esc(tip)}">${label}</td>`;
+        }
+      }
+
+      // Occupations. Les formations « épreuve seule » (AIPR) occupent la
+      // grille TESTEUR sur leur créneau (champs Pratique), jamais la grille
+      // FORMATEUR.
       const occupants = rows.filter((r) => {
         if (r.cancelled) return false;
         const i = r.insc;
         if (kind === 'F') {
+          return !r.formation?.testOnly && i.datePratique === date && i.debutPratique != null
+            && i.debutPratique < slotEnd && r.finPratique > t;
+        }
+        if (r.formation?.testOnly) {
           return i.datePratique === date && i.debutPratique != null
             && i.debutPratique < slotEnd && r.finPratique > t;
         }
@@ -130,7 +147,8 @@ function gridHTML(state, days, kind) {
       });
 
       if (occupants.length) {
-        const label = occupants.map((r) => `<span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || ''))}</span><span class="slot-detail">${esc(kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?') : 'Testeur : ' + (memberName(state, r.testeurEffectif) || '?'))}</span>`).join('<hr style="margin:2px 0;border:none;border-top:1px dashed var(--grid-line)">');
+        const tLabel = (r) => r.formation?.testOnly ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || '');
+        const label = occupants.map((r) => `<span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span><span class="slot-detail">${esc(kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?') : 'Testeur : ' + (memberName(state, r.testeurEffectif) || '?'))}</span>`).join('<hr style="margin:2px 0;border:none;border-top:1px dashed var(--grid-line)">');
         const inscAttr = occupants.length === 1 ? ` data-insc="${occupants[0].insc.id}"` : '';
         const pre = occupants.every((r) => r.insc.statut === 'pre') ? ' slot-pre' : '';
         const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`).join(' | ');
@@ -143,7 +161,7 @@ function gridHTML(state, days, kind) {
     // Charge de formation pratique du jour (grille formateur)
     let loadInfo = '';
     if (kind === 'F' && open && inPeriod) {
-      const load = rows.reduce((sum, r) => sum + (!r.cancelled && r.insc.datePratique === date && r.insc.debutPratique != null ? r.duree : 0), 0);
+      const load = rows.reduce((sum, r) => sum + (!r.cancelled && !r.formation?.testOnly && r.insc.datePratique === date && r.insc.debutPratique != null ? r.duree : 0), 0);
       if (load > 0) {
         const over = load > state.params.maxDailyLoad;
         loadInfo = `<br><span style="font-weight:400;font-size:10px;color:${over ? 'var(--error)' : 'var(--muted-foreground)'}">${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''} / ${fmtTime(state.params.maxDailyLoad).replace(':', 'h')}</span>`;

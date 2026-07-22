@@ -11,6 +11,7 @@ export const DEFAULT_PARAMS = {
   theoryDuration: 60,        // 1h00
   practicalTestDuration: 60, // 1h00
   maxDailyLoad: 360,         // 6h00 de formation pratique max / jour / formateur
+  salleCapacite: 12,         // places en salle de théorie (présentiel + e-learning en centre)
   holidays: [
     { date: '2026-11-11', label: 'Armistice 1918' },
     { date: '2026-12-25', label: 'Noël' },
@@ -25,9 +26,27 @@ export const DEFAULT_FORMATIONS = [
   { code: 'R486-A', label: 'Pratique R486 Cat A', reco: 'R486', dureeInitial: 120, dureeRecyclage: 120, tests: true, capacite: 1 },
   { code: 'R486-B', label: 'Pratique R486 Cat B', reco: 'R486', dureeInitial: 120, dureeRecyclage: 120, tests: true, capacite: 1 },
   { code: 'HAB-ELEC', label: 'Habilitation électrique', reco: 'HAB ELEC', dureeInitial: 120, dureeRecyclage: 120, tests: false, capacite: 1 },
+  // AIPR : la formation se fait à distance (e-learning) — seule l'épreuve
+  // (QCM surveillé, 2h00) est planifiée sur site, tenue par un testeur.
+  { code: 'AIPR', label: 'AIPR (épreuve sur site)', reco: 'AIPR', dureeInitial: 120, dureeRecyclage: 120, tests: false, capacite: 1, testOnly: true },
 ];
 
 export const TYPES = ['Initial', 'Recyclage'];
+
+// Théorie de la formation (phase présentielle ou e-learning en centre)
+export const THEORIE_PRESENTIEL_DUREES = { Initial: 420, Recyclage: 210 }; // 7h00 / 3h30
+export const THEORIE_CENTRE_DUREE_DEFAUT = 210; // 3h30, modifiable à la saisie
+export const MODES_THEORIE = [
+  { id: 'distance', label: 'E-learning hors centre (rien à planifier)' },
+  { id: 'centre', label: 'E-learning en centre (créneau en salle)' },
+  { id: 'presentiel', label: 'Présentiel (session inter)' },
+];
+
+export function dureeTheorieFor(insc) {
+  if (insc.modeTheorie === 'presentiel') return THEORIE_PRESENTIEL_DUREES[insc.type] ?? THEORIE_PRESENTIEL_DUREES.Initial;
+  if (insc.modeTheorie === 'centre') return insc.dureeTheorieCentre ?? THEORIE_CENTRE_DUREE_DEFAUT;
+  return 0;
+}
 
 export const MAX_TEAM = 12;
 

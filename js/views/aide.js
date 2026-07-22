@@ -36,6 +36,9 @@ export function renderAide(main) {
         <li>Un candidat peut faire sa formation et ses tests le même jour en décalant les horaires : seuls les chevauchements réels sont signalés.</li>
       </ol>
       <p class="muted">Astuce : sur une grille de semaine, cliquer sur un créneau vert préremplit directement le formulaire d'inscription.</p>
+      <p class="muted"><b>Saisie guidée</b> : les listes de dates ne proposent que les jours ouverts du plateau, et les heures
+      uniquement les créneaux où un intervenant habilité, présent ce jour-là et libre existe. Cocher « Saisie libre »
+      dans le formulaire pour réafficher tous les créneaux (les contrôles STATUT restent actifs).</p>
     </div>
 
     <div class="card">
@@ -48,6 +51,18 @@ export function renderAide(main) {
         <li><b>Formateur ≠ testeur du même candidat</b> : le formateur du jour de pratique ne peut être le testeur du candidat (théorie ou test pratique).</li>
         <li><b>Habilitations</b> : un intervenant affecté hors de ses habilitations F/T est signalé.</li>
         <li><b>Jours EFI</b> : toute inscription sur un jour non ouvert est signalée.</li>
+        <li><b>Présence du jour</b> : sur la page Jours EFI, cocher les intervenants présents chaque jour
+          (« Tous » par défaut) — l'affectation automatique ne choisit que parmi eux, et un intervenant
+          positionné un jour où il n'est pas présent est signalé.</li>
+        <li><b>AIPR</b> : la formation se fait à distance (e-learning) — seule l'épreuve sur site (2h00,
+          tenue par un testeur habilité AIPR) se planifie ici, sans formateur ni autre test.</li>
+        <li><b>Théorie de la formation</b> (3 modes, par inscription) :
+          <b>e-learning hors centre</b> (défaut, rien à planifier) ;
+          <b>e-learning en centre</b> (créneau en salle, sans formateur) ;
+          <b>présentiel</b> — sessions <b>inter</b> de 7h00 (initiale) ou 3h30 (recyclage) :
+          les stagiaires de la même recommandation saisis sur le même créneau partagent la session
+          et son formateur. La <b>capacité de la salle</b> (Paramètres) est contrôlée en cumulant
+          présentiel et e-learning en centre — dépassement signalé, créneaux pleins non proposés.</li>
       </ul>
     </div>
 

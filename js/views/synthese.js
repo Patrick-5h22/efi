@@ -51,10 +51,14 @@ function buildEvents(state, days) {
     if (row.cancelled) continue;
     const i = row.insc;
     if (daySet.has(i.datePratique) && i.debutPratique != null) {
+      // Formation « épreuve seule » (AIPR) : c'est une épreuve tenue par un testeur
+      const exam = row.formation?.testOnly;
       events.push({
         date: i.datePratique, start: i.debutPratique, end: row.finPratique,
-        stagiaire: i.stagiaire, action: `Formation pratique — ${shortCat(row)}`,
-        who: memberName(state, row.formateurEffectif) || '⚠', kind: 'pratique',
+        stagiaire: i.stagiaire,
+        action: exam ? `Épreuve — ${shortCat(row)}` : `Formation pratique — ${shortCat(row)}`,
+        who: memberName(state, exam ? row.testeurEffectif : row.formateurEffectif) || '⚠',
+        kind: exam ? 'test' : 'pratique',
       });
     }
     if (daySet.has(i.dateTestPratique) && i.debutTestPratique != null && row.formation?.tests) {
@@ -62,6 +66,26 @@ function buildEvents(state, days) {
         date: i.dateTestPratique, start: i.debutTestPratique, end: row.finTestPratique,
         stagiaire: i.stagiaire, action: `Test pratique — ${shortCat(row)}`,
         who: memberName(state, row.testeurEffectif) || '⚠', kind: 'test',
+      });
+    }
+  }
+
+  // Sessions de théorie présentielle (inter) + e-learning en centre
+  for (const s of app.schedule.theorySessions || []) {
+    if (!daySet.has(s.date)) continue;
+    events.push({
+      date: s.date, start: s.debut, end: s.fin,
+      stagiaire: `Session ${s.reco} ${s.type === 'Initial' ? 'initiale (7h00)' : 'recyclage (3h30)'} — ${s.stagiaires.length} stagiaire(s) : ${s.stagiaires.join(', ')}`,
+      action: 'THÉORIE PRÉSENTIELLE', who: memberName(state, s.formateurId) || '⚠', kind: 'theorie',
+    });
+  }
+  for (const row of rows) {
+    if (row.cancelled) continue;
+    const i = row.insc;
+    if (i.modeTheorie === 'centre' && daySet.has(i.dateTheorieFormation) && i.debutTheorieFormation != null) {
+      events.push({
+        date: i.dateTheorieFormation, start: i.debutTheorieFormation, end: row.finTheorieFormation,
+        stagiaire: i.stagiaire, action: 'E-learning en centre (salle)', who: '—', kind: 'theorie',
       });
     }
   }

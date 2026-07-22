@@ -14,6 +14,8 @@ export function defaultState() {
     openDays: [...DEFAULT_OPEN_DAYS],
     // Affectations jour par jour : { '2026-09-01': { formateur: 'p1', testeur: 'p2' } }
     dayAssignments: {},
+    // Présence des intervenants : { '2026-09-01': ['p1'] } — clé absente = tous présents
+    dayPresence: {},
     inscriptions: [],
     nextId: 1,
   };
@@ -68,6 +70,14 @@ export function addInscription(state, data) {
     debutTestPratique: data.debutTestPratique ?? null,
     formateurId: data.formateurId || null, // choix manuel (sinon affectation auto)
     testeurId: data.testeurId || null,
+    // Théorie de la formation : distance (e-learning hors centre, défaut —
+    // rien à planifier) | centre (e-learning en centre : créneau en salle)
+    // | presentiel (session inter mutualisée par recommandation)
+    modeTheorie: data.modeTheorie || 'distance',
+    dateTheorieFormation: data.dateTheorieFormation || null,
+    debutTheorieFormation: data.debutTheorieFormation ?? null,
+    dureeTheorieCentre: data.dureeTheorieCentre ?? null, // minutes (mode centre, défaut 3h30)
+    formateurTheorieId: data.formateurTheorieId || null, // présentiel (sinon auto)
     // Dossier de réservation
     entreprise: (data.entreprise || '').trim() || null,
     siret: (data.siret || '').trim() || null,
@@ -121,12 +131,19 @@ export function migrate(state) {
   // Complète les champs manquants sans écraser les données existantes
   state.params = { ...base.params, ...(state.params || {}) };
   state.formations = state.formations?.length ? state.formations : base.formations;
+  // Formations ajoutées au catalogue par défaut (ex. AIPR) : injectées dans
+  // les états existants sans toucher aux formations personnalisées
+  for (const f of base.formations) {
+    if (!state.formations.some((x) => x.code === f.code)) state.formations.push(structuredClone(f));
+  }
   state.team = state.team || [];
   state.openDays = state.openDays || [];
   state.dayAssignments = state.dayAssignments || {};
+  state.dayPresence = state.dayPresence || {};
   state.inscriptions = state.inscriptions || [];
   for (const i of state.inscriptions) {
     if (!i.statut) i.statut = 'confirmee';
+    if (!i.modeTheorie) i.modeTheorie = 'distance';
   }
   state.nextId = state.nextId || (Math.max(0, ...state.inscriptions.map((i) => i.id)) + 1);
   return state;

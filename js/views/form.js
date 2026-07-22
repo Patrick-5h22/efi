@@ -3,9 +3,9 @@
 
 import { app, esc, toast } from '../app.js';
 import { addInscription, updateInscription } from '../store.js';
-import { formationByCode, dureeFor, TYPES } from '../config.js';
+import { formationByCode, dureeFor, TYPES, MODES_THEORIE, THEORIE_CENTRE_DUREE_DEFAUT, dureeTheorieFor } from '../config.js';
 import { daySlots, fmtTime, workingDays, fmtDateDay } from '../dates.js';
-import { computeSchedule, memberAvailability, suggestSlots } from '../engine.js';
+import { computeSchedule, memberAvailability, suggestSlots, availableSlotsFor, availableTheorieSlots, roomFreeSlots } from '../engine.js';
 
 let dialog = null;
 
@@ -24,6 +24,11 @@ export function openInscriptionForm(options = {}) {
     debutTestPratique: options.debutTestPratique ?? null,
     formateurId: null,
     testeurId: null,
+    modeTheorie: options.modeTheorie || 'distance',
+    dateTheorieFormation: options.dateTheorieFormation || null,
+    debutTheorieFormation: options.debutTheorieFormation ?? null,
+    dureeTheorieCentre: null,
+    formateurTheorieId: null,
     entreprise: options.entreprise || '',
     siret: options.siret || '',
     statut: options.statut || 'confirmee',
@@ -36,14 +41,32 @@ export function openInscriptionForm(options = {}) {
   const slots = daySlots(state.params);
   const openSet = new Set(state.openDays);
   const days = workingDays(state.params);
+  // Mode guidé (défaut) : seuls les jours ouverts et les créneaux avec une
+  // ressource disponible sont proposés. « Saisie libre » réaffiche tout.
+  let expert = false;
 
-  const dayOptions = (selected) => days.map((d) =>
-    `<option value="${d}" ${d === selected ? 'selected' : ''}>${fmtDateDay(d)}${openSet.has(d) ? '' : ' (fermé)'}</option>`
-  ).join('');
+  const dayOptions = (selected) => days
+    .filter((d) => expert || openSet.has(d) || d === selected)
+    .map((d) =>
+      `<option value="${d}" ${d === selected ? 'selected' : ''}>${fmtDateDay(d)}${openSet.has(d) ? '' : ' (fermé)'}</option>`
+    ).join('');
 
   const timeOptions = (selected) => slots.map((t) =>
     `<option value="${t}" ${t === selected ? 'selected' : ''}>${fmtTime(t)}</option>`
   ).join('');
+
+  // Options d'heures filtrées sur les créneaux disponibles (mode guidé) ;
+  // la valeur déjà saisie reste proposée, marquée « indisponible ».
+  const guidedTimeOptions = (available, selected) => {
+    const set = new Set(available);
+    return slots
+      .filter((t) => expert || set.has(t) || t === selected)
+      .map((t) => {
+        const suffix = set.has(t) ? '' : (expert ? ' ⚠' : ' (indisponible)');
+        return `<option value="${t}" ${t === selected ? 'selected' : ''}>${fmtTime(t)}${suffix}</option>`;
+      })
+      .join('');
+  };
 
   const memberOptions = (selected) => state.team
     .filter((m) => m.name.trim())
@@ -90,10 +113,13 @@ export function openInscriptionForm(options = {}) {
         <p class="muted" id="duree-info"></p>
         <div class="form-row no-print">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-suggest" title="Chercher la première combinaison pratique + tests sans conflit">💡 Proposer des créneaux</button>
+          <label class="expert-toggle" title="Par défaut, seuls les jours ouverts et les créneaux avec un intervenant habilité, présent et libre sont proposés. La saisie libre réaffiche tout (les contrôles restent actifs).">
+            <input type="checkbox" id="expert-toggle"> Saisie libre
+          </label>
           <span class="muted" id="suggest-info"></span>
         </div>
 
-        <h2 style="font-size:14px; margin: 14px 0 8px;">Formation pratique</h2>
+        <h2 style="font-size:14px; margin: 14px 0 8px;" id="pratique-title">Formation pratique</h2>
         <div class="form-grid">
           <label class="field">Date <select name="datePratique" required><option value="">—</option>${dayOptions(init.datePratique)}</select></label>
           <label class="field">Heure de début <select name="debutPratique" required><option value="">—</option>${timeOptions(init.debutPratique)}</select></label>
@@ -111,9 +137,28 @@ export function openInscriptionForm(options = {}) {
           recommandation est commune à toutes ses catégories : un seul créneau par stagiaire et par recommandation.</p>
         </div>
 
+        <div id="theorie-formation-section">
+          <h2 style="font-size:14px; margin: 14px 0 8px;">Théorie de la formation</h2>
+          <div class="form-grid">
+            <label class="field">Mode
+              <select name="modeTheorie">
+                ${MODES_THEORIE.map((m) => `<option value="${m.id}" ${m.id === (init.modeTheorie || 'distance') ? 'selected' : ''}>${m.label}</option>`).join('')}
+              </select>
+            </label>
+            <label class="field th-planned">Date <select name="dateTheorieFormation"><option value="">—</option>${dayOptions(init.dateTheorieFormation)}</select></label>
+            <label class="field th-planned">Heure de début <select name="debutTheorieFormation"><option value="">—</option>${timeOptions(init.debutTheorieFormation)}</select></label>
+            <label class="field th-centre">Durée (h)
+              <input type="number" name="dureeTheorieCentre" step="0.5" min="0.5" max="8"
+                value="${(init.dureeTheorieCentre ?? THEORIE_CENTRE_DUREE_DEFAUT) / 60}">
+            </label>
+            <label class="field th-pres">Formateur théorie <select name="formateurTheorieId"><option value="">— auto —</option>${memberOptions(init.formateurTheorieId)}</select></label>
+          </div>
+          <p class="muted" id="theorie-info"></p>
+        </div>
+
         <h2 style="font-size:14px; margin: 14px 0 8px;">Intervenants <span class="muted">(vide = affectation automatique)</span></h2>
         <div class="form-grid">
-          <label class="field">Formateur (si ≠ jour) <select name="formateurId"><option value="">— auto —</option>${memberOptions(init.formateurId)}</select></label>
+          <label class="field" id="formateur-field">Formateur (si ≠ jour) <select name="formateurId"><option value="">— auto —</option>${memberOptions(init.formateurId)}</select></label>
           <label class="field">Testeur (si ≠ jour) <select name="testeurId"><option value="">— auto —</option>${memberOptions(init.testeurId)}</select></label>
         </div>
 
@@ -145,37 +190,108 @@ export function openInscriptionForm(options = {}) {
     debutTestPratique: $('debutTestPratique').value ? Number($('debutTestPratique').value) : null,
     formateurId: $('formateurId').value || null,
     testeurId: $('testeurId').value || null,
+    modeTheorie: $('modeTheorie').value || 'distance',
+    dateTheorieFormation: $('dateTheorieFormation').value || null,
+    debutTheorieFormation: $('debutTheorieFormation').value ? Number($('debutTheorieFormation').value) : null,
+    dureeTheorieCentre: $('modeTheorie').value === 'centre'
+      ? Math.round((Number($('dureeTheorieCentre').value) || THEORIE_CENTRE_DUREE_DEFAUT / 60) * 60)
+      : null,
+    formateurTheorieId: $('modeTheorie').value === 'presentiel' ? ($('formateurTheorieId').value || null) : null,
   });
 
   // Annotation des intervenants : habilité / occupé / libre sur les créneaux choisis
   const annotateMembers = (draft) => {
     if (!draft.formation) return;
     const avail = memberAvailability(state, draft, editing ? editing.id : null);
-    const mark = { libre: '✓', occupe: ' (occupé)', 'non-habilite': ' (non habilité)' };
+    const mark = { libre: '✓', occupe: ' (occupé)', 'non-habilite': ' (non habilité)', absent: ' (absent ce jour)' };
     for (const [selName, role] of [['formateurId', 'F'], ['testeurId', 'T']]) {
       const sel = $(selName);
       for (const opt of sel.options) {
         if (!opt.value) continue;
         const a = avail.find((x) => x.id === opt.value);
         const status = a?.[role];
-        const base = opt.textContent.replace(/ \((occupé|non habilité)\)| ✓$/g, '');
+        const base = opt.textContent.replace(/ \((occupé|non habilité|absent ce jour)\)| ✓$/g, '');
         opt.textContent = status ? base + (status === 'libre' ? ' ✓' : mark[status]) : base;
       }
+    }
+  };
+
+  // Mode guidé : les listes de dates/heures ne proposent que les jours
+  // ouverts et les créneaux où une ressource habilitée, présente et libre
+  // existe. Reconstruites uniquement quand leurs dépendances changent.
+  let guidedKey = null;
+  const syncGuided = (draft) => {
+    const key = [draft.formation, draft.type, draft.datePratique, draft.dateTestPratique,
+      draft.modeTheorie, draft.dateTheorieFormation, draft.dureeTheorieCentre, expert].join('|');
+    if (key === guidedKey) return;
+    guidedKey = key;
+    const rebuildDay = (name, sel) => {
+      $(name).innerHTML = '<option value="">—</option>' + dayOptions(sel);
+      $(name).value = sel ?? '';
+    };
+    rebuildDay('datePratique', draft.datePratique);
+    rebuildDay('dateTestPratique', draft.dateTestPratique);
+    rebuildDay('dateTheorie', draft.dateTheorie);
+    rebuildDay('dateTheorieFormation', draft.dateTheorieFormation);
+    const setOptions = (name, avail, sel) => {
+      const el = $(name);
+      el.innerHTML = '<option value="">—</option>' + (avail == null ? timeOptions(sel) : guidedTimeOptions(avail, sel));
+      el.value = sel ?? '';
+    };
+    const excl = editing ? editing.id : null;
+    const rebuildTime = (name, role, date, sel) => {
+      const avail = (!draft.formation || !date) ? null
+        : availableSlotsFor(state, { formation: draft.formation, type: draft.type, date, role }, excl);
+      setOptions(name, avail, sel);
+    };
+    rebuildTime('debutPratique', 'pratique', draft.datePratique, draft.debutPratique);
+    rebuildTime('debutTestPratique', 'test', draft.dateTestPratique, draft.debutTestPratique);
+    // Théorie de la formation : présentiel = rejoindre une session ou en
+    // ouvrir une (formateur + salle) ; centre = place de salle uniquement
+    {
+      const date = draft.dateTheorieFormation;
+      let avail = null;
+      if (draft.formation && date && draft.modeTheorie === 'presentiel') {
+        avail = availableTheorieSlots(state, { formation: draft.formation, type: draft.type, date }, excl);
+      } else if (date && draft.modeTheorie === 'centre') {
+        avail = roomFreeSlots(state, { date, duration: draft.dureeTheorieCentre ?? THEORIE_CENTRE_DUREE_DEFAUT }, excl);
+      }
+      setOptions('debutTheorieFormation', avail, draft.debutTheorieFormation);
     }
   };
 
   // Aperçu en direct : durée, fin, contrôles
   const refresh = () => {
     const draft = readDraft();
+    syncGuided(draft);
     dialog.querySelector('#motif-field').style.display = draft.statut === 'annulee' ? '' : 'none';
     const formation = formationByCode(state.formations, draft.formation);
     const duree = dureeFor(formation, draft.type);
     annotateMembers(draft);
     $('finPratique').value = draft.debutPratique != null && formation ? fmtTime(draft.debutPratique + duree) : '';
     dialog.querySelector('#duree-info').textContent = formation
-      ? `Durée de la pratique : ${fmtTime(duree).replace(':', 'h')}${formation.tests ? ` — tests obligatoires (${formation.reco})` : ' — pas de test planifié dans cet outil'}${formation.capacite > 1 ? ` — capacité simultanée : ${formation.capacite}` : ''}`
+      ? (formation.testOnly
+        ? `Épreuve sur site : ${fmtTime(duree).replace(':', 'h')} (tenue par un testeur) — la formation ${formation.reco} se fait à distance (e-learning)`
+        : `Durée de la pratique : ${fmtTime(duree).replace(':', 'h')}${formation.tests ? ` — tests obligatoires (${formation.reco})` : ' — pas de test planifié dans cet outil'}${formation.capacite > 1 ? ` — capacité simultanée : ${formation.capacite}` : ''}`)
       : '';
     dialog.querySelector('#tests-section').style.display = formation && !formation.tests ? 'none' : '';
+    // Formation « épreuve seule » (AIPR) : le créneau est tenu par un testeur
+    dialog.querySelector('#pratique-title').textContent = formation?.testOnly ? 'Épreuve sur site' : 'Formation pratique';
+    dialog.querySelector('#formateur-field').style.display = formation?.testOnly ? 'none' : '';
+
+    // Théorie de la formation : champs selon le mode (masquée pour les
+    // formations « épreuve seule », dont la théorie est à distance par nature)
+    const thSection = dialog.querySelector('#theorie-formation-section');
+    thSection.style.display = formation?.testOnly ? 'none' : '';
+    const mode = draft.modeTheorie;
+    thSection.querySelectorAll('.th-planned').forEach((el) => { el.style.display = mode === 'distance' ? 'none' : ''; });
+    thSection.querySelectorAll('.th-centre').forEach((el) => { el.style.display = mode === 'centre' ? '' : 'none'; });
+    thSection.querySelectorAll('.th-pres').forEach((el) => { el.style.display = mode === 'presentiel' ? '' : 'none'; });
+    dialog.querySelector('#theorie-info').textContent = mode === 'presentiel'
+      ? `Session inter de ${draft.type === 'Initial' ? '7h00 (initiale)' : '3h30 (recyclage)'} — les stagiaires de la même recommandation saisis sur le même créneau partagent la session et son formateur. Capacité de salle : ${state.params.salleCapacite ?? 12} places.`
+      : mode === 'centre'
+        ? `Occupe une place de salle (${state.params.salleCapacite ?? 12} max) sur le créneau — aucun formateur mobilisé.`
+        : 'Formation théorique à distance : aucune ressource à planifier.';
 
     // Simulation des contrôles sur une copie de l'état
     const preview = dialog.querySelector('#form-preview');
@@ -197,6 +313,11 @@ export function openInscriptionForm(options = {}) {
     }
   };
   form.addEventListener('input', refresh);
+  dialog.querySelector('#expert-toggle').addEventListener('change', (e) => {
+    expert = e.target.checked;
+    guidedKey = null;
+    refresh();
+  });
   refresh();
 
   dialog.querySelector('#btn-suggest').addEventListener('click', () => {

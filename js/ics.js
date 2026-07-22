@@ -43,14 +43,33 @@ export function buildICS(state, schedule, { onlyDates = null } = {}) {
     const i = row.insc;
     const cat = row.formation ? row.formation.label.replace('Pratique ', '') : '?';
     if (keep(i.datePratique) && i.debutPratique != null) {
+      const exam = row.formation?.testOnly;
       lines.push(...event(`practice-${i.id}`, i.datePratique, i.debutPratique, row.finPratique,
-        `Formation ${cat} — ${i.stagiaire}`,
-        `Formateur : ${memberName(state, row.formateurEffectif) || 'à affecter'} (${fmtTime(i.debutPratique)}–${fmtTime(row.finPratique)})`));
+        `${exam ? 'Épreuve' : 'Formation'} ${cat} — ${i.stagiaire}`,
+        exam
+          ? `Testeur : ${memberName(state, row.testeurEffectif) || 'à affecter'} (${fmtTime(i.debutPratique)}–${fmtTime(row.finPratique)})`
+          : `Formateur : ${memberName(state, row.formateurEffectif) || 'à affecter'} (${fmtTime(i.debutPratique)}–${fmtTime(row.finPratique)})`));
     }
     if (keep(i.dateTestPratique) && i.debutTestPratique != null && row.formation?.tests) {
       lines.push(...event(`test-${i.id}`, i.dateTestPratique, i.debutTestPratique, row.finTestPratique,
         `Test pratique ${cat} — ${i.stagiaire}`,
         `Testeur : ${memberName(state, row.testeurEffectif) || 'à affecter'}`));
+    }
+  }
+
+  // Sessions de théorie présentielle (une par session) + e-learning en centre
+  for (const s of schedule.theorySessions || []) {
+    if (!keep(s.date)) continue;
+    lines.push(...event(`theorie-${s.reco}-${s.date}-${s.debut}`, s.date, s.debut, s.fin,
+      `Théorie ${s.reco} ${s.type === 'Initial' ? 'initiale (7h00)' : 'recyclage (3h30)'} — ${s.stagiaires.length} stagiaire(s)`,
+      `Formateur : ${memberName(state, s.formateurId) || 'à affecter'} — ${s.stagiaires.join(', ')}`));
+  }
+  for (const row of schedule.rows) {
+    if (row.cancelled) continue;
+    const i = row.insc;
+    if (i.modeTheorie === 'centre' && keep(i.dateTheorieFormation) && i.debutTheorieFormation != null) {
+      lines.push(...event(`elearning-${i.id}`, i.dateTheorieFormation, i.debutTheorieFormation, row.finTheorieFormation,
+        `E-learning en centre — ${i.stagiaire}`, 'Salle de théorie (aucun formateur mobilisé)'));
     }
   }
 
