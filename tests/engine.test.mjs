@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultState, seedExamples, addInscription } from '../js/store.js';
-import { computeSchedule } from '../js/engine.js';
+import { computeSchedule, unionDuration } from '../js/engine.js';
 
 function freshState() {
   const s = defaultState();
@@ -388,4 +388,31 @@ test('occupation par jour : calcul de la heatmap', async () => {
   assert.ok(Math.abs(d1.ratio - 17 / 36) < 1e-9);
   // 02/09 : 2h de pratique = 4 créneaux
   assert.equal(occ.get('2026-09-02').busy, 4);
+});
+
+test('charge formateur : 2 stagiaires simultanés (capacité 2) = 1 séance', () => {
+  const state = freshState();
+  // GARCIA : 08:00-09:30 (1 stagiaire) + 13:00-14:30 ×2 simultanés (R489-3, 2 chariots)
+  addInscription(state, { stagiaire: 'A', formation: 'R489-1A', type: 'Initial', datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p2' });
+  addInscription(state, { stagiaire: 'B', formation: 'R489-3', type: 'Initial', datePratique: '2026-09-01', debutPratique: 780, formateurId: 'p2' });
+  addInscription(state, { stagiaire: 'C', formation: 'R489-3', type: 'Initial', datePratique: '2026-09-01', debutPratique: 780, formateurId: 'p2' });
+  // Somme naïve des lignes = 4h30, mais temps de séance réel = 3h00 :
+  // 3 autres heures ne doivent PAS déclencher la charge (3h + 3h = 6h pile)
+  addInscription(state, { stagiaire: 'D', formation: 'HAB-ELEC', type: 'Initial', datePratique: '2026-09-01', debutPratique: 570, formateurId: 'p2' });
+  addInscription(state, { stagiaire: 'E', formation: 'R489-1A', type: 'Recyclage', datePratique: '2026-09-01', debutPratique: 870, formateurId: 'p2' });
+  const { rows } = computeSchedule(state);
+  assert.ok(!rows.some((r) => r.errors.some((e) => e.includes('Charge'))),
+    rows.flatMap((r) => r.errors).join(' | '));
+  // Une heure de plus → dépassement réel (7h de séances)
+  addInscription(state, { stagiaire: 'F', formation: 'R489-1A', type: 'Recyclage', datePratique: '2026-09-01', debutPratique: 930, formateurId: 'p2' });
+  const again = computeSchedule(state).rows;
+  assert.ok(again.some((r) => r.errors.some((e) => e.includes('Charge'))));
+});
+
+test('unionDuration : chevauchements et intervalles disjoints', () => {
+  assert.equal(unionDuration([]), 0);
+  assert.equal(unionDuration([{ start: 480, end: 600 }]), 120);
+  assert.equal(unionDuration([{ start: 480, end: 600 }, { start: 480, end: 600 }]), 120);
+  assert.equal(unionDuration([{ start: 480, end: 600 }, { start: 540, end: 660 }]), 180);
+  assert.equal(unionDuration([{ start: 480, end: 540 }, { start: 600, end: 660 }]), 120);
 });
