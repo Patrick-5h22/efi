@@ -136,6 +136,15 @@ export function migrate(state) {
   for (const f of base.formations) {
     if (!state.formations.some((x) => x.code === f.code)) state.formations.push(structuredClone(f));
   }
+  // Formations « épreuve seule » du catalogue (AIPR) : le drapeau testOnly
+  // doit suivre même si la formation existait déjà dans l'état (créée avant
+  // son ajout au catalogue, ou coche « tests » posée par erreur) — une
+  // épreuve surveillée n'a ni formateur ni tests séparés.
+  for (const f of base.formations) {
+    if (!f.testOnly) continue;
+    const x = state.formations.find((x) => x.code === f.code);
+    if (x && (!x.testOnly || x.tests)) { x.testOnly = true; x.tests = false; }
+  }
   state.team = state.team || [];
   state.openDays = state.openDays || [];
   state.dayAssignments = state.dayAssignments || {};
