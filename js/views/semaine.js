@@ -4,6 +4,7 @@
 import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
 import { periodWeeks, weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isWeekend } from '../dates.js';
+import { unionDuration } from '../engine.js';
 import { openInscriptionForm } from './form.js';
 
 export function renderSemaine(main, args) {
@@ -158,17 +159,20 @@ function gridHTML(state, days, kind) {
       return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button" aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"></td>`;
     }).join('');
 
-    // Charge de formation pratique du jour, PAR formateur (le plafond
-    // maxDailyLoad s'applique par formateur, pas au total de la journée)
+    // Charge de formation pratique du jour, PAR formateur — en temps de
+    // séance (union des intervalles : 2 stagiaires simultanés = 1 séance).
+    // Le plafond maxDailyLoad s'applique par formateur.
     let loadInfo = '';
     if (kind === 'F' && open && inPeriod) {
-      const byTrainer = new Map();
+      const intervalsByTrainer = new Map();
       for (const r of rows) {
         if (r.cancelled || r.formation?.testOnly) continue;
         if (r.insc.datePratique !== date || r.insc.debutPratique == null) continue;
         const key = r.formateurEffectif || '?';
-        byTrainer.set(key, (byTrainer.get(key) || 0) + r.duree);
+        if (!intervalsByTrainer.has(key)) intervalsByTrainer.set(key, []);
+        intervalsByTrainer.get(key).push({ start: r.insc.debutPratique, end: r.finPratique });
       }
+      const byTrainer = new Map([...intervalsByTrainer.entries()].map(([id, list]) => [id, unionDuration(list)]));
       if (byTrainer.size) {
         const maxLabel = fmtTime(state.params.maxDailyLoad).replace(':', 'h');
         const parts = [...byTrainer.entries()].map(([id, load]) => {

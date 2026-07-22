@@ -424,15 +424,20 @@ function validateRows(rows, ctx) {
     }
   }
 
-  // Charge : formation pratique ≤ max / jour / formateur effectif
-  // (les épreuves « test seul » ne comptent pas comme formation pratique)
-  const loadByDayTrainer = new Map();
+  // Charge : formation pratique ≤ max / jour / formateur effectif —
+  // calculée en TEMPS DE SÉANCE du formateur (union de ses intervalles) :
+  // deux stagiaires simultanés (capacité ≥ 2) = une seule séance.
+  // Les épreuves « test seul » ne comptent pas comme formation pratique.
+  const intervalsByDayTrainer = new Map();
   for (const row of rows) {
     if (row.formation?.testOnly) continue;
     if (!row.insc.datePratique || row.insc.debutPratique == null) continue;
     const key = `${row.insc.datePratique}|${row.formateurEffectif || '?'}`;
-    loadByDayTrainer.set(key, (loadByDayTrainer.get(key) || 0) + row.duree);
+    if (!intervalsByDayTrainer.has(key)) intervalsByDayTrainer.set(key, []);
+    intervalsByDayTrainer.get(key).push({ start: row.insc.debutPratique, end: row.finPratique });
   }
+  const loadByDayTrainer = new Map();
+  for (const [key, list] of intervalsByDayTrainer) loadByDayTrainer.set(key, unionDuration(list));
   for (const row of rows) {
     if (row.formation?.testOnly) continue;
     if (!row.insc.datePratique || row.insc.debutPratique == null) continue;
@@ -616,6 +621,28 @@ function crossChecks(a, b, params) {
 
 export function statutOf(row) {
   return row.errors.length ? row.errors : null;
+}
+
+// Durée cumulée d'une union d'intervalles {start, end} : deux stagiaires
+// simultanés (capacité ≥ 2) ne comptent qu'UNE séance de formateur.
+export function unionDuration(intervals) {
+  const sorted = intervals
+    .filter((i) => i && i.start != null && i.end != null)
+    .sort((a, b) => a.start - b.start);
+  let total = 0;
+  let curStart = null;
+  let curEnd = null;
+  for (const { start, end } of sorted) {
+    if (curEnd == null || start > curEnd) {
+      if (curEnd != null) total += curEnd - curStart;
+      curStart = start;
+      curEnd = end;
+    } else {
+      curEnd = Math.max(curEnd, end);
+    }
+  }
+  if (curEnd != null) total += curEnd - curStart;
+  return total;
 }
 
 // ---------------------------------------------------------------------------
