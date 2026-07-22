@@ -51,10 +51,12 @@ export function renderPlanning(main, args, kind) {
       });
 
       if (!occupants.length) return `<td class="slot-free" style="cursor:default"></td>`;
-      if (occupants.length > 1) return `<td class="slot-busy" title="${esc(occupants.map((o) => o.insc.stagiaire).join(' + '))}">${occupants.length} stagiaires</td>`;
+      // Épreuves surveillées (AIPR) : couleur dédiée — le superviseur reste disponible
+      const cls = occupants.every((o) => o.formation?.testOnly) ? 'slot-exam slot-busy' : 'slot-busy';
+      if (occupants.length > 1) return `<td class="${cls}" title="${esc(occupants.map((o) => o.insc.stagiaire).join(' + '))}">${occupants.length} stagiaires</td>`;
       const r = occupants[0];
       const who = kind === 'F' ? r.formateurEffectif : r.testeurEffectif;
-      return `<td class="slot-busy" title="${esc((r.formation?.label || '') + ' — ' + (memberName(state, who) || '?'))}">${esc(r.insc.stagiaire)}</td>`;
+      return `<td class="${cls}" title="${esc((r.formation?.label || '') + (r.formation?.testOnly ? ' (surveillance)' : '') + ' — ' + (memberName(state, who) || '?'))}">${esc(r.insc.stagiaire)}</td>`;
     }).join('');
 
     return `${weekSep}<tr><td class="day-col">${fmtDateDay(date)}${open ? '' : ' <span class="muted">(fermé)</span>'}</td>${cells}</tr>`;
@@ -69,7 +71,7 @@ export function renderPlanning(main, args, kind) {
     <div class="legend no-print">
       <span><span class="chip" style="background:var(--free)"></span>Disponible</span>
       <span><span class="chip" style="background:var(--busy)"></span>Occupé (nom du stagiaire)</span>
-      ${kind === 'T' ? '<span><span class="chip" style="background:var(--theory-bg);border-color:#e2c14d"></span>Théorie</span>' : ''}
+      ${kind === 'T' ? '<span><span class="chip" style="background:var(--theory-bg);border-color:#e2c14d"></span>Théorie</span><span><span class="chip" style="background:var(--exam-bg);border-color:var(--exam-border)"></span>Épreuve surveillée (AIPR)</span>' : ''}
       <span><span class="chip" style="background:#f2f4f8"></span>Jour non ouvert</span>
     </div>
     <div class="card"><div class="grid-wrap"><table class="planning">${head}${body}</table></div></div>

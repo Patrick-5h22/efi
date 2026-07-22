@@ -37,19 +37,33 @@ test('AIPR : l’épreuve est tenue par un testeur, pas de formateur ni de test 
   assert.equal(r.finPratique, 480 + 120, 'épreuve de 2h00');
 });
 
-test('AIPR : deux épreuves simultanées avec le même testeur explicite → anomalie', () => {
+test('AIPR : surveillance — le même superviseur couvre plusieurs épreuves simultanées', () => {
   const state = fixture();
   state.inscriptions = [
     { id: 1, stagiaire: 'UN', formation: 'AIPR', type: 'Initial', datePratique: '2026-09-01', debutPratique: 480, testeurId: 'p1', statut: 'confirmee' },
     { id: 2, stagiaire: 'DEUX', formation: 'AIPR', type: 'Recyclage', datePratique: '2026-09-01', debutPratique: 510, testeurId: 'p1', statut: 'confirmee' },
   ];
   const { rows } = computeSchedule(state);
-  assert.ok(rows[0].errors.some((e) => e.includes('2 épreuves')), rows[0].errors.join(' | '));
-  // En automatique, le moteur choisit l'autre testeur → pas d'anomalie
+  assert.equal(rows[0].errors.length, 0, rows[0].errors.join(' | '));
+  assert.equal(rows[1].errors.length, 0, rows[1].errors.join(' | '));
+  // En automatique aussi : un superviseur est identifié, sans besoin d'être libre
   delete state.inscriptions[1].testeurId;
   const again = computeSchedule(state).rows;
   assert.equal(again[1].errors.length, 0, again[1].errors.join(' | '));
-  assert.equal(again[1].testeurEffectif, 'p2');
+  assert.ok(again[1].testeurEffectif, 'un superviseur est identifié');
+});
+
+test('AIPR : la surveillance ne mobilise pas le superviseur (autre action en parallèle, charge 0)', () => {
+  const state = fixture();
+  state.inscriptions = [
+    // p1 forme en HAB-ELEC 08:00-10:00 ET surveille une épreuve AIPR sur le même créneau
+    { id: 1, stagiaire: 'UN', formation: 'HAB-ELEC', type: 'Initial', datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p1', statut: 'confirmee' },
+    { id: 2, stagiaire: 'DEUX', formation: 'AIPR', type: 'Initial', datePratique: '2026-09-01', debutPratique: 480, testeurId: 'p1', statut: 'confirmee' },
+  ];
+  const { rows } = computeSchedule(state);
+  assert.equal(rows[0].errors.length, 0, rows[0].errors.join(' | '));
+  assert.equal(rows[1].errors.length, 0, rows[1].errors.join(' | '));
+  assert.equal(rows[1].testeurEffectif, 'p1');
 });
 
 test('présence par jour : contrainte dure pour l’affectation automatique', () => {

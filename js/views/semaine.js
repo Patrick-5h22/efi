@@ -35,6 +35,7 @@ export function renderSemaine(main, args) {
       <span><span class="chip" style="background:var(--busy)"></span>Occupé</span>
       <span><span class="chip" style="background:var(--busy); outline:1px dashed var(--warn); outline-offset:-2px"></span>Pré-réservé</span>
       <span><span class="chip" style="background:var(--theory-bg);border-color:#e2c14d"></span>Théorie</span>
+      <span><span class="chip" style="background:var(--exam-bg);border-color:var(--exam-border)"></span>Épreuve surveillée (AIPR) — ne mobilise pas l'intervenant</span>
       <span><span class="chip" style="background:var(--closed)"></span>Fermé</span>
     </div>
 
@@ -149,11 +150,15 @@ function gridHTML(state, days, kind) {
 
       if (occupants.length) {
         const tLabel = (r) => r.formation?.testOnly ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || '');
-        const label = occupants.map((r) => `<span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span><span class="slot-detail">${esc(kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?') : 'Testeur : ' + (memberName(state, r.testeurEffectif) || '?'))}</span>`).join('<hr style="margin:2px 0;border:none;border-top:1px dashed var(--grid-line)">');
+        const whoLabel = (r) => kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?')
+          : (r.formation?.testOnly ? 'Surv. : ' : 'Testeur : ') + (memberName(state, r.testeurEffectif) || '?');
+        const label = occupants.map((r) => `<span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span><span class="slot-detail">${esc(whoLabel(r))}</span>`).join('<hr style="margin:2px 0;border:none;border-top:1px dashed var(--grid-line)">');
         const inscAttr = occupants.length === 1 ? ` data-insc="${occupants[0].insc.id}"` : '';
+        // Épreuves surveillées (AIPR) : couleur dédiée — le superviseur reste disponible
+        const cls = occupants.every((r) => r.formation?.testOnly) ? 'slot-exam slot-busy' : 'slot-busy';
         const pre = occupants.every((r) => r.insc.statut === 'pre') ? ' slot-pre' : '';
-        const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`).join(' | ');
-        return `<td class="slot-busy${pre}"${inscAttr} title="${esc(tip)}">${label}</td>`;
+        const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}${r.formation?.testOnly ? ' (surveillance)' : ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`).join(' | ');
+        return `<td class="${cls}${pre}"${inscAttr} title="${esc(tip)}">${label}</td>`;
       }
 
       return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button" aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"></td>`;
