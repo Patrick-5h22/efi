@@ -158,13 +158,25 @@ function gridHTML(state, days, kind) {
       return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button" aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"></td>`;
     }).join('');
 
-    // Charge de formation pratique du jour (grille formateur)
+    // Charge de formation pratique du jour, PAR formateur (le plafond
+    // maxDailyLoad s'applique par formateur, pas au total de la journée)
     let loadInfo = '';
     if (kind === 'F' && open && inPeriod) {
-      const load = rows.reduce((sum, r) => sum + (!r.cancelled && !r.formation?.testOnly && r.insc.datePratique === date && r.insc.debutPratique != null ? r.duree : 0), 0);
-      if (load > 0) {
-        const over = load > state.params.maxDailyLoad;
-        loadInfo = `<br><span style="font-weight:400;font-size:10px;color:${over ? 'var(--error)' : 'var(--muted-foreground)'}">${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''} / ${fmtTime(state.params.maxDailyLoad).replace(':', 'h')}</span>`;
+      const byTrainer = new Map();
+      for (const r of rows) {
+        if (r.cancelled || r.formation?.testOnly) continue;
+        if (r.insc.datePratique !== date || r.insc.debutPratique == null) continue;
+        const key = r.formateurEffectif || '?';
+        byTrainer.set(key, (byTrainer.get(key) || 0) + r.duree);
+      }
+      if (byTrainer.size) {
+        const maxLabel = fmtTime(state.params.maxDailyLoad).replace(':', 'h');
+        const parts = [...byTrainer.entries()].map(([id, load]) => {
+          const over = load > state.params.maxDailyLoad;
+          const name = id === '?' ? '?' : esc(memberName(state, id).split(' ')[0] || id);
+          return `<span style="color:${over ? 'var(--error)' : 'var(--muted-foreground)'}" title="Charge de pratique de ${name} : ${fmtTime(load).replace(':', 'h')} (max ${maxLabel}/formateur)">${name} ${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''}</span>`;
+        });
+        loadInfo = `<br><span style="font-weight:400;font-size:10px">${parts.join(' · ')} <span style="color:var(--muted-foreground)">/ ${maxLabel}</span></span>`;
       }
     }
     return `<tr><td class="day-col">${fmtDateDay(date)}${loadInfo}</td><td class="who-col">${who}</td>${cells}</tr>`;
