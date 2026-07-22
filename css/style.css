@@ -321,6 +321,8 @@ td.slot-free:hover, td.slot-free:focus-visible {
 td.slot-busy { background: var(--busy); white-space: normal; }
 td.slot-busy.slot-pre { background: repeating-linear-gradient(45deg, var(--busy), var(--busy) 5px, color-mix(in srgb, var(--busy) 55%, var(--card)) 5px, color-mix(in srgb, var(--busy) 55%, var(--card)) 10px); outline: 1px dashed var(--warn); outline-offset: -2px; }
 td.slot-theory { background: var(--theory-bg); border-color: var(--theory-border); white-space: normal; }
+/* Épreuves surveillées (AIPR) : le superviseur reste disponible */
+td.slot-exam { background: var(--exam-bg); border-color: var(--exam-border); white-space: normal; }
 td.slot-closed { background: var(--closed); color: var(--muted-foreground); }
 td.slot-off { background: var(--muted); }
 .slot-name { font-weight: 600; display: block; }
@@ -365,6 +367,7 @@ table.synthese th, table.synthese td { border-bottom: 1px solid var(--border); p
 table.synthese th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted-foreground); }
 table.synthese tr.day-sep td { background: var(--muted); font-weight: 600; }
 table.synthese tr.theory-row td { background: var(--theory-bg); }
+table.synthese tr.exam-row td { background: var(--exam-bg); }
 
 /* ---------- Toast ---------- */
 #toast-zone { position: fixed; bottom: 18px; right: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
@@ -478,7 +481,7 @@ dialog.cmdk {
   :root, .dark, .dark[data-theme] {
     --background: #fff; --foreground: #111; --card: #fff; --card-foreground: #111;
     --border: #ccc; --grid-line: #bbb; --muted: #f2f2f2; --muted-foreground: #555;
-    --free: #dcf2e4; --busy: #fbd9d3; --theory-bg: #fdf3d7; --closed: #ececec;
+    --free: #dcf2e4; --busy: #fbd9d3; --theory-bg: #fdf3d7; --exam-bg: #e8e2f7; --closed: #ececec;
     --neon-glow: none;
   }
   #sidebar, .page-actions, .no-print, #toast-zone { display: none !important; }

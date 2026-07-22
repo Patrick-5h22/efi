@@ -58,7 +58,7 @@ function buildEvents(state, days) {
         stagiaire: i.stagiaire,
         action: exam ? `Épreuve — ${shortCat(row)}` : `Formation pratique — ${shortCat(row)}`,
         who: memberName(state, exam ? row.testeurEffectif : row.formateurEffectif) || '⚠',
-        kind: exam ? 'test' : 'pratique',
+        kind: exam ? 'exam' : 'pratique',
       });
     }
     if (daySet.has(i.dateTestPratique) && i.debutTestPratique != null && row.formation?.tests) {
@@ -119,7 +119,7 @@ function syntheseTable(state, events) {
       lastDate = e.date;
     }
     return sep + `
-      <tr class="${e.kind === 'theorie' ? 'theory-row' : ''}">
+      <tr class="${e.kind === 'theorie' ? 'theory-row' : e.kind === 'exam' ? 'exam-row' : ''}">
         <td>${fmtTime(e.start)}</td>
         <td>${fmtTime(e.end)}</td>
         <td>${esc(e.stagiaire)}</td>

@@ -114,20 +114,20 @@ export function computeSchedule(state) {
   }
 
   // Passe 1 bis — formations « épreuve seule » (ex. AIPR : la formation se
-  // fait à distance) : le créneau saisi est une épreuve tenue par un TESTEUR.
+  // fait à distance) : le créneau saisi est une épreuve SURVEILLÉE par un
+  // testeur. La surveillance ne mobilise pas son temps (0 en charge) : il
+  // reste disponible pour toute autre action, on l'identifie simplement.
   for (const row of rows) {
     const { insc, formation } = row;
     if (row.cancelled || !formation?.testOnly || !insc.datePratique || insc.debutPratique == null) continue;
-    const { datePratique: date, debutPratique: start } = insc;
-    const end = row.finPratique;
+    const { datePratique: date } = insc;
     if (insc.testeurId) {
       row.testeurEffectif = insc.testeurId;
     } else {
-      row.testeurEffectif = pickPerson(date, formation.code, 'T',
-        (id) => isFree(id, date, start, end));
+      row.testeurEffectif = pickPerson(date, formation.code, 'T', () => true);
       if (!row.testeurEffectif) row.errors.push('Aucun testeur disponible');
     }
-    addBusy(row.testeurEffectif, { date, start, end, kind: 'test', formation: formation.code, inscId: insc.id });
+    // Pas d'addBusy : le superviseur n'est pas bloqué par l'épreuve.
   }
 
   // Passe 1 ter — sessions de théorie PRÉSENTIELLE (inter, mutualisées par
@@ -343,13 +343,11 @@ function validateRows(rows, ctx) {
     }
   }
 
-  // Créneaux « testeur » d'une ligne : test pratique classique, et l'épreuve
-  // des formations « test seul » (portée par les champs Pratique)
+  // Créneaux « testeur » d'une ligne : test pratique classique uniquement.
+  // Les épreuves « test seul » (AIPR) sont de la SURVEILLANCE : elles ne
+  // mobilisent pas le temps du testeur et n'entrent dans aucun conflit.
   const testerSlots = (r) => {
     const out = [];
-    if (r.formation?.testOnly && r.insc.datePratique && r.insc.debutPratique != null) {
-      out.push({ date: r.insc.datePratique, start: r.insc.debutPratique, end: r.finPratique });
-    }
     if (r.insc.dateTestPratique && r.insc.debutTestPratique != null) {
       out.push({ date: r.insc.dateTestPratique, start: r.insc.debutTestPratique, end: r.finTestPratique });
     }
@@ -386,7 +384,7 @@ function validateRows(rows, ctx) {
       const theoryTester = theoryTesters.get(s.date);
       if (theoryTester && row.testeurEffectif === theoryTester
         && overlaps(s.start, s.end, params.theoryTime, theoryEnd)) {
-        const msg = row.formation?.testOnly ? 'Épreuve pendant le créneau théorie' : 'Test pratique pendant le créneau théorie';
+        const msg = 'Test pratique pendant le créneau théorie';
         if (!row.errors.includes(msg)) row.errors.push(msg);
       }
     }
@@ -452,8 +450,8 @@ function validateRows(rows, ctx) {
   for (const s of theorySessions) {
     if (!s.formateurId) continue;
     for (const r of rows) {
-      if (r.insc.datePratique === s.date && r.insc.debutPratique != null
-        && (r.formation?.testOnly ? r.testeurEffectif : r.formateurEffectif) === s.formateurId
+      if (!r.formation?.testOnly && r.insc.datePratique === s.date && r.insc.debutPratique != null
+        && r.formateurEffectif === s.formateurId
         && overlaps(r.insc.debutPratique, r.finPratique, s.debut, s.fin)) {
         const msg = 'Intervenant en théorie présentielle et en activité en même temps';
         if (!r.errors.includes(msg)) r.errors.push(msg);
@@ -520,24 +518,9 @@ function validateRows(rows, ctx) {
     }
   }
 
-  // Testeur : deux épreuves/tests en même temps par le même testeur effectif
-  // (généralisation incluant les épreuves « test seul », ex. AIPR)
-  for (let i = 0; i < rows.length; i++) {
-    for (let j = i + 1; j < rows.length; j++) {
-      const a = rows[i]; const b = rows[j];
-      if (!a.testeurEffectif || a.testeurEffectif !== b.testeurEffectif) continue;
-      if (!a.formation?.testOnly && !b.formation?.testOnly) continue; // cas classique déjà contrôlé
-      for (const sa of testerSlots(a)) {
-        for (const sb of testerSlots(b)) {
-          if (sa.date === sb.date && overlaps(sa.start, sa.end, sb.start, sb.end)) {
-            const msg = 'Testeur : 2 épreuves en même temps';
-            if (!a.errors.includes(msg)) a.errors.push(msg);
-            if (!b.errors.includes(msg)) b.errors.push(msg);
-          }
-        }
-      }
-    }
-  }
+  // NB : pas de contrôle de cumul sur les épreuves « test seul » (AIPR) —
+  // le superviseur peut surveiller plusieurs candidats à la fois et assurer
+  // une autre action en parallèle.
 
   // Théorie du stagiaire vs ses propres créneaux (chevauchement même stagiaire) :
   // traité dans crossChecks + ci-dessous pour la théorie de la même ligne
@@ -667,7 +650,9 @@ export function occupancyByDay(state, schedule) {
   for (const r of schedule.rows) {
     if (r.cancelled) continue;
     const i = r.insc;
-    if (i.datePratique && i.debutPratique != null) {
+    // Les épreuves « test seul » (AIPR) sont de la surveillance : 0 temps
+    // d'intervenant mobilisé, elles ne pèsent pas dans l'occupation.
+    if (i.datePratique && i.debutPratique != null && !r.formation?.testOnly) {
       ensure(i.datePratique).busy += r.duree / params.slotMinutes;
     }
     if (i.dateTestPratique && i.debutTestPratique != null && r.formation?.tests) {
@@ -747,7 +732,8 @@ export function occupationSummary(state, schedule, scope = 'periode', todayISO =
   for (const r of schedule.rows) {
     if (r.cancelled) continue;
     const i = r.insc;
-    if (i.datePratique && i.debutPratique != null && scopeDays.has(i.datePratique)) {
+    // Épreuves « test seul » (AIPR) : surveillance, 0 temps mobilisé
+    if (i.datePratique && i.debutPratique != null && scopeDays.has(i.datePratique) && !r.formation?.testOnly) {
       busy += r.duree / params.slotMinutes;
     }
     if (i.dateTestPratique && i.debutTestPratique != null && scopeDays.has(i.dateTestPratique)) {
@@ -863,12 +849,9 @@ function busyIndex(state, excludeId = null) {
   };
   for (const r of rows) {
     if (excludeId != null && r.insc.id === excludeId) continue;
-    if (r.insc.datePratique && r.insc.debutPratique != null) {
-      if (r.formation?.testOnly) {
-        add(r.testeurEffectif, r.insc.datePratique, r.insc.debutPratique, r.finPratique, 'test', r.formation?.code);
-      } else {
-        add(r.formateurEffectif, r.insc.datePratique, r.insc.debutPratique, r.finPratique, 'formation', r.formation?.code);
-      }
+    // Épreuves « test seul » (AIPR) : surveillance — n'occupe pas le testeur
+    if (r.insc.datePratique && r.insc.debutPratique != null && !r.formation?.testOnly) {
+      add(r.formateurEffectif, r.insc.datePratique, r.insc.debutPratique, r.finPratique, 'formation', r.formation?.code);
     }
     if (r.insc.dateTestPratique && r.insc.debutTestPratique != null) {
       add(r.testeurEffectif, r.insc.dateTestPratique, r.insc.debutTestPratique, r.finTestPratique, 'test', r.formation?.code);
@@ -915,9 +898,12 @@ export function memberAvailability(state, draft, excludeId = null) {
         const status = (kind, allowSameCat) => !m.quals?.[formation.code]?.[kind] ? 'non-habilite'
           : !presentOn(m.id, draft.datePratique) ? 'absent'
           : freeOn(m.id, draft.datePratique, draft.debutPratique, end, allowSameCat) ? 'libre' : 'occupe';
-        // Formation « épreuve seule » : le créneau Pratique est tenu par un testeur
-        if (formation.testOnly) out.T = status('T', false);
-        else out.F = status('F', true);
+        // Formation « épreuve seule » : surveillance par un testeur — ne
+        // mobilise pas son temps, donc habilité + présent suffit
+        if (formation.testOnly) {
+          out.T = !m.quals?.[formation.code]?.T ? 'non-habilite'
+            : !presentOn(m.id, draft.datePratique) ? 'absent' : 'libre';
+        } else out.F = status('F', true);
       }
       if (!formation.testOnly && draft.dateTestPratique && draft.debutTestPratique != null) {
         const end = draft.debutTestPratique + params.practicalTestDuration;
@@ -947,6 +933,9 @@ export function availableSlotsFor(state, { formation: code, type, date, role = '
     : dureeFor(formation, type);
   const kind = role === 'test' || (role === 'pratique' && formation.testOnly) ? 'T' : 'F';
   const allowSameCat = role === 'pratique' && kind === 'F';
+  // Épreuve « test seul » (AIPR) : surveillance — un superviseur habilité et
+  // présent suffit, peu importe ses autres occupations
+  const surveillance = role === 'pratique' && !!formation.testOnly;
 
   const idx = busyIndex(state, excludeId);
   const freeOn = idx.freeOn(formation);
@@ -955,7 +944,7 @@ export function availableSlotsFor(state, { formation: code, type, date, role = '
 
   const out = [];
   for (let t = params.dayStart; t + duration <= params.dayEnd; t += params.slotMinutes) {
-    if (members.some((m) => freeOn(m.id, date, t, t + duration, allowSameCat))) out.push(t);
+    if (surveillance || members.some((m) => freeOn(m.id, date, t, t + duration, allowSameCat))) out.push(t);
   }
   return out;
 }

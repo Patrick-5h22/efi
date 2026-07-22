@@ -49,6 +49,8 @@
   --free: oklch(0.95 0.045 155);
   --free-hover: oklch(0.88 0.08 155);
   --busy: oklch(0.92 0.05 25);
+  --exam-bg: oklch(0.93 0.05 290);
+  --exam-border: oklch(0.75 0.1 290);
   --closed: oklch(0.94 0.005 260);
   --grid-line: oklch(0.87 0.01 260);
 }
@@ -144,6 +146,8 @@
   --free: oklch(0.33 0.05 155);
   --free-hover: oklch(0.42 0.08 155);
   --busy: oklch(0.34 0.06 25);
+  --exam-bg: oklch(0.32 0.07 290);
+  --exam-border: oklch(0.55 0.1 290);
   --closed: oklch(0.24 0.005 260);
   --grid-line: oklch(0.35 0.01 260);
 }

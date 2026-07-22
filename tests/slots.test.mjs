@@ -53,21 +53,21 @@ test('créneaux : capacité 2 (R489 Cat 3) — le créneau du formateur reste pr
   assert.ok(avail.includes(480), '2e candidat possible sur le même créneau (2 chariots)');
 });
 
-test('créneaux : rôle test — testeur requis, épreuve AIPR = rôle T avec sa durée', () => {
+test('créneaux : rôle test — l’épreuve AIPR (surveillance) ne bloque pas le testeur', () => {
   const state = fixture();
   state.inscriptions = [
-    // p1 et p2 seront pris à 10:00 : p1 par une épreuve AIPR (2h), p2 par un test (1h)
+    // À 10:00 : p1 surveille une épreuve AIPR (2h), p2 tient un test (1h)
     { id: 1, stagiaire: 'UN', formation: 'AIPR', type: 'Initial', datePratique: '2026-09-01', debutPratique: 600, testeurId: 'p1', statut: 'confirmee' },
     { id: 2, stagiaire: 'DEUX', formation: 'R489-3', type: 'Initial', datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p1',
       dateTestPratique: '2026-09-01', debutTestPratique: 600, testeurId: 'p2', statut: 'confirmee' },
   ];
   const availTest = availableSlotsFor(state, { formation: 'R489-3', type: 'Initial', date: '2026-09-01', role: 'test' }, null);
-  // 10:00 : p1 en épreuve AIPR (jusqu'à 12:00), p2 en test (jusqu'à 11:00) → indisponible
-  assert.ok(!availTest.includes(600));
-  // 11:00 : p2 libéré → disponible ; p1 encore en épreuve
-  assert.ok(availTest.includes(660));
-  // Épreuve AIPR : créneaux calculés sur 2h avec habilitation T
+  // 10:00 : p2 en test, mais p1 reste disponible — la surveillance AIPR ne l'occupe pas
+  assert.ok(availTest.includes(600));
+  // Épreuve AIPR : tous les débuts possibles pour 2h — la surveillance ne
+  // dépend pas des autres occupations (habilité + présent suffit)
   const availAipr = availableSlotsFor(state, { formation: 'AIPR', type: 'Recyclage', date: '2026-09-01', role: 'pratique' });
-  assert.ok(availAipr.at(-1) <= 900, 'départ max 15:00 pour 2h');
-  assert.ok(!availAipr.includes(600), '10:00 pris (p1 épreuve, p2 test)');
+  assert.equal(availAipr[0], 480);
+  assert.equal(availAipr.at(-1), 900, 'départ max 15:00 pour 2h');
+  assert.ok(availAipr.includes(600), '10:00 proposé malgré l’épreuve et le test en cours');
 });
