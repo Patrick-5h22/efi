@@ -26,6 +26,17 @@ test('migration : AIPR injectée dans un état existant, dayPresence initialisé
   assert.equal(migrated.params.salleCapacite, 12);
 });
 
+test('migration : une AIPR préexistante (sans testOnly, tests cochés) est réparée', () => {
+  // Cas réel : l'état partagé contenait déjà une formation AIPR créée avant
+  // son ajout au catalogue → traitée comme une formation classique avec tests.
+  const old = { version: 1, formations: [{ code: 'AIPR', label: 'AIPR maison', reco: 'AIPR', dureeInitial: 120, dureeRecyclage: 120, tests: true, capacite: 1 }], inscriptions: [] };
+  const migrated = migrate(old);
+  const aipr = migrated.formations.find((f) => f.code === 'AIPR');
+  assert.equal(aipr.testOnly, true, 'drapeau « épreuve seule » rétabli');
+  assert.equal(aipr.tests, false, 'plus de tests séparés exigés');
+  assert.equal(aipr.label, 'AIPR maison', 'les personnalisations sont conservées');
+});
+
 test('AIPR : l’épreuve est tenue par un testeur, pas de formateur ni de test requis', () => {
   const state = fixture();
   state.inscriptions = [{ id: 1, stagiaire: 'DURAND Paul', formation: 'AIPR', type: 'Initial', datePratique: '2026-09-01', debutPratique: 480, statut: 'confirmee' }];

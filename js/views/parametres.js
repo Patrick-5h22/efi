@@ -28,7 +28,9 @@ export function renderParametres(main) {
                 <td>${esc(f.reco)}</td>
                 <td><input type="number" step="0.5" min="0.5" max="8" value="${f.dureeInitial / 60}" data-f="${idx}|dureeInitial" style="width:70px"></td>
                 <td><input type="number" step="0.5" min="0.5" max="8" value="${f.dureeRecyclage / 60}" data-f="${idx}|dureeRecyclage" style="width:70px"></td>
-                <td style="text-align:center"><input type="checkbox" ${f.tests ? 'checked' : ''} data-f="${idx}|tests"></td>
+                <td style="text-align:center">${f.testOnly
+                  ? '<span class="muted" title="Épreuve surveillée : la formation se fait à distance, seule l’épreuve est planifiée — pas de tests séparés">épreuve seule</span>'
+                  : `<input type="checkbox" ${f.tests ? 'checked' : ''} data-f="${idx}|tests">`}</td>
                 <td><input type="number" min="1" max="4" value="${f.capacite}" data-f="${idx}|capacite" style="width:60px"></td>
               </tr>`).join('')}
           </tbody>
