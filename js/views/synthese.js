@@ -70,6 +70,26 @@ function buildEvents(state, days) {
     }
   }
 
+  // Sessions de théorie présentielle (inter) + e-learning en centre
+  for (const s of app.schedule.theorySessions || []) {
+    if (!daySet.has(s.date)) continue;
+    events.push({
+      date: s.date, start: s.debut, end: s.fin,
+      stagiaire: `Session ${s.reco} ${s.type === 'Initial' ? 'initiale (7h00)' : 'recyclage (3h30)'} — ${s.stagiaires.length} stagiaire(s) : ${s.stagiaires.join(', ')}`,
+      action: 'THÉORIE PRÉSENTIELLE', who: memberName(state, s.formateurId) || '⚠', kind: 'theorie',
+    });
+  }
+  for (const row of rows) {
+    if (row.cancelled) continue;
+    const i = row.insc;
+    if (i.modeTheorie === 'centre' && daySet.has(i.dateTheorieFormation) && i.debutTheorieFormation != null) {
+      events.push({
+        date: i.dateTheorieFormation, start: i.debutTheorieFormation, end: row.finTheorieFormation,
+        stagiaire: i.stagiaire, action: 'E-learning en centre (salle)', who: '—', kind: 'theorie',
+      });
+    }
+  }
+
   // Théorie : un événement de groupe par jour concerné
   for (const date of days) {
     if (!theoryTesters.has(date)) continue;

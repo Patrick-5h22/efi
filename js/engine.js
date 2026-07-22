@@ -2,7 +2,7 @@
 // les intervenants effectifs (affectation automatique) et les contrôles (STATUT).
 // Reproduit les règles du classeur "Planification EFI v4.2".
 
-import { formationByCode, dureeFor } from './config.js';
+import { formationByCode, dureeFor, dureeTheorieFor } from './config.js';
 import { isoWeek, overlaps, workingDays, fmtTime, mondayOf, weekDays, toISO } from './dates.js';
 
 // ---------------------------------------------------------------------------
@@ -18,6 +18,7 @@ export function computeSchedule(state) {
   const rows = inscriptions.map((insc) => {
     const formation = formationByCode(formations, insc.formation);
     const duree = dureeFor(formation, insc.type);
+    const dureeTheorieF = dureeTheorieFor(insc);
     return {
       insc,
       formation,
@@ -26,10 +27,14 @@ export function computeSchedule(state) {
       finPratique: insc.debutPratique != null ? insc.debutPratique + duree : null,
       finTestPratique: insc.debutTestPratique != null ? insc.debutTestPratique + params.practicalTestDuration : null,
       heureTheorie: insc.dateTheorie ? params.theoryTime : null,
+      // Théorie de la formation (modes centre / présentiel)
+      dureeTheorieFormation: dureeTheorieF,
+      finTheorieFormation: insc.debutTheorieFormation != null && dureeTheorieF ? insc.debutTheorieFormation + dureeTheorieF : null,
       semaine: insc.datePratique ? isoWeek(insc.datePratique) : null,
       formateurEffectif: null,
       testeurEffectif: null,
       testeurTheorie: null,
+      formateurTheorieEffectif: null,
       errors: [],
     };
   });
@@ -125,6 +130,44 @@ export function computeSchedule(state) {
     addBusy(row.testeurEffectif, { date, start, end, kind: 'test', formation: formation.code, inscId: insc.id });
   }
 
+  // Passe 1 ter — sessions de théorie PRÉSENTIELLE (inter, mutualisées par
+  // recommandation) : les lignes de la même recommandation saisies sur le
+  // même créneau forment une session commune, animée par UN formateur.
+  const theorySessions = [];
+  {
+    const byKey = new Map();
+    for (const row of active) {
+      const i = row.insc;
+      if (i.modeTheorie !== 'presentiel' || !i.dateTheorieFormation || i.debutTheorieFormation == null || !row.formation) continue;
+      const key = `${row.formation.reco}|${i.dateTheorieFormation}|${i.debutTheorieFormation}`;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(row);
+    }
+    for (const [key, group] of byKey) {
+      const [reco, date, debutStr] = key.split('|');
+      const debut = Number(debutStr);
+      const fin = debut + group[0].dureeTheorieFormation;
+      // Une session est d'un seul type (7h initiale / 3h30 recyclage)
+      const types = new Set(group.map((r) => r.insc.type));
+      if (types.size > 1) {
+        for (const r of group) r.errors.push(`Session théorie ${reco} : initiale (7h00) et recyclage (3h30) mélangés sur le même créneau`);
+      }
+      const explicit = group.map((r) => r.insc.formateurTheorieId).find(Boolean) || null;
+      let formateur = explicit;
+      if (!formateur) {
+        formateur = pickPerson(date, group[0].formation.code, 'F', (id) => isFree(id, date, debut, fin));
+        if (!formateur) for (const r of group) r.errors.push('Aucun formateur disponible (théorie présentielle)');
+      }
+      for (const r of group) r.formateurTheorieEffectif = formateur;
+      addBusy(formateur, { date, start: debut, end: fin, kind: 'theorie-formation' });
+      theorySessions.push({
+        reco, date, debut, fin, type: group[0].insc.type, formateurId: formateur,
+        stagiaires: [...new Set(group.map((r) => r.insc.stagiaire))],
+        rows: group,
+      });
+    }
+  }
+
   // Passe 2 — théorie : testeur du jour (auto si non affecté), en évitant les
   // formateurs des candidats du jour. Bloque le créneau théorie.
   const theoryTesters = new Map(); // date -> personId|null
@@ -168,12 +211,13 @@ export function computeSchedule(state) {
   }
 
   // --- Contrôles ----------------------------------------------------------
-  validateRows(active, { state, params, openDays, validDays, theoryDays, theoryTesters, qualified, presentOn });
+  validateRows(active, { state, params, openDays, validDays, theoryDays, theoryTesters, qualified, presentOn, theorySessions });
 
   return {
     rows,
     theoryDays,
     theoryTesters,
+    theorySessions,
     // Nombre de candidats au test théorique du jour (stagiaires uniques)
     theoryCandidates: (date) => new Set(
       rows.filter((r) => !r.cancelled && r.insc.dateTheorie === date).map((r) => r.insc.stagiaire.toLowerCase())
@@ -185,7 +229,7 @@ export function computeSchedule(state) {
 // Contrôles automatiques — colonne STATUT
 // ---------------------------------------------------------------------------
 function validateRows(rows, ctx) {
-  const { state, params, openDays, validDays, theoryTesters, qualified, presentOn } = ctx;
+  const { state, params, openDays, validDays, theoryTesters, qualified, presentOn, theorySessions = [] } = ctx;
   const theoryEnd = params.theoryTime + params.theoryDuration;
   const pratiqueLabel = (row) => (row.formation?.testOnly ? 'Épreuve' : 'Pratique');
   const memberNameOf = (st, id) => st.team.find((m) => m.id === id)?.name || id;
@@ -276,6 +320,20 @@ function validateRows(rows, ctx) {
       checkPresence(row.testeurEffectif, insc.dateTestPratique, 'test pratique');
     }
     checkPresence(row.testeurTheorie, insc.dateTheorie, 'théorie');
+    checkPresence(row.formateurTheorieEffectif, insc.dateTheorieFormation, 'théorie présentielle');
+
+    // Théorie de la formation (modes centre / présentiel)
+    if (insc.modeTheorie && insc.modeTheorie !== 'distance') {
+      const label = insc.modeTheorie === 'presentiel' ? 'Théorie présentielle' : 'Théorie en centre';
+      if (!insc.dateTheorieFormation) row.errors.push(`${label} : date manquante`);
+      else checkDay(row, insc.dateTheorieFormation, label);
+      if (insc.dateTheorieFormation && insc.debutTheorieFormation == null) row.errors.push(`${label} : heure manquante`);
+      checkWindow(row, insc.debutTheorieFormation, row.finTheorieFormation, label);
+      if (insc.modeTheorie === 'presentiel' && row.formateurTheorieEffectif
+        && !qualified(row.formateurTheorieEffectif, formation.code, 'F')) {
+        row.errors.push('Formateur théorie non habilité');
+      }
+    }
   }
 
   // --- Conflits croisés entre lignes ---
@@ -384,6 +442,79 @@ function validateRows(rows, ctx) {
     }
   }
 
+  // Sessions de théorie présentielle : le formateur de session ne peut pas
+  // être en pratique ou en test pendant sa session
+  for (const s of theorySessions) {
+    if (!s.formateurId) continue;
+    for (const r of rows) {
+      if (r.insc.datePratique === s.date && r.insc.debutPratique != null
+        && (r.formation?.testOnly ? r.testeurEffectif : r.formateurEffectif) === s.formateurId
+        && overlaps(r.insc.debutPratique, r.finPratique, s.debut, s.fin)) {
+        const msg = 'Intervenant en théorie présentielle et en activité en même temps';
+        if (!r.errors.includes(msg)) r.errors.push(msg);
+        for (const g of s.rows) if (!g.errors.includes(msg)) g.errors.push(msg);
+      }
+      if (r.insc.dateTestPratique === s.date && r.insc.debutTestPratique != null
+        && r.testeurEffectif === s.formateurId
+        && overlaps(r.insc.debutTestPratique, r.finTestPratique, s.debut, s.fin)) {
+        const msg = 'Intervenant en théorie présentielle et en test en même temps';
+        if (!r.errors.includes(msg)) r.errors.push(msg);
+        for (const g of s.rows) if (!g.errors.includes(msg)) g.errors.push(msg);
+      }
+    }
+  }
+
+  // Chevauchements du stagiaire avec sa propre théorie de formation
+  // (les autres chevauchements stagiaire sont traités dans crossChecks)
+  for (const row of rows) {
+    const i = row.insc;
+    if (!i.dateTheorieFormation || i.debutTheorieFormation == null || !row.finTheorieFormation) continue;
+    const tf = { start: i.debutTheorieFormation, end: row.finTheorieFormation };
+    if (i.datePratique === i.dateTheorieFormation && i.debutPratique != null
+      && overlaps(i.debutPratique, row.finPratique, tf.start, tf.end)) {
+      row.errors.push(`${row.formation?.testOnly ? 'Épreuve' : 'Pratique'} en même temps que la théorie de formation`);
+    }
+    if (i.dateTestPratique === i.dateTheorieFormation && i.debutTestPratique != null
+      && overlaps(i.debutTestPratique, row.finTestPratique, tf.start, tf.end)) {
+      row.errors.push('Test pratique en même temps que la théorie de formation');
+    }
+    if (i.dateTheorie === i.dateTheorieFormation
+      && overlaps(params.theoryTime, theoryEnd, tf.start, tf.end)) {
+      row.errors.push('Test théorique en même temps que la théorie de formation');
+    }
+  }
+
+  // Capacité de la salle de théorie : présentiel + e-learning en centre
+  {
+    const cap = params.salleCapacite ?? 12;
+    // Occupations de salle par date : { date, start, end, stagiaire, row }
+    const roomUse = [];
+    for (const s of theorySessions) {
+      for (const r of s.rows) roomUse.push({ date: s.date, start: s.debut, end: s.fin, stagiaire: r.insc.stagiaire.toLowerCase(), row: r });
+    }
+    for (const r of rows) {
+      const i = r.insc;
+      if (i.modeTheorie === 'centre' && i.dateTheorieFormation && i.debutTheorieFormation != null && r.finTheorieFormation) {
+        roomUse.push({ date: i.dateTheorieFormation, start: i.debutTheorieFormation, end: r.finTheorieFormation, stagiaire: i.stagiaire.toLowerCase(), row: r });
+      }
+    }
+    const byDate = new Map();
+    for (const u of roomUse) {
+      if (!byDate.has(u.date)) byDate.set(u.date, []);
+      byDate.get(u.date).push(u);
+    }
+    for (const [, uses] of byDate) {
+      for (let t = params.dayStart; t < params.dayEnd; t += params.slotMinutes) {
+        const concurrent = uses.filter((u) => overlaps(u.start, u.end, t, t + params.slotMinutes));
+        const distinct = new Set(concurrent.map((u) => u.stagiaire));
+        if (distinct.size > cap) {
+          const msg = `Salle de théorie pleine : ${distinct.size} stagiaires simultanés (capacité ${cap})`;
+          for (const u of concurrent) if (!u.row.errors.includes(msg)) u.row.errors.push(msg);
+        }
+      }
+    }
+  }
+
   // Testeur : deux épreuves/tests en même temps par le même testeur effectif
   // (généralisation incluant les épreuves « test seul », ex. AIPR)
   for (let i = 0; i < rows.length; i++) {
@@ -436,12 +567,19 @@ function crossChecks(a, b, params) {
       if (i.datePratique && i.debutPratique != null) out.push({ date: i.datePratique, start: i.debutPratique, end: r.finPratique, label: 'pratique' });
       if (i.dateTestPratique && i.debutTestPratique != null) out.push({ date: i.dateTestPratique, start: i.debutTestPratique, end: r.finTestPratique, label: 'test pratique' });
       if (i.dateTheorie) out.push({ date: i.dateTheorie, start: params.theoryTime, end: params.theoryTime + params.theoryDuration, label: 'théorie' });
+      if (i.dateTheorieFormation && i.debutTheorieFormation != null && r.finTheorieFormation) {
+        out.push({ date: i.dateTheorieFormation, start: i.debutTheorieFormation, end: r.finTheorieFormation, label: 'théorie formation' });
+      }
       return out;
     };
+    // Créneaux mutualisés par nature : test théorique commun, et session de
+    // théorie de formation identique (même début) sur deux lignes du stagiaire
+    const mutualised = (sa, sb) => (sa.label === 'théorie' && sb.label === 'théorie')
+      || (sa.label === 'théorie formation' && sb.label === 'théorie formation' && sa.start === sb.start);
     for (const sa of slots(a)) {
       for (const sb of slots(b)) {
         if (sa.date === sb.date && overlaps(sa.start, sa.end, sb.start, sb.end)
-          && !(sa.label === 'théorie' && sb.label === 'théorie')) {
+          && !mutualised(sa, sb)) {
           const msg = `Chevauchement stagiaire (${sa.label} / ${sb.label} le ${sa.date})`;
           if (!a.errors.includes(msg)) a.errors.push(msg);
           if (!b.errors.includes(msg)) b.errors.push(msg);
@@ -516,6 +654,10 @@ export function occupancyByDay(state, schedule) {
       ensure(date).busy += state.params.theoryDuration / params.slotMinutes;
     }
   }
+  // Sessions de théorie présentielle : un formateur mobilisé par session
+  for (const s of schedule.theorySessions || []) {
+    ensure(s.date).busy += (s.fin - s.debut) / params.slotMinutes;
+  }
 
   for (const v of out.values()) {
     v.ratio = v.total ? v.busy / v.total : 0;
@@ -584,6 +726,10 @@ export function occupationSummary(state, schedule, scope = 'periode', todayISO =
     if (i.dateTestPratique && i.debutTestPratique != null && scopeDays.has(i.dateTestPratique)) {
       busy += params.practicalTestDuration / params.slotMinutes;
     }
+  }
+  // Sessions de théorie présentielle (un formateur mobilisé par session)
+  for (const s of schedule.theorySessions || []) {
+    if (scopeDays.has(s.date)) busy += (s.fin - s.debut) / params.slotMinutes;
   }
 
   return {
@@ -681,7 +827,7 @@ export function suggestSlots(state, { stagiaire, formation: code, type }, exclud
 // partagé entre memberAvailability et availableSlotsFor.
 function busyIndex(state, excludeId = null) {
   const { params, team } = state;
-  const { rows, theoryTesters } = computeSchedule(state);
+  const { rows, theoryTesters, theorySessions } = computeSchedule(state);
   const theoryEnd = params.theoryTime + params.theoryDuration;
 
   const busy = new Map(team.map((m) => [m.id, []]));
@@ -702,6 +848,11 @@ function busyIndex(state, excludeId = null) {
     }
   }
   for (const [date, id] of theoryTesters) add(id, date, params.theoryTime, theoryEnd, 'theorie', null);
+  // Sessions de théorie présentielle : le formateur de session est occupé
+  for (const s of theorySessions || []) {
+    if (excludeId != null && s.rows.every((r) => r.insc.id === excludeId)) continue;
+    add(s.formateurId, s.date, s.debut, s.fin, 'theorie-formation', null);
+  }
 
   const freeOn = (formation) => (id, date, start, end, allowSameCat) => {
     const conflicts = (busy.get(id) || []).filter((b) => b.date === date && overlaps(b.start, b.end, start, end));
@@ -764,9 +915,11 @@ export function availableSlotsFor(state, { formation: code, type, date, role = '
   const formation = formationByCode(state.formations, code);
   if (!formation || !date) return [];
 
-  const duration = role === 'test' ? params.practicalTestDuration : dureeFor(formation, type);
-  const kind = role === 'test' || formation.testOnly ? 'T' : 'F';
-  const allowSameCat = kind === 'F';
+  const duration = role === 'test' ? params.practicalTestDuration
+    : role === 'theorie' ? dureeTheorieFor({ modeTheorie: 'presentiel', type })
+    : dureeFor(formation, type);
+  const kind = role === 'test' || (role === 'pratique' && formation.testOnly) ? 'T' : 'F';
+  const allowSameCat = role === 'pratique' && kind === 'F';
 
   const idx = busyIndex(state, excludeId);
   const freeOn = idx.freeOn(formation);
@@ -776,6 +929,67 @@ export function availableSlotsFor(state, { formation: code, type, date, role = '
   const out = [];
   for (let t = params.dayStart; t + duration <= params.dayEnd; t += params.slotMinutes) {
     if (members.some((m) => freeOn(m.id, date, t, t + duration, allowSameCat))) out.push(t);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Créneaux proposables pour une théorie PRÉSENTIELLE : rejoindre une session
+// existante de la même recommandation/type (créneau identique), ou en ouvrir
+// une nouvelle (formateur habilité/présent/libre) — dans les deux cas si la
+// salle a encore de la place.
+// ---------------------------------------------------------------------------
+export function availableTheorieSlots(state, { formation: code, type, date }, excludeId = null) {
+  const formation = formationByCode(state.formations, code);
+  if (!formation || !date) return [];
+  const duration = dureeTheorieFor({ modeTheorie: 'presentiel', type });
+  const room = new Set(roomFreeSlots(state, { date, duration }, excludeId));
+
+  const { theorySessions } = computeSchedule(state);
+  const joinable = (theorySessions || [])
+    .filter((s) => s.date === date && s.reco === formation.reco && s.type === type
+      && !s.rows.every((r) => r.insc.id === excludeId))
+    .map((s) => s.debut);
+
+  const fresh = availableSlotsFor(state, { formation: code, type, date, role: 'theorie' }, excludeId);
+  return [...new Set([...fresh, ...joinable])].filter((t) => room.has(t)).sort((a, b) => a - b);
+}
+
+// ---------------------------------------------------------------------------
+// Créneaux de salle disponibles : débuts où AJOUTER un stagiaire en salle
+// (théorie présentielle ou e-learning en centre) ne dépasse pas la capacité.
+// ---------------------------------------------------------------------------
+export function roomFreeSlots(state, { date, duration }, excludeId = null) {
+  const { params } = state;
+  if (!date || !duration) return [];
+  const cap = params.salleCapacite ?? 12;
+  const { rows, theorySessions } = computeSchedule(state);
+
+  // Occupations de salle du jour : { start, end, stagiaire }
+  const uses = [];
+  for (const s of theorySessions || []) {
+    if (s.date !== date) continue;
+    for (const r of s.rows) {
+      if (excludeId != null && r.insc.id === excludeId) continue;
+      uses.push({ start: s.debut, end: s.fin, stagiaire: r.insc.stagiaire.toLowerCase() });
+    }
+  }
+  for (const r of rows) {
+    if (r.cancelled || (excludeId != null && r.insc.id === excludeId)) continue;
+    const i = r.insc;
+    if (i.modeTheorie === 'centre' && i.dateTheorieFormation === date && i.debutTheorieFormation != null && r.finTheorieFormation) {
+      uses.push({ start: i.debutTheorieFormation, end: r.finTheorieFormation, stagiaire: i.stagiaire.toLowerCase() });
+    }
+  }
+
+  const out = [];
+  for (let t = params.dayStart; t + duration <= params.dayEnd; t += params.slotMinutes) {
+    let ok = true;
+    for (let s = t; s < t + duration && ok; s += params.slotMinutes) {
+      const concurrent = new Set(uses.filter((u) => overlaps(u.start, u.end, s, s + params.slotMinutes)).map((u) => u.stagiaire));
+      if (concurrent.size >= cap) ok = false;
+    }
+    if (ok) out.push(t);
   }
   return out;
 }

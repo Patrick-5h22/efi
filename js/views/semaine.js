@@ -118,6 +118,16 @@ function gridHTML(state, days, kind) {
         return `<td class="slot-theory"><span class="slot-name">THÉORIE (${n} cand.)</span><span class="slot-detail">Testeur : ${esc(memberName(state, theoryTesters.get(date)) || '?')}</span></td>`;
       }
 
+      // Sessions de théorie présentielle (grille formateur)
+      if (kind === 'F') {
+        const sess = (app.schedule.theorySessions || []).filter((s) => s.date === date && t < s.fin && slotEnd > s.debut);
+        if (sess.length) {
+          const label = sess.map((s) => `<span class="slot-name">THÉORIE ${esc(s.reco)} (${s.stagiaires.length})</span><span class="slot-detail">${s.type === 'Initial' ? '7h00' : '3h30'} — Form. : ${esc(memberName(state, s.formateurId) || '⚠')}</span>`).join('');
+          const tip = sess.map((s) => `Théorie ${s.reco} ${s.type} — ${s.stagiaires.join(', ')}`).join(' | ');
+          return `<td class="slot-theory" title="${esc(tip)}">${label}</td>`;
+        }
+      }
+
       // Occupations. Les formations « épreuve seule » (AIPR) occupent la
       // grille TESTEUR sur leur créneau (champs Pratique), jamais la grille
       // FORMATEUR.

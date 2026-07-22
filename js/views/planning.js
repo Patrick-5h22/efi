@@ -35,6 +35,13 @@ export function renderPlanning(main, args, kind) {
         return `<td class="slot-theory">THÉORIE (${n} cand.)</td>`;
       }
 
+      if (kind === 'F') {
+        const sess = (app.schedule.theorySessions || []).filter((s) => s.date === date && t < s.fin && slotEnd > s.debut);
+        if (sess.length) {
+          return `<td class="slot-theory" title="${esc(sess.map((s) => `Théorie ${s.reco} — ${s.stagiaires.join(', ')}`).join(' | '))}">THÉORIE ${esc(sess[0].reco)} (${sess[0].stagiaires.length})</td>`;
+        }
+      }
+
       const occupants = rows.filter((r) => {
         if (r.cancelled) return false;
         const i = r.insc;

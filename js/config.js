@@ -33,6 +33,21 @@ export const DEFAULT_FORMATIONS = [
 
 export const TYPES = ['Initial', 'Recyclage'];
 
+// Théorie de la formation (phase présentielle ou e-learning en centre)
+export const THEORIE_PRESENTIEL_DUREES = { Initial: 420, Recyclage: 210 }; // 7h00 / 3h30
+export const THEORIE_CENTRE_DUREE_DEFAUT = 210; // 3h30, modifiable à la saisie
+export const MODES_THEORIE = [
+  { id: 'distance', label: 'E-learning hors centre (rien à planifier)' },
+  { id: 'centre', label: 'E-learning en centre (créneau en salle)' },
+  { id: 'presentiel', label: 'Présentiel (session inter)' },
+];
+
+export function dureeTheorieFor(insc) {
+  if (insc.modeTheorie === 'presentiel') return THEORIE_PRESENTIEL_DUREES[insc.type] ?? THEORIE_PRESENTIEL_DUREES.Initial;
+  if (insc.modeTheorie === 'centre') return insc.dureeTheorieCentre ?? THEORIE_CENTRE_DUREE_DEFAUT;
+  return 0;
+}
+
 export const MAX_TEAM = 12;
 
 // Équipe d'exemple (identique au classeur)

@@ -56,6 +56,13 @@ export function renderAide(main) {
           positionné un jour où il n'est pas présent est signalé.</li>
         <li><b>AIPR</b> : la formation se fait à distance (e-learning) — seule l'épreuve sur site (2h00,
           tenue par un testeur habilité AIPR) se planifie ici, sans formateur ni autre test.</li>
+        <li><b>Théorie de la formation</b> (3 modes, par inscription) :
+          <b>e-learning hors centre</b> (défaut, rien à planifier) ;
+          <b>e-learning en centre</b> (créneau en salle, sans formateur) ;
+          <b>présentiel</b> — sessions <b>inter</b> de 7h00 (initiale) ou 3h30 (recyclage) :
+          les stagiaires de la même recommandation saisis sur le même créneau partagent la session
+          et son formateur. La <b>capacité de la salle</b> (Paramètres) est contrôlée en cumulant
+          présentiel et e-learning en centre — dépassement signalé, créneaux pleins non proposés.</li>
       </ul>
     </div>
 

@@ -57,6 +57,22 @@ export function buildICS(state, schedule, { onlyDates = null } = {}) {
     }
   }
 
+  // Sessions de théorie présentielle (une par session) + e-learning en centre
+  for (const s of schedule.theorySessions || []) {
+    if (!keep(s.date)) continue;
+    lines.push(...event(`theorie-${s.reco}-${s.date}-${s.debut}`, s.date, s.debut, s.fin,
+      `Théorie ${s.reco} ${s.type === 'Initial' ? 'initiale (7h00)' : 'recyclage (3h30)'} — ${s.stagiaires.length} stagiaire(s)`,
+      `Formateur : ${memberName(state, s.formateurId) || 'à affecter'} — ${s.stagiaires.join(', ')}`));
+  }
+  for (const row of schedule.rows) {
+    if (row.cancelled) continue;
+    const i = row.insc;
+    if (i.modeTheorie === 'centre' && keep(i.dateTheorieFormation) && i.debutTheorieFormation != null) {
+      lines.push(...event(`elearning-${i.id}`, i.dateTheorieFormation, i.debutTheorieFormation, row.finTheorieFormation,
+        `E-learning en centre — ${i.stagiaire}`, 'Salle de théorie (aucun formateur mobilisé)'));
+    }
+  }
+
   // Théorie : un événement de groupe par jour
   for (const [date, testerId] of schedule.theoryTesters) {
     if (!keep(date)) continue;

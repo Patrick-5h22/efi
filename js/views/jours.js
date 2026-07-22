@@ -146,10 +146,14 @@ function assignRowsHTML(state, days, openSet) {
     const nPratique = rows.filter((r) => !r.cancelled && r.insc.datePratique === date).length;
     const nTests = rows.filter((r) => !r.cancelled && r.insc.dateTestPratique === date).length;
     const nTheorie = app.schedule.theoryCandidates(date);
+    const sessions = (app.schedule.theorySessions || []).filter((s) => s.date === date);
+    const nSalle = rows.filter((r) => !r.cancelled && r.insc.modeTheorie === 'centre' && r.insc.dateTheorieFormation === date).length;
     const activity = [
       nPratique ? `${nPratique} pratique(s)` : '',
       nTests ? `${nTests} test(s)` : '',
       nTheorie ? `théorie (${nTheorie})` : '',
+      sessions.length ? `${sessions.length} session(s) théorie` : '',
+      nSalle ? `${nSalle} e-learning salle` : '',
     ].filter(Boolean).join(', ') || '<span class="muted">—</span>';
 
     const present = state.dayPresence[date] || null; // null = tous
