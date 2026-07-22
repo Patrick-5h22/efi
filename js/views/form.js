@@ -5,7 +5,7 @@ import { app, esc, toast } from '../app.js';
 import { addInscription, updateInscription } from '../store.js';
 import { formationByCode, dureeFor, TYPES } from '../config.js';
 import { daySlots, fmtTime, workingDays, fmtDateDay } from '../dates.js';
-import { computeSchedule, memberAvailability, suggestSlots } from '../engine.js';
+import { computeSchedule, memberAvailability, suggestSlots, availableSlotsFor } from '../engine.js';
 
 let dialog = null;
 
@@ -36,14 +36,32 @@ export function openInscriptionForm(options = {}) {
   const slots = daySlots(state.params);
   const openSet = new Set(state.openDays);
   const days = workingDays(state.params);
+  // Mode guidé (défaut) : seuls les jours ouverts et les créneaux avec une
+  // ressource disponible sont proposés. « Saisie libre » réaffiche tout.
+  let expert = false;
 
-  const dayOptions = (selected) => days.map((d) =>
-    `<option value="${d}" ${d === selected ? 'selected' : ''}>${fmtDateDay(d)}${openSet.has(d) ? '' : ' (fermé)'}</option>`
-  ).join('');
+  const dayOptions = (selected) => days
+    .filter((d) => expert || openSet.has(d) || d === selected)
+    .map((d) =>
+      `<option value="${d}" ${d === selected ? 'selected' : ''}>${fmtDateDay(d)}${openSet.has(d) ? '' : ' (fermé)'}</option>`
+    ).join('');
 
   const timeOptions = (selected) => slots.map((t) =>
     `<option value="${t}" ${t === selected ? 'selected' : ''}>${fmtTime(t)}</option>`
   ).join('');
+
+  // Options d'heures filtrées sur les créneaux disponibles (mode guidé) ;
+  // la valeur déjà saisie reste proposée, marquée « indisponible ».
+  const guidedTimeOptions = (available, selected) => {
+    const set = new Set(available);
+    return slots
+      .filter((t) => expert || set.has(t) || t === selected)
+      .map((t) => {
+        const suffix = set.has(t) ? '' : (expert ? ' ⚠' : ' (indisponible)');
+        return `<option value="${t}" ${t === selected ? 'selected' : ''}>${fmtTime(t)}${suffix}</option>`;
+      })
+      .join('');
+  };
 
   const memberOptions = (selected) => state.team
     .filter((m) => m.name.trim())
@@ -90,6 +108,9 @@ export function openInscriptionForm(options = {}) {
         <p class="muted" id="duree-info"></p>
         <div class="form-row no-print">
           <button type="button" class="btn btn-secondary btn-sm" id="btn-suggest" title="Chercher la première combinaison pratique + tests sans conflit">💡 Proposer des créneaux</button>
+          <label class="expert-toggle" title="Par défaut, seuls les jours ouverts et les créneaux avec un intervenant habilité, présent et libre sont proposés. La saisie libre réaffiche tout (les contrôles restent actifs).">
+            <input type="checkbox" id="expert-toggle"> Saisie libre
+          </label>
           <span class="muted" id="suggest-info"></span>
         </div>
 
@@ -164,9 +185,39 @@ export function openInscriptionForm(options = {}) {
     }
   };
 
+  // Mode guidé : les listes de dates/heures ne proposent que les jours
+  // ouverts et les créneaux où une ressource habilitée, présente et libre
+  // existe. Reconstruites uniquement quand leurs dépendances changent.
+  let guidedKey = null;
+  const syncGuided = (draft) => {
+    const key = [draft.formation, draft.type, draft.datePratique, draft.dateTestPratique, expert].join('|');
+    if (key === guidedKey) return;
+    guidedKey = key;
+    const rebuildDay = (name, sel) => {
+      $(name).innerHTML = '<option value="">—</option>' + dayOptions(sel);
+      $(name).value = sel ?? '';
+    };
+    rebuildDay('datePratique', draft.datePratique);
+    rebuildDay('dateTestPratique', draft.dateTestPratique);
+    rebuildDay('dateTheorie', draft.dateTheorie);
+    const rebuildTime = (name, role, date, sel) => {
+      const el = $(name);
+      if (!draft.formation || !date) {
+        el.innerHTML = '<option value="">—</option>' + timeOptions(sel);
+      } else {
+        const avail = availableSlotsFor(state, { formation: draft.formation, type: draft.type, date, role }, editing ? editing.id : null);
+        el.innerHTML = '<option value="">—</option>' + guidedTimeOptions(avail, sel);
+      }
+      el.value = sel ?? '';
+    };
+    rebuildTime('debutPratique', 'pratique', draft.datePratique, draft.debutPratique);
+    rebuildTime('debutTestPratique', 'test', draft.dateTestPratique, draft.debutTestPratique);
+  };
+
   // Aperçu en direct : durée, fin, contrôles
   const refresh = () => {
     const draft = readDraft();
+    syncGuided(draft);
     dialog.querySelector('#motif-field').style.display = draft.statut === 'annulee' ? '' : 'none';
     const formation = formationByCode(state.formations, draft.formation);
     const duree = dureeFor(formation, draft.type);
@@ -202,6 +253,11 @@ export function openInscriptionForm(options = {}) {
     }
   };
   form.addEventListener('input', refresh);
+  dialog.querySelector('#expert-toggle').addEventListener('change', (e) => {
+    expert = e.target.checked;
+    guidedKey = null;
+    refresh();
+  });
   refresh();
 
   dialog.querySelector('#btn-suggest').addEventListener('click', () => {

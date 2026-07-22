@@ -677,13 +677,13 @@ export function suggestSlots(state, { stagiaire, formation: code, type }, exclud
 // d'inscription, indique pour chaque intervenant s'il est habilité et libre
 // sur le créneau de pratique (rôle F) et de test pratique (rôle T).
 // ---------------------------------------------------------------------------
-export function memberAvailability(state, draft, excludeId = null) {
-  const { params, formations, team } = state;
-  const formation = formationByCode(formations, draft.formation);
+// Index des occupations par intervenant (hors ligne en cours d'édition),
+// partagé entre memberAvailability et availableSlotsFor.
+function busyIndex(state, excludeId = null) {
+  const { params, team } = state;
   const { rows, theoryTesters } = computeSchedule(state);
   const theoryEnd = params.theoryTime + params.theoryDuration;
 
-  // Intervalles occupés par intervenant (hors ligne en cours d'édition)
   const busy = new Map(team.map((m) => [m.id, []]));
   const add = (id, date, start, end, kind, code) => {
     if (id && busy.has(id)) busy.get(id).push({ date, start, end, kind, code });
@@ -703,7 +703,7 @@ export function memberAvailability(state, draft, excludeId = null) {
   }
   for (const [date, id] of theoryTesters) add(id, date, params.theoryTime, theoryEnd, 'theorie', null);
 
-  const freeOn = (id, date, start, end, allowSameCat) => {
+  const freeOn = (formation) => (id, date, start, end, allowSameCat) => {
     const conflicts = (busy.get(id) || []).filter((b) => b.date === date && overlaps(b.start, b.end, start, end));
     if (!conflicts.length) return true;
     if (allowSameCat && formation && (formation.capacite || 1) > 1) {
@@ -713,11 +713,21 @@ export function memberAvailability(state, draft, excludeId = null) {
     return false;
   };
 
-  // Présence du jour (clé absente = tous présents)
   const presentOn = (id, date) => {
     const p = state.dayPresence?.[date];
     return !p || !p.length || p.includes(id);
   };
+
+  return { busy, freeOn, presentOn };
+}
+
+export function memberAvailability(state, draft, excludeId = null) {
+  const { params, formations } = state;
+  const formation = formationByCode(formations, draft.formation);
+  const idx = busyIndex(state, excludeId);
+  const freeOn = idx.freeOn(formation);
+  const presentOn = idx.presentOn;
+  const { team } = state;
 
   return team.filter((m) => m.name.trim()).map((m) => {
     const out = { id: m.id, name: m.name, F: null, T: null };
@@ -740,4 +750,32 @@ export function memberAvailability(state, draft, excludeId = null) {
     }
     return out;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Créneaux de début réellement disponibles pour une date donnée : il existe
+// au moins un intervenant habilité, PRÉSENT ce jour-là et libre sur toute la
+// durée. role = 'pratique' (formation, ou épreuve des formations « test
+// seul ») ou 'test' (test pratique). Alimente les listes du formulaire
+// d'inscription (mode guidé).
+// ---------------------------------------------------------------------------
+export function availableSlotsFor(state, { formation: code, type, date, role = 'pratique' }, excludeId = null) {
+  const { params, team } = state;
+  const formation = formationByCode(state.formations, code);
+  if (!formation || !date) return [];
+
+  const duration = role === 'test' ? params.practicalTestDuration : dureeFor(formation, type);
+  const kind = role === 'test' || formation.testOnly ? 'T' : 'F';
+  const allowSameCat = kind === 'F';
+
+  const idx = busyIndex(state, excludeId);
+  const freeOn = idx.freeOn(formation);
+  const members = team.filter((m) => m.name.trim() && m.quals?.[formation.code]?.[kind] && idx.presentOn(m.id, date));
+  if (!members.length) return [];
+
+  const out = [];
+  for (let t = params.dayStart; t + duration <= params.dayEnd; t += params.slotMinutes) {
+    if (members.some((m) => freeOn(m.id, date, t, t + duration, allowSameCat))) out.push(t);
+  }
+  return out;
 }

@@ -36,6 +36,9 @@ export function renderAide(main) {
         <li>Un candidat peut faire sa formation et ses tests le même jour en décalant les horaires : seuls les chevauchements réels sont signalés.</li>
       </ol>
       <p class="muted">Astuce : sur une grille de semaine, cliquer sur un créneau vert préremplit directement le formulaire d'inscription.</p>
+      <p class="muted"><b>Saisie guidée</b> : les listes de dates ne proposent que les jours ouverts du plateau, et les heures
+      uniquement les créneaux où un intervenant habilité, présent ce jour-là et libre existe. Cocher « Saisie libre »
+      dans le formulaire pour réafficher tous les créneaux (les contrôles STATUT restent actifs).</p>
     </div>
 
     <div class="card">
