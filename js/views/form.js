@@ -246,6 +246,26 @@ export function openInscriptionForm(options = {}) {
     };
     rebuildTime('debutPratique', 'pratique', draft.datePratique, draft.debutPratique);
     rebuildTime('debutTestPratique', 'test', draft.dateTestPratique, draft.debutTestPratique);
+    // Intervenants : ne proposer que les personnes habilitées pour la
+    // formation choisie (un choix déjà enregistré non habilité reste
+    // visible, marqué)
+    {
+      const formation = formationByCode(state.formations, draft.formation);
+      for (const [name, kind, sel] of [
+        ['formateurId', 'F', draft.formateurId],
+        ['testeurId', 'T', draft.testeurId],
+        ['formateurTheorieId', 'F', draft.formateurTheorieId],
+      ]) {
+        const el = $(name);
+        const qualifies = (m) => !formation || !!m.quals?.[formation.code]?.[kind];
+        const list = state.team.filter((m) => m.name.trim() && qualifies(m));
+        const kept = sel && !list.some((m) => m.id === sel) ? state.team.find((m) => m.id === sel) : null;
+        el.innerHTML = '<option value="">— auto —</option>'
+          + list.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')
+          + (kept ? `<option value="${kept.id}">${esc(kept.name)} (non habilité)</option>` : '');
+        el.value = sel || '';
+      }
+    }
     // Théorie de la formation : présentiel = rejoindre une session ou en
     // ouvrir une (formateur + salle) ; centre = place de salle uniquement
     {
