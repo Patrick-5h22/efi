@@ -43,9 +43,12 @@ export function buildICS(state, schedule, { onlyDates = null } = {}) {
     const i = row.insc;
     const cat = row.formation ? row.formation.label.replace('Pratique ', '') : '?';
     if (keep(i.datePratique) && i.debutPratique != null) {
+      const exam = row.formation?.testOnly;
       lines.push(...event(`practice-${i.id}`, i.datePratique, i.debutPratique, row.finPratique,
-        `Formation ${cat} — ${i.stagiaire}`,
-        `Formateur : ${memberName(state, row.formateurEffectif) || 'à affecter'} (${fmtTime(i.debutPratique)}–${fmtTime(row.finPratique)})`));
+        `${exam ? 'Épreuve' : 'Formation'} ${cat} — ${i.stagiaire}`,
+        exam
+          ? `Testeur : ${memberName(state, row.testeurEffectif) || 'à affecter'} (${fmtTime(i.debutPratique)}–${fmtTime(row.finPratique)})`
+          : `Formateur : ${memberName(state, row.formateurEffectif) || 'à affecter'} (${fmtTime(i.debutPratique)}–${fmtTime(row.finPratique)})`));
     }
     if (keep(i.dateTestPratique) && i.debutTestPratique != null && row.formation?.tests) {
       lines.push(...event(`test-${i.id}`, i.dateTestPratique, i.debutTestPratique, row.finTestPratique,

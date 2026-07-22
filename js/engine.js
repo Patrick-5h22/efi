@@ -67,6 +67,12 @@ export function computeSchedule(state) {
     return !!m?.quals?.[code]?.[kind];
   };
 
+  // Présence du jour (page Jours EFI) : clé absente ou liste vide = tous présents
+  const presentOn = (personId, date) => {
+    const p = state.dayPresence?.[date];
+    return !p || !p.length || p.includes(personId);
+  };
+
   const dayAssign = (date) => state.dayAssignments[date] || {};
 
   // avoid = intervenant à éviter (formateur du candidat) : on ne le retient
@@ -78,7 +84,7 @@ export function computeSchedule(state) {
     for (const m of team) if (!candidates.includes(m.id)) candidates.push(m.id);
     let fallback = null;
     for (const id of candidates) {
-      if (!qualified(id, code, kind) || !freeFn(id)) continue;
+      if (!qualified(id, code, kind) || !presentOn(id, date) || !freeFn(id)) continue;
       if (avoid && id === avoid) { fallback = fallback || id; continue; }
       return id;
     }
@@ -89,7 +95,7 @@ export function computeSchedule(state) {
   // évite ensuite le formateur du candidat)
   for (const row of rows) {
     const { insc, formation } = row;
-    if (row.cancelled || !formation || !insc.datePratique || insc.debutPratique == null) continue;
+    if (row.cancelled || !formation || formation.testOnly || !insc.datePratique || insc.debutPratique == null) continue;
     const { datePratique: date, debutPratique: start } = insc;
     const end = row.finPratique;
     if (insc.formateurId) {
@@ -102,6 +108,23 @@ export function computeSchedule(state) {
     addBusy(row.formateurEffectif, { date, start, end, kind: 'formation', formation: formation.code, inscId: insc.id });
   }
 
+  // Passe 1 bis — formations « épreuve seule » (ex. AIPR : la formation se
+  // fait à distance) : le créneau saisi est une épreuve tenue par un TESTEUR.
+  for (const row of rows) {
+    const { insc, formation } = row;
+    if (row.cancelled || !formation?.testOnly || !insc.datePratique || insc.debutPratique == null) continue;
+    const { datePratique: date, debutPratique: start } = insc;
+    const end = row.finPratique;
+    if (insc.testeurId) {
+      row.testeurEffectif = insc.testeurId;
+    } else {
+      row.testeurEffectif = pickPerson(date, formation.code, 'T',
+        (id) => isFree(id, date, start, end));
+      if (!row.testeurEffectif) row.errors.push('Aucun testeur disponible');
+    }
+    addBusy(row.testeurEffectif, { date, start, end, kind: 'test', formation: formation.code, inscId: insc.id });
+  }
+
   // Passe 2 — théorie : testeur du jour (auto si non affecté), en évitant les
   // formateurs des candidats du jour. Bloque le créneau théorie.
   const theoryTesters = new Map(); // date -> personId|null
@@ -111,8 +134,8 @@ export function computeSchedule(state) {
       const candidatesRows = active.filter((r) => r.insc.dateTheorie === date && r.formation?.tests);
       const codes = candidatesRows.map((r) => r.formation.code);
       const trainerIds = new Set(candidatesRows.map((r) => r.formateurEffectif).filter(Boolean));
-      const okFor = (m) => codes.length ? codes.some((c) => qualified(m.id, c, 'T'))
-        : Object.values(m.quals || {}).some((q) => q.T);
+      const okFor = (m) => presentOn(m.id, date) && (codes.length ? codes.some((c) => qualified(m.id, c, 'T'))
+        : Object.values(m.quals || {}).some((q) => q.T));
       tester = team.find((m) => okFor(m) && !trainerIds.has(m.id))?.id
         || team.find(okFor)?.id
         || null;
@@ -145,7 +168,7 @@ export function computeSchedule(state) {
   }
 
   // --- Contrôles ----------------------------------------------------------
-  validateRows(active, { state, params, openDays, validDays, theoryDays, theoryTesters, qualified });
+  validateRows(active, { state, params, openDays, validDays, theoryDays, theoryTesters, qualified, presentOn });
 
   return {
     rows,
@@ -162,8 +185,10 @@ export function computeSchedule(state) {
 // Contrôles automatiques — colonne STATUT
 // ---------------------------------------------------------------------------
 function validateRows(rows, ctx) {
-  const { state, params, openDays, validDays, theoryTesters, qualified } = ctx;
+  const { state, params, openDays, validDays, theoryTesters, qualified, presentOn } = ctx;
   const theoryEnd = params.theoryTime + params.theoryDuration;
+  const pratiqueLabel = (row) => (row.formation?.testOnly ? 'Épreuve' : 'Pratique');
+  const memberNameOf = (st, id) => st.team.find((m) => m.id === id)?.name || id;
 
   const checkDay = (row, date, label) => {
     if (!date) return;
@@ -196,14 +221,14 @@ function validateRows(rows, ctx) {
     if (!formation) { row.errors.push('Formation non renseignée'); continue; }
 
     // Jours ouverts + plages horaires
-    checkDay(row, insc.datePratique, 'Pratique');
+    checkDay(row, insc.datePratique, pratiqueLabel(row));
     checkDay(row, insc.dateTheorie, 'Théorie');
     checkDay(row, insc.dateTestPratique, 'Test pratique');
-    checkWindow(row, insc.debutPratique, row.finPratique, 'Pratique');
+    checkWindow(row, insc.debutPratique, row.finPratique, pratiqueLabel(row));
     checkWindow(row, insc.debutTestPratique, row.finTestPratique, 'Test pratique');
 
-    if (insc.datePratique && insc.debutPratique == null) row.errors.push('Heure de début de pratique manquante');
-    if (!insc.datePratique) row.errors.push('Date de pratique manquante');
+    if (insc.datePratique && insc.debutPratique == null) row.errors.push(`Heure de début de ${formation.testOnly ? 'l’épreuve' : 'pratique'} manquante`);
+    if (!insc.datePratique) row.errors.push(`Date de ${formation.testOnly ? 'l’épreuve' : 'pratique'} manquante`);
 
     // Tests obligatoires (R489 / R486)
     if (formation.tests) {
@@ -236,6 +261,21 @@ function validateRows(rows, ctx) {
         row.errors.push('Formateur = testeur du candidat (théorie)');
       }
     }
+
+    // Présence du jour (page Jours EFI) : un intervenant positionné un jour
+    // où il n'est pas coché présent est signalé
+    const checkPresence = (id, date, label) => {
+      if (id && date && !presentOn(id, date)) {
+        row.errors.push(`${memberNameOf(state, id)} non présent ce jour (${label})`);
+      }
+    };
+    if (formation.testOnly) {
+      checkPresence(row.testeurEffectif, insc.datePratique, 'épreuve');
+    } else {
+      checkPresence(row.formateurEffectif, insc.datePratique, 'pratique');
+      checkPresence(row.testeurEffectif, insc.dateTestPratique, 'test pratique');
+    }
+    checkPresence(row.testeurTheorie, insc.dateTheorie, 'théorie');
   }
 
   // --- Conflits croisés entre lignes ---
@@ -245,16 +285,32 @@ function validateRows(rows, ctx) {
     }
   }
 
+  // Créneaux « testeur » d'une ligne : test pratique classique, et l'épreuve
+  // des formations « test seul » (portée par les champs Pratique)
+  const testerSlots = (r) => {
+    const out = [];
+    if (r.formation?.testOnly && r.insc.datePratique && r.insc.debutPratique != null) {
+      out.push({ date: r.insc.datePratique, start: r.insc.debutPratique, end: r.finPratique });
+    }
+    if (r.insc.dateTestPratique && r.insc.debutTestPratique != null) {
+      out.push({ date: r.insc.dateTestPratique, start: r.insc.debutTestPratique, end: r.finTestPratique });
+    }
+    return out;
+  };
+
   // Un même intervenant ne peut pas former et faire passer un test en même temps
   for (const a of rows) {
+    if (a.formation?.testOnly) continue;
     if (!a.insc.datePratique || a.insc.debutPratique == null || !a.formateurEffectif) continue;
     for (const b of rows) {
-      if (b.insc.dateTestPratique !== a.insc.datePratique || b.insc.debutTestPratique == null) continue;
       if (b.testeurEffectif !== a.formateurEffectif) continue;
-      if (overlaps(a.insc.debutPratique, a.finPratique, b.insc.debutTestPratique, b.finTestPratique)) {
-        const msg = 'Intervenant en formation et en test en même temps';
-        if (!a.errors.includes(msg)) a.errors.push(msg);
-        if (!b.errors.includes(msg)) b.errors.push(msg);
+      for (const s of testerSlots(b)) {
+        if (s.date !== a.insc.datePratique) continue;
+        if (overlaps(a.insc.debutPratique, a.finPratique, s.start, s.end)) {
+          const msg = 'Intervenant en formation et en test en même temps';
+          if (!a.errors.includes(msg)) a.errors.push(msg);
+          if (!b.errors.includes(msg)) b.errors.push(msg);
+        }
       }
     }
     // … ni former pendant le créneau théorie qu'il anime
@@ -266,14 +322,15 @@ function validateRows(rows, ctx) {
     }
   }
 
-  // Test pratique pendant le créneau théorie du MÊME testeur
+  // Test pratique (ou épreuve) pendant le créneau théorie du MÊME testeur
   for (const row of rows) {
-    const { insc } = row;
-    if (!insc.dateTestPratique || insc.debutTestPratique == null) continue;
-    const theoryTester = theoryTesters.get(insc.dateTestPratique);
-    if (theoryTester && row.testeurEffectif === theoryTester
-      && overlaps(insc.debutTestPratique, row.finTestPratique, params.theoryTime, theoryEnd)) {
-      row.errors.push('Test pratique pendant le créneau théorie');
+    for (const s of testerSlots(row)) {
+      const theoryTester = theoryTesters.get(s.date);
+      if (theoryTester && row.testeurEffectif === theoryTester
+        && overlaps(s.start, s.end, params.theoryTime, theoryEnd)) {
+        const msg = row.formation?.testOnly ? 'Épreuve pendant le créneau théorie' : 'Test pratique pendant le créneau théorie';
+        if (!row.errors.includes(msg)) row.errors.push(msg);
+      }
     }
   }
 
@@ -310,17 +367,39 @@ function validateRows(rows, ctx) {
   }
 
   // Charge : formation pratique ≤ max / jour / formateur effectif
+  // (les épreuves « test seul » ne comptent pas comme formation pratique)
   const loadByDayTrainer = new Map();
   for (const row of rows) {
+    if (row.formation?.testOnly) continue;
     if (!row.insc.datePratique || row.insc.debutPratique == null) continue;
     const key = `${row.insc.datePratique}|${row.formateurEffectif || '?'}`;
     loadByDayTrainer.set(key, (loadByDayTrainer.get(key) || 0) + row.duree);
   }
   for (const row of rows) {
+    if (row.formation?.testOnly) continue;
     if (!row.insc.datePratique || row.insc.debutPratique == null) continue;
     const key = `${row.insc.datePratique}|${row.formateurEffectif || '?'}`;
     if (loadByDayTrainer.get(key) > params.maxDailyLoad) {
       row.errors.push(`Charge > ${fmtTime(params.maxDailyLoad).replace(':', 'h')} de pratique ce jour`);
+    }
+  }
+
+  // Testeur : deux épreuves/tests en même temps par le même testeur effectif
+  // (généralisation incluant les épreuves « test seul », ex. AIPR)
+  for (let i = 0; i < rows.length; i++) {
+    for (let j = i + 1; j < rows.length; j++) {
+      const a = rows[i]; const b = rows[j];
+      if (!a.testeurEffectif || a.testeurEffectif !== b.testeurEffectif) continue;
+      if (!a.formation?.testOnly && !b.formation?.testOnly) continue; // cas classique déjà contrôlé
+      for (const sa of testerSlots(a)) {
+        for (const sb of testerSlots(b)) {
+          if (sa.date === sb.date && overlaps(sa.start, sa.end, sb.start, sb.end)) {
+            const msg = 'Testeur : 2 épreuves en même temps';
+            if (!a.errors.includes(msg)) a.errors.push(msg);
+            if (!b.errors.includes(msg)) b.errors.push(msg);
+          }
+        }
+      }
     }
   }
 
@@ -612,7 +691,11 @@ export function memberAvailability(state, draft, excludeId = null) {
   for (const r of rows) {
     if (excludeId != null && r.insc.id === excludeId) continue;
     if (r.insc.datePratique && r.insc.debutPratique != null) {
-      add(r.formateurEffectif, r.insc.datePratique, r.insc.debutPratique, r.finPratique, 'formation', r.formation?.code);
+      if (r.formation?.testOnly) {
+        add(r.testeurEffectif, r.insc.datePratique, r.insc.debutPratique, r.finPratique, 'test', r.formation?.code);
+      } else {
+        add(r.formateurEffectif, r.insc.datePratique, r.insc.debutPratique, r.finPratique, 'formation', r.formation?.code);
+      }
     }
     if (r.insc.dateTestPratique && r.insc.debutTestPratique != null) {
       add(r.testeurEffectif, r.insc.dateTestPratique, r.insc.debutTestPratique, r.finTestPratique, 'test', r.formation?.code);
@@ -630,17 +713,28 @@ export function memberAvailability(state, draft, excludeId = null) {
     return false;
   };
 
+  // Présence du jour (clé absente = tous présents)
+  const presentOn = (id, date) => {
+    const p = state.dayPresence?.[date];
+    return !p || !p.length || p.includes(id);
+  };
+
   return team.filter((m) => m.name.trim()).map((m) => {
     const out = { id: m.id, name: m.name, F: null, T: null };
     if (formation) {
       if (draft.datePratique && draft.debutPratique != null) {
         const end = draft.debutPratique + dureeFor(formation, draft.type);
-        out.F = !m.quals?.[formation.code]?.F ? 'non-habilite'
-          : freeOn(m.id, draft.datePratique, draft.debutPratique, end, true) ? 'libre' : 'occupe';
+        const status = (kind, allowSameCat) => !m.quals?.[formation.code]?.[kind] ? 'non-habilite'
+          : !presentOn(m.id, draft.datePratique) ? 'absent'
+          : freeOn(m.id, draft.datePratique, draft.debutPratique, end, allowSameCat) ? 'libre' : 'occupe';
+        // Formation « épreuve seule » : le créneau Pratique est tenu par un testeur
+        if (formation.testOnly) out.T = status('T', false);
+        else out.F = status('F', true);
       }
-      if (draft.dateTestPratique && draft.debutTestPratique != null) {
+      if (!formation.testOnly && draft.dateTestPratique && draft.debutTestPratique != null) {
         const end = draft.debutTestPratique + params.practicalTestDuration;
         out.T = !m.quals?.[formation.code]?.T ? 'non-habilite'
+          : !presentOn(m.id, draft.dateTestPratique) ? 'absent'
           : freeOn(m.id, draft.dateTestPratique, draft.debutTestPratique, end, false) ? 'libre' : 'occupe';
       }
     }

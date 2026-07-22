@@ -93,7 +93,7 @@ export function openInscriptionForm(options = {}) {
           <span class="muted" id="suggest-info"></span>
         </div>
 
-        <h2 style="font-size:14px; margin: 14px 0 8px;">Formation pratique</h2>
+        <h2 style="font-size:14px; margin: 14px 0 8px;" id="pratique-title">Formation pratique</h2>
         <div class="form-grid">
           <label class="field">Date <select name="datePratique" required><option value="">—</option>${dayOptions(init.datePratique)}</select></label>
           <label class="field">Heure de début <select name="debutPratique" required><option value="">—</option>${timeOptions(init.debutPratique)}</select></label>
@@ -113,7 +113,7 @@ export function openInscriptionForm(options = {}) {
 
         <h2 style="font-size:14px; margin: 14px 0 8px;">Intervenants <span class="muted">(vide = affectation automatique)</span></h2>
         <div class="form-grid">
-          <label class="field">Formateur (si ≠ jour) <select name="formateurId"><option value="">— auto —</option>${memberOptions(init.formateurId)}</select></label>
+          <label class="field" id="formateur-field">Formateur (si ≠ jour) <select name="formateurId"><option value="">— auto —</option>${memberOptions(init.formateurId)}</select></label>
           <label class="field">Testeur (si ≠ jour) <select name="testeurId"><option value="">— auto —</option>${memberOptions(init.testeurId)}</select></label>
         </div>
 
@@ -151,14 +151,14 @@ export function openInscriptionForm(options = {}) {
   const annotateMembers = (draft) => {
     if (!draft.formation) return;
     const avail = memberAvailability(state, draft, editing ? editing.id : null);
-    const mark = { libre: '✓', occupe: ' (occupé)', 'non-habilite': ' (non habilité)' };
+    const mark = { libre: '✓', occupe: ' (occupé)', 'non-habilite': ' (non habilité)', absent: ' (absent ce jour)' };
     for (const [selName, role] of [['formateurId', 'F'], ['testeurId', 'T']]) {
       const sel = $(selName);
       for (const opt of sel.options) {
         if (!opt.value) continue;
         const a = avail.find((x) => x.id === opt.value);
         const status = a?.[role];
-        const base = opt.textContent.replace(/ \((occupé|non habilité)\)| ✓$/g, '');
+        const base = opt.textContent.replace(/ \((occupé|non habilité|absent ce jour)\)| ✓$/g, '');
         opt.textContent = status ? base + (status === 'libre' ? ' ✓' : mark[status]) : base;
       }
     }
@@ -173,9 +173,14 @@ export function openInscriptionForm(options = {}) {
     annotateMembers(draft);
     $('finPratique').value = draft.debutPratique != null && formation ? fmtTime(draft.debutPratique + duree) : '';
     dialog.querySelector('#duree-info').textContent = formation
-      ? `Durée de la pratique : ${fmtTime(duree).replace(':', 'h')}${formation.tests ? ` — tests obligatoires (${formation.reco})` : ' — pas de test planifié dans cet outil'}${formation.capacite > 1 ? ` — capacité simultanée : ${formation.capacite}` : ''}`
+      ? (formation.testOnly
+        ? `Épreuve sur site : ${fmtTime(duree).replace(':', 'h')} (tenue par un testeur) — la formation ${formation.reco} se fait à distance (e-learning)`
+        : `Durée de la pratique : ${fmtTime(duree).replace(':', 'h')}${formation.tests ? ` — tests obligatoires (${formation.reco})` : ' — pas de test planifié dans cet outil'}${formation.capacite > 1 ? ` — capacité simultanée : ${formation.capacite}` : ''}`)
       : '';
     dialog.querySelector('#tests-section').style.display = formation && !formation.tests ? 'none' : '';
+    // Formation « épreuve seule » (AIPR) : le créneau est tenu par un testeur
+    dialog.querySelector('#pratique-title').textContent = formation?.testOnly ? 'Épreuve sur site' : 'Formation pratique';
+    dialog.querySelector('#formateur-field').style.display = formation?.testOnly ? 'none' : '';
 
     // Simulation des contrôles sur une copie de l'état
     const preview = dialog.querySelector('#form-preview');

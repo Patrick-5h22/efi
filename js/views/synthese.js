@@ -51,10 +51,14 @@ function buildEvents(state, days) {
     if (row.cancelled) continue;
     const i = row.insc;
     if (daySet.has(i.datePratique) && i.debutPratique != null) {
+      // Formation « épreuve seule » (AIPR) : c'est une épreuve tenue par un testeur
+      const exam = row.formation?.testOnly;
       events.push({
         date: i.datePratique, start: i.debutPratique, end: row.finPratique,
-        stagiaire: i.stagiaire, action: `Formation pratique — ${shortCat(row)}`,
-        who: memberName(state, row.formateurEffectif) || '⚠', kind: 'pratique',
+        stagiaire: i.stagiaire,
+        action: exam ? `Épreuve — ${shortCat(row)}` : `Formation pratique — ${shortCat(row)}`,
+        who: memberName(state, exam ? row.testeurEffectif : row.formateurEffectif) || '⚠',
+        kind: exam ? 'test' : 'pratique',
       });
     }
     if (daySet.has(i.dateTestPratique) && i.debutTestPratique != null && row.formation?.tests) {

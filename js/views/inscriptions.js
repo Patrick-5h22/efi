@@ -170,8 +170,10 @@ function focusEnd(main, sel) {
 function rowHTML(state, row) {
   const { insc, formation } = row;
   const manuel = ' <span title="Choix manuel">✎</span>';
-  const fmtF = row.formateurEffectif ? esc(memberName(state, row.formateurEffectif)) + (insc.formateurId ? manuel : '') : '<span class="badge badge-warn">—</span>';
-  const fmtT = formation?.tests
+  const fmtF = formation?.testOnly
+    ? '<span class="muted" title="Épreuve tenue par un testeur — pas de formateur">n/a</span>'
+    : row.formateurEffectif ? esc(memberName(state, row.formateurEffectif)) + (insc.formateurId ? manuel : '') : '<span class="badge badge-warn">—</span>';
+  const fmtT = (formation?.tests || formation?.testOnly)
     ? (row.testeurEffectif ? esc(memberName(state, row.testeurEffectif)) + (insc.testeurId ? manuel : '') : '<span class="badge badge-warn">—</span>')
     : '<span class="muted">n/a</span>';
 

@@ -46,6 +46,7 @@ export function renderParametres(main) {
         <label class="field">Durée du test théorique (h) <input type="number" step="0.5" min="0.5" max="4" value="${p.theoryDuration / 60}" data-p="theoryDuration" data-hours></label>
         <label class="field">Durée du test pratique (h) <input type="number" step="0.5" min="0.5" max="4" value="${p.practicalTestDuration / 60}" data-p="practicalTestDuration" data-hours></label>
         <label class="field">Charge max de formation pratique / jour (h) <input type="number" step="0.5" min="1" max="9" value="${p.maxDailyLoad / 60}" data-p="maxDailyLoad" data-hours></label>
+        <label class="field">Capacité de la salle de théorie (places) <input type="number" min="1" max="40" value="${p.salleCapacite ?? 12}" data-p="salleCapacite" data-int></label>
       </div>
     </div>
 
@@ -96,6 +97,8 @@ export function renderParametres(main) {
         const v = parseTime(input.value);
         if (v == null) { toast('Heure invalide (format HH:MM).', 'error'); input.value = fmtTime(state.params[key]); return; }
         state.params[key] = v;
+      } else if ('int' in input.dataset) {
+        state.params[key] = Math.max(1, Math.round(Number(input.value) || 1));
       } else {
         state.params[key] = Math.round((Number(input.value) || 1) * 60);
       }

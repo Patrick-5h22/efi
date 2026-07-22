@@ -25,12 +25,14 @@ export function renderJours(main) {
     </div>
 
     <div class="card">
-      <h2>Affectation des intervenants (jour par jour)</h2>
-      <p class="muted">L'intervenant du jour est prioritaire dans l'affectation automatique. Une même personne affectée
+      <h2>Affectation et présence des intervenants (jour par jour)</h2>
+      <p class="muted">« Présents » : les intervenants disponibles ce jour-là (« Tous » par défaut) — l'affectation automatique
+      ne choisit que parmi eux, et un intervenant positionné un jour où il n'est pas présent est signalé en anomalie.
+      L'intervenant affecté est prioritaire dans l'affectation automatique ; une même personne affectée
       formateur ET testeur le même jour est signalée. « Testeur théorie (auto) » = testeur retenu pour le créneau théorie du jour.</p>
       <div class="table-wrap">
         <table class="data">
-          <thead><tr><th>Jour</th><th>Sem.</th><th>Ouvert EFI</th><th>Formateur affecté</th><th>Testeur affecté</th><th>Testeur théorie (auto)</th><th>Activité</th></tr></thead>
+          <thead><tr><th>Jour</th><th>Sem.</th><th>Ouvert EFI</th><th>Présents</th><th>Formateur affecté</th><th>Testeur affecté</th><th>Testeur théorie (auto)</th><th>Activité</th></tr></thead>
           <tbody>${assignRowsHTML(state, days, openSet)}</tbody>
         </table>
       </div>
@@ -56,6 +58,28 @@ export function renderJours(main) {
       const [date, role] = sel.dataset.assign.split('|');
       state.dayAssignments[date] = state.dayAssignments[date] || {};
       state.dayAssignments[date][role] = sel.value || null;
+      app.commit();
+    });
+  });
+
+  // Présence : case « Tous » (clé absente) ou sélection individuelle
+  main.querySelectorAll('input[data-presall]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const date = cb.dataset.presall;
+      if (cb.checked) delete state.dayPresence[date];
+      else state.dayPresence[date] = state.team.filter((m) => m.name.trim()).map((m) => m.id);
+      app.commit();
+    });
+  });
+  main.querySelectorAll('input[data-pres]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const [date, id] = cb.dataset.pres.split('|');
+      const all = state.team.filter((m) => m.name.trim()).map((m) => m.id);
+      let list = state.dayPresence[date] || [...all];
+      list = cb.checked ? [...new Set([...list, id])] : list.filter((x) => x !== id);
+      // Tout le monde coché → retour au mode « Tous » (clé absente)
+      if (all.every((x) => list.includes(x))) delete state.dayPresence[date];
+      else state.dayPresence[date] = list;
       app.commit();
     });
   });
@@ -128,10 +152,19 @@ function assignRowsHTML(state, days, openSet) {
       nTheorie ? `théorie (${nTheorie})` : '',
     ].filter(Boolean).join(', ') || '<span class="muted">—</span>';
 
+    const present = state.dayPresence[date] || null; // null = tous
+    const members = state.team.filter((m) => m.name.trim());
+    const presenceCell = open ? `
+      <label class="pres-all"><input type="checkbox" data-presall="${date}" ${!present ? 'checked' : ''}> Tous</label>
+      <span class="pres-list" ${!present ? 'hidden' : ''}>
+        ${members.map((m) => `<label><input type="checkbox" data-pres="${date}|${m.id}" ${!present || present.includes(m.id) ? 'checked' : ''}> ${esc(m.name.split(' ')[0])}</label>`).join('')}
+      </span>` : '<span class="muted">—</span>';
+
     return `<tr ${sameBoth ? 'class="row-error" title="Même personne formateur ET testeur le même jour"' : ''} ${!open ? 'style="opacity:.55"' : ''}>
       <td>${fmtDateShort(date)}</td>
       <td>S${isoWeek(date)}</td>
       <td>${open ? '<span class="badge badge-ok">OUI</span>' : '<span class="badge badge-warn">NON</span>'}</td>
+      <td class="pres-cell">${presenceCell}</td>
       <td><select data-assign="${date}|formateur" ${!open ? 'disabled' : ''}>${memberOptions(a.formateur)}</select></td>
       <td><select data-assign="${date}|testeur" ${!open ? 'disabled' : ''}>${memberOptions(a.testeur)}</select>${sameBoth ? ' <span class="badge badge-error">⚠</span>' : ''}</td>
       <td>${theoryTesters.has(date) ? esc(memberName(state, theoryTesters.get(date)) || '?') : '<span class="muted">—</span>'}</td>

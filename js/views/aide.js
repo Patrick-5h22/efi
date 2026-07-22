@@ -48,6 +48,11 @@ export function renderAide(main) {
         <li><b>Formateur ≠ testeur du même candidat</b> : le formateur du jour de pratique ne peut être le testeur du candidat (théorie ou test pratique).</li>
         <li><b>Habilitations</b> : un intervenant affecté hors de ses habilitations F/T est signalé.</li>
         <li><b>Jours EFI</b> : toute inscription sur un jour non ouvert est signalée.</li>
+        <li><b>Présence du jour</b> : sur la page Jours EFI, cocher les intervenants présents chaque jour
+          (« Tous » par défaut) — l'affectation automatique ne choisit que parmi eux, et un intervenant
+          positionné un jour où il n'est pas présent est signalé.</li>
+        <li><b>AIPR</b> : la formation se fait à distance (e-learning) — seule l'épreuve sur site (2h00,
+          tenue par un testeur habilité AIPR) se planifie ici, sans formateur ni autre test.</li>
       </ul>
     </div>
 
