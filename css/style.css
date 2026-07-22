@@ -323,6 +323,12 @@ td.slot-busy.slot-pre { background: repeating-linear-gradient(45deg, var(--busy)
 td.slot-theory { background: var(--theory-bg); border-color: var(--theory-border); white-space: normal; }
 /* Épreuves surveillées (AIPR) : le superviseur reste disponible */
 td.slot-exam { background: var(--exam-bg); border-color: var(--exam-border); white-space: normal; }
+/* Entrées multiples d'une même cellule ; les épreuves AIPR gardent leur
+   couleur même mélangées à un test classique */
+.cell-entry + .cell-entry { border-top: 1px dashed var(--grid-line); margin-top: 2px; padding-top: 2px; }
+td.slot-busy:not(.slot-exam) .cell-entry-exam { background: var(--exam-bg); border: 1px solid var(--exam-border); border-radius: 4px; padding: 2px 3px; margin: 1px -1px; }
+td.slot-busy:not(.slot-exam) .cell-entry-exam + .cell-entry,
+td.slot-busy:not(.slot-exam) .cell-entry + .cell-entry-exam { border-top: none; }
 td.slot-closed { background: var(--closed); color: var(--muted-foreground); }
 td.slot-off { background: var(--muted); }
 .slot-name { font-weight: 600; display: block; }

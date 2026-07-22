@@ -152,9 +152,10 @@ function gridHTML(state, days, kind) {
         const tLabel = (r) => r.formation?.testOnly ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || '');
         const whoLabel = (r) => kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?')
           : (r.formation?.testOnly ? 'Surv. : ' : 'Testeur : ') + (memberName(state, r.testeurEffectif) || '?');
-        const label = occupants.map((r) => `<span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span><span class="slot-detail">${esc(whoLabel(r))}</span>`).join('<hr style="margin:2px 0;border:none;border-top:1px dashed var(--grid-line)">');
+        const label = occupants.map((r) => `<div class="cell-entry${r.formation?.testOnly ? ' cell-entry-exam' : ''}"><span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span><span class="slot-detail">${esc(whoLabel(r))}</span></div>`).join('');
         const inscAttr = occupants.length === 1 ? ` data-insc="${occupants[0].insc.id}"` : '';
-        // Épreuves surveillées (AIPR) : couleur dédiée — le superviseur reste disponible
+        // Épreuves surveillées (AIPR) : couleur dédiée — cellule entière si tout
+        // est épreuve, sinon pastille violette sur les seules entrées AIPR
         const cls = occupants.every((r) => r.formation?.testOnly) ? 'slot-exam slot-busy' : 'slot-busy';
         const pre = occupants.every((r) => r.insc.statut === 'pre') ? ' slot-pre' : '';
         const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}${r.formation?.testOnly ? ' (surveillance)' : ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`).join(' | ');
