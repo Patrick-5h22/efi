@@ -139,11 +139,18 @@ export function migrate(state) {
   // Formations « épreuve seule » du catalogue (AIPR) : le drapeau testOnly
   // doit suivre même si la formation existait déjà dans l'état (créée avant
   // son ajout au catalogue, ou coche « tests » posée par erreur) — une
-  // épreuve surveillée n'a ni formateur ni tests séparés.
+  // épreuve surveillée n'a ni formateur ni tests séparés, et sa surveillance
+  // ne consomme pas de temps d'intervenant.
   for (const f of base.formations) {
     if (!f.testOnly) continue;
     const x = state.formations.find((x) => x.code === f.code);
     if (x && (!x.testOnly || x.tests)) { x.testOnly = true; x.tests = false; }
+    if (x && f.chargeComptee === false && x.chargeComptee !== false) x.chargeComptee = false;
+  }
+  // Champs de formation ajoutés au fil des versions
+  for (const f of state.formations) {
+    if (f.chargeComptee === undefined) f.chargeComptee = true;
+    if (f.testOnly === undefined) f.testOnly = false;
   }
   state.team = state.team || [];
   state.openDays = state.openDays || [];

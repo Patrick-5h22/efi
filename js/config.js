@@ -25,11 +25,28 @@ export const DEFAULT_FORMATIONS = [
   { code: 'R489-5', label: 'Pratique R489 Cat 5', reco: 'R489', dureeInitial: 90, dureeRecyclage: 60, tests: true, capacite: 1 },
   { code: 'R486-A', label: 'Pratique R486 Cat A', reco: 'R486', dureeInitial: 120, dureeRecyclage: 120, tests: true, capacite: 1 },
   { code: 'R486-B', label: 'Pratique R486 Cat B', reco: 'R486', dureeInitial: 120, dureeRecyclage: 120, tests: true, capacite: 1 },
+  { code: 'R485-1', label: 'Pratique R485 Cat 1', reco: 'R485', dureeInitial: 90, dureeRecyclage: 60, tests: true, capacite: 1 },
+  { code: 'R485-2', label: 'Pratique R485 Cat 2', reco: 'R485', dureeInitial: 90, dureeRecyclage: 60, tests: true, capacite: 1 },
   { code: 'HAB-ELEC', label: 'Habilitation électrique', reco: 'HAB ELEC', dureeInitial: 120, dureeRecyclage: 120, tests: false, capacite: 1 },
   // AIPR : la formation se fait à distance (e-learning) — seule l'épreuve
   // (QCM surveillé, 2h00) est planifiée sur site, tenue par un testeur.
-  { code: 'AIPR', label: 'AIPR (épreuve sur site)', reco: 'AIPR', dureeInitial: 120, dureeRecyclage: 120, tests: false, capacite: 1, testOnly: true },
+  // Surveillance : ne consomme pas de temps d'intervenant (chargeComptee).
+  { code: 'AIPR', label: 'AIPR (épreuve sur site)', reco: 'AIPR', dureeInitial: 120, dureeRecyclage: 120, tests: false, capacite: 1, testOnly: true, chargeComptee: false },
 ];
+
+// Une formation dont la charge n'est pas comptée mobilise un intervenant
+// mais n'entre ni dans le plafond quotidien, ni dans le taux d'occupation
+// (cas de la surveillance d'épreuve). Défaut : comptée.
+export function chargeComptee(formation) {
+  return formation?.chargeComptee !== false;
+}
+
+// Modèle d'une formation du catalogue : valeurs par défaut d'une création.
+export const FORMATION_DEFAUT = {
+  code: '', label: '', reco: '',
+  dureeInitial: 90, dureeRecyclage: 60,
+  tests: true, capacite: 1, testOnly: false, chargeComptee: true,
+};
 
 export const TYPES = ['Initial', 'Recyclage'];
 
