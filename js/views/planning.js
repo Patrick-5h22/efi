@@ -51,8 +51,10 @@ export function renderPlanning(main, args, kind) {
       });
 
       if (!occupants.length) return `<td class="slot-free" style="cursor:default"></td>`;
-      // Épreuves surveillées (AIPR) : couleur dédiée — le superviseur reste disponible
-      const cls = occupants.every((o) => o.formation?.testOnly) ? 'slot-exam slot-busy' : 'slot-busy';
+      // Épreuves surveillées (AIPR) : couleur dédiée — le superviseur reste
+      // disponible. Sinon vert (confirmée) ou jaune (pré-réservée).
+      const pre = occupants.every((o) => o.insc.statut === 'pre') ? ' slot-pre' : '';
+      const cls = (occupants.every((o) => o.formation?.testOnly) ? 'slot-exam slot-busy' : 'slot-busy') + pre;
       if (occupants.length > 1) return `<td class="${cls}" title="${esc(occupants.map((o) => o.insc.stagiaire).join(' + '))}">${occupants.length} stagiaires</td>`;
       const r = occupants[0];
       const who = kind === 'F' ? r.formateurEffectif : r.testeurEffectif;
@@ -69,9 +71,10 @@ export function renderPlanning(main, args, kind) {
       <div class="page-actions"><button class="btn btn-secondary" onclick="window.print()">🖨 Imprimer</button></div>
     </div>
     <div class="legend no-print">
-      <span><span class="chip" style="background:var(--free)"></span>Disponible</span>
-      <span><span class="chip" style="background:var(--busy)"></span>Occupé (nom du stagiaire)</span>
-      ${kind === 'T' ? '<span><span class="chip" style="background:var(--theory-bg);border-color:#e2c14d"></span>Théorie</span><span><span class="chip" style="background:var(--exam-bg);border-color:var(--exam-border)"></span>Épreuve surveillée (AIPR)</span>' : ''}
+      <span><span class="chip" style="background:var(--free)"></span>Libre</span>
+      <span><span class="chip" style="background:var(--confirmed);border-color:var(--confirmed-border)"></span>Confirmée (nom du stagiaire)</span>
+      <span><span class="chip" style="background:var(--pre);border-color:var(--pre-border)"></span>Pré-réservée</span>
+      ${kind === 'T' ? '<span><span class="chip" style="background:var(--theory-bg);border-color:var(--theory-border)"></span>Théorie</span><span><span class="chip" style="background:var(--exam-bg);border-color:var(--exam-border)"></span>Épreuve surveillée (AIPR)</span>' : ''}
       <span><span class="chip" style="background:#f2f4f8"></span>Jour non ouvert</span>
     </div>
     <div class="card"><div class="grid-wrap"><table class="planning">${head}${body}</table></div></div>
