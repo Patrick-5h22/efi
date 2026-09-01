@@ -6,7 +6,7 @@ import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
 import { periodWeeks, weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isWeekend } from '../dates.js';
 import { unionDuration } from '../engine.js';
-import { chargeComptee } from '../config.js';
+import { chargeComptee, chevauchePause } from '../config.js';
 import { openInscriptionForm } from './form.js';
 
 export function renderSemaine(main, args) {
@@ -39,6 +39,7 @@ export function renderSemaine(main, args) {
       <span><span class="chip" style="background:var(--theory-bg);border-color:var(--theory-border)"></span>Théorie</span>
       <span><span class="chip" style="background:var(--exam-bg);border-color:var(--exam-border)"></span>Épreuve surveillée (AIPR) — ne mobilise pas l'intervenant</span>
       <span><span class="chip" style="background:var(--closed)"></span>Fermé</span>
+      ${state.params.pauseActive ? '<span><span class="chip slot-pause"></span>Pause déjeuner</span>' : ''}
     </div>
 
     <div class="card">
@@ -162,6 +163,12 @@ function gridHTML(state, days, kind) {
         const pre = occupants.every((r) => r.insc.statut === 'pre') ? ' slot-pre' : '';
         const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}${r.formation?.testOnly ? ' (surveillance)' : ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`).join(' | ');
         return `<td class="${cls}${pre}"${inscAttr} title="${esc(tip)}">${label}</td>`;
+      }
+
+      // Pause déjeuner : peinte seulement sur les créneaux restés libres — une
+      // séance déjà posée dessus reste visible, son anomalie la signale.
+      if (chevauchePause(state.params, t, slotEnd)) {
+        return `<td class="slot-pause" title="Pause déjeuner">PAUSE</td>`;
       }
 
       return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button" aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"></td>`;

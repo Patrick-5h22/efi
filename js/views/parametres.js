@@ -4,6 +4,38 @@
 import { app, esc, toast } from '../app.js';
 import { fmtTime, parseTime, fmtDateShort } from '../dates.js';
 import { defaultState, seedExamples, saveState } from '../store.js';
+import { chevauchePause } from '../config.js';
+
+// Activer la pause fait basculer en anomalie les séances déjà posées qui la
+// chevauchent. On le dit AVANT, avec le compte exact — et on le redit après,
+// pour que le chiffre ne soit pas une surprise dans la liste des anomalies.
+function pauseAlerte(state, p) {
+  const test = { ...p, pauseActive: true };
+  const rows = app.schedule?.rows || [];
+  let touchees = 0;
+  for (const r of rows) {
+    if (r.cancelled) continue;
+    const i = r.insc;
+    const gene = chevauchePause(test, i.debutPratique, r.finPratique)
+      || chevauchePause(test, i.debutTestPratique, r.finTestPratique)
+      || (i.modeTheorie === 'centre' && chevauchePause(test, i.debutTheorieFormation, r.finTheorieFormation));
+    if (gene) touchees += 1;
+  }
+
+  const items = [];
+  if (touchees) {
+    items.push(p.pauseActive
+      ? `<b>${touchees} inscription(s)</b> chevauchent la pause et sont signalées en anomalie.`
+      : `Activer la pause ferait basculer <b>${touchees} inscription(s)</b> en anomalie : elles la chevauchent déjà.`);
+  }
+  if (chevauchePause(test, p.theoryTime, p.theoryTime + p.theoryDuration)) {
+    items.push(`Le créneau du test théorique (${fmtTime(p.theoryTime)}) tombe dans la pause : le décaler avant de l’activer.`);
+  }
+  if (!items.length) return '';
+  return `<div class="callout" style="border-left:3px solid var(--warn);padding-left:10px;margin-top:10px">
+    <ul class="plain-list">${items.map((t) => `<li>${t}</li>`).join('')}</ul>
+  </div>`;
+}
 
 export function renderParametres(main) {
   const state = app.state;
@@ -85,6 +117,18 @@ export function renderParametres(main) {
         <label class="field">Charge max de formation pratique / jour (h) <input type="number" step="0.5" min="1" max="9" value="${p.maxDailyLoad / 60}" data-p="maxDailyLoad" data-hours></label>
         <label class="field">Capacité de la salle de théorie (places) <input type="number" min="1" max="40" value="${p.salleCapacite ?? 12}" data-p="salleCapacite" data-int></label>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>2 bis. Pause déjeuner</h2>
+      <div class="form-row">
+        <label class="expert-toggle"><input type="checkbox" ${p.pauseActive ? 'checked' : ''} data-p="pauseActive" data-bool> Réserver la pause déjeuner</label>
+        <label class="field">Début <input value="${fmtTime(p.pauseDebut ?? 720)}" data-p="pauseDebut" data-time></label>
+        <label class="field">Fin <input value="${fmtTime(p.pauseFin ?? 780)}" data-p="pauseFin" data-time></label>
+      </div>
+      <p class="muted">Une fois active, aucune pratique, aucun test et aucune théorie en centre ne peut la chevaucher.
+      Seule la <b>théorie présentielle</b> l’enjambe : une session initiale dure 7h00, elle ne tient dans aucune demi-journée.</p>
+      ${pauseAlerte(state, p)}
     </div>
 
     <div class="card">
@@ -178,7 +222,9 @@ export function renderParametres(main) {
   main.querySelectorAll('[data-p]').forEach((input) => {
     input.addEventListener('change', () => {
       const key = input.dataset.p;
-      if ('time' in input.dataset) {
+      if ('bool' in input.dataset) {
+        state.params[key] = input.checked;
+      } else if ('time' in input.dataset) {
         const v = parseTime(input.value);
         if (v == null) { toast('Heure invalide (format HH:MM).', 'error'); input.value = fmtTime(state.params[key]); return; }
         state.params[key] = v;

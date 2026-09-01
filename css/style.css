@@ -348,6 +348,14 @@ td.slot-busy:not(.slot-exam) .cell-entry-exam + .cell-entry,
 td.slot-busy:not(.slot-exam) .cell-entry + .cell-entry-exam { border-top: none; }
 td.slot-closed { background: var(--closed); color: var(--muted-foreground); }
 td.slot-off { background: var(--muted); }
+/* Pause déjeuner : hachures, pour se distinguer d'un jour fermé en N&B
+   comme en couleur, et pour ne jamais passer pour un créneau réservé. */
+td.slot-pause, .chip.slot-pause {
+  background: repeating-linear-gradient(45deg, var(--closed), var(--closed) 4px, var(--background) 4px, var(--background) 8px);
+  color: var(--muted-foreground);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
 .slot-name { font-weight: 600; display: block; }
 .slot-detail { font-size: 10px; color: var(--muted-foreground); display: block; }
 .who-missing { color: var(--warn); font-weight: 700; }
