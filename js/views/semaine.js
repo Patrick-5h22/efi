@@ -6,6 +6,7 @@ import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
 import { periodWeeks, weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isWeekend } from '../dates.js';
 import { unionDuration } from '../engine.js';
+import { chargeComptee } from '../config.js';
 import { openInscriptionForm } from './form.js';
 
 export function renderSemaine(main, args) {
@@ -173,7 +174,7 @@ function gridHTML(state, days, kind) {
     if (kind === 'F' && open && inPeriod) {
       const intervalsByTrainer = new Map();
       for (const r of rows) {
-        if (r.cancelled || r.formation?.testOnly) continue;
+        if (r.cancelled || !chargeComptee(r.formation)) continue;
         if (r.insc.datePratique !== date || r.insc.debutPratique == null) continue;
         const key = r.formateurEffectif || '?';
         if (!intervalsByTrainer.has(key)) intervalsByTrainer.set(key, []);
