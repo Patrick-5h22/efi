@@ -2,7 +2,7 @@
 // les intervenants effectifs (affectation automatique) et les contrôles (STATUT).
 // Reproduit les règles du classeur "Planification EFI v4.2".
 
-import { formationByCode, dureeFor, dureeTheorieFor } from './config.js';
+import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee } from './config.js';
 import { isoWeek, overlaps, workingDays, fmtTime, mondayOf, weekDays, toISO } from './dates.js';
 
 // ---------------------------------------------------------------------------
@@ -425,10 +425,11 @@ function validateRows(rows, ctx) {
   // Charge : formation pratique ≤ max / jour / formateur effectif —
   // calculée en TEMPS DE SÉANCE du formateur (union de ses intervalles) :
   // deux stagiaires simultanés (capacité ≥ 2) = une seule séance.
-  // Les épreuves « test seul » ne comptent pas comme formation pratique.
+  // Les formations dont la charge n'est pas comptée (paramètre du catalogue,
+  // ex. surveillance d'épreuve AIPR) sont exclues du plafond.
   const intervalsByDayTrainer = new Map();
   for (const row of rows) {
-    if (row.formation?.testOnly) continue;
+    if (!chargeComptee(row.formation)) continue;
     if (!row.insc.datePratique || row.insc.debutPratique == null) continue;
     const key = `${row.insc.datePratique}|${row.formateurEffectif || '?'}`;
     if (!intervalsByDayTrainer.has(key)) intervalsByDayTrainer.set(key, []);
@@ -437,7 +438,7 @@ function validateRows(rows, ctx) {
   const loadByDayTrainer = new Map();
   for (const [key, list] of intervalsByDayTrainer) loadByDayTrainer.set(key, unionDuration(list));
   for (const row of rows) {
-    if (row.formation?.testOnly) continue;
+    if (!chargeComptee(row.formation)) continue;
     if (!row.insc.datePratique || row.insc.debutPratique == null) continue;
     const key = `${row.insc.datePratique}|${row.formateurEffectif || '?'}`;
     if (loadByDayTrainer.get(key) > params.maxDailyLoad) {
@@ -650,9 +651,9 @@ export function occupancyByDay(state, schedule) {
   for (const r of schedule.rows) {
     if (r.cancelled) continue;
     const i = r.insc;
-    // Les épreuves « test seul » (AIPR) sont de la surveillance : 0 temps
-    // d'intervenant mobilisé, elles ne pèsent pas dans l'occupation.
-    if (i.datePratique && i.debutPratique != null && !r.formation?.testOnly) {
+    // Une formation dont la charge n'est pas comptée (surveillance d'épreuve)
+    // ne mobilise pas de temps d'intervenant : elle ne pèse pas dans l'occupation.
+    if (i.datePratique && i.debutPratique != null && chargeComptee(r.formation)) {
       ensure(i.datePratique).busy += r.duree / params.slotMinutes;
     }
     if (i.dateTestPratique && i.debutTestPratique != null && r.formation?.tests) {
@@ -732,8 +733,8 @@ export function occupationSummary(state, schedule, scope = 'periode', todayISO =
   for (const r of schedule.rows) {
     if (r.cancelled) continue;
     const i = r.insc;
-    // Épreuves « test seul » (AIPR) : surveillance, 0 temps mobilisé
-    if (i.datePratique && i.debutPratique != null && scopeDays.has(i.datePratique) && !r.formation?.testOnly) {
+    // Charge non comptée (surveillance d'épreuve) : 0 temps mobilisé
+    if (i.datePratique && i.debutPratique != null && scopeDays.has(i.datePratique) && chargeComptee(r.formation)) {
       busy += r.duree / params.slotMinutes;
     }
     if (i.dateTestPratique && i.debutTestPratique != null && scopeDays.has(i.dateTestPratique)) {
