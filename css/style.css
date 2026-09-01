@@ -276,8 +276,13 @@ table.data th {
   background: var(--card); position: sticky; top: 0;
 }
 table.data tbody tr:hover { background: var(--muted); }
+/* Même code couleur que les grilles : vert confirmée, jaune pré-réservée.
+   L'anomalie (rouge) et l'annulation priment — d'où l'ordre des règles. */
+table.data tr.row-confirmed { background: color-mix(in srgb, var(--confirmed) 40%, var(--card)); }
+table.data tr.row-pre { background: color-mix(in srgb, var(--pre) 45%, var(--card)); }
 table.data tr.row-error { background: color-mix(in srgb, var(--error-bg) 45%, var(--card)); }
 table.data tr.row-error:hover { background: var(--error-bg); }
+table.data tr.row-cancelled { background: var(--card); }
 tr.row-cancelled td { opacity: .5; }
 tr.row-cancelled td b { text-decoration: line-through; }
 
@@ -313,13 +318,17 @@ table.planning th.day-col, table.planning td.day-col {
 table.planning th.who-col, table.planning td.who-col {
   text-align: left; min-width: 105px; background: var(--muted); font-size: 11px;
 }
+/* Créneau libre : fond neutre (le vert sert désormais aux confirmations).
+   L'affordance de clic passe par le survol et le focus. */
 td.slot-free { background: var(--free); cursor: pointer; }
 td.slot-free:hover, td.slot-free:focus-visible {
   background: var(--free-hover);
-  outline: 2px solid var(--ok); outline-offset: -2px;
+  outline: 2px solid var(--ring); outline-offset: -2px;
 }
-td.slot-busy { background: var(--busy); white-space: normal; }
-td.slot-busy.slot-pre { background: repeating-linear-gradient(45deg, var(--busy), var(--busy) 5px, color-mix(in srgb, var(--busy) 55%, var(--card)) 5px, color-mix(in srgb, var(--busy) 55%, var(--card)) 10px); outline: 1px dashed var(--warn); outline-offset: -2px; }
+/* Réservation confirmée = vert, pré-réservation = jaune (le tiret conserve
+   l'information hors couleur : impression N&B, daltonisme). */
+td.slot-busy { background: var(--confirmed); border-color: var(--confirmed-border); white-space: normal; }
+td.slot-busy.slot-pre { background: var(--pre); border-color: var(--pre-border); outline: 1px dashed var(--warn); outline-offset: -2px; }
 td.slot-theory { background: var(--theory-bg); border-color: var(--theory-border); white-space: normal; }
 /* Épreuves surveillées (AIPR) : le superviseur reste disponible */
 td.slot-exam { background: var(--exam-bg); border-color: var(--exam-border); white-space: normal; }
@@ -394,7 +403,7 @@ table.synthese tr.exam-row td { background: var(--exam-bg); }
 table.cal { border-collapse: collapse; width: 100%; font-size: 12px; }
 table.cal th, table.cal td { border: 1px solid var(--grid-line); padding: 4px; text-align: center; width: 20%; }
 table.cal th { background: var(--muted); font-size: 10.5px; color: var(--muted-foreground); }
-table.cal td.cal-open { background: var(--free); font-weight: 700; cursor: pointer; }
+table.cal td.cal-open { background: var(--cal-open); font-weight: 700; cursor: pointer; }
 table.cal td.cal-closed { cursor: pointer; }
 table.cal td.cal-closed:hover, table.cal td.cal-open:hover,
 table.cal td.cal-closed:focus-visible, table.cal td.cal-open:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
@@ -487,7 +496,9 @@ dialog.cmdk {
   :root, .dark, .dark[data-theme] {
     --background: #fff; --foreground: #111; --card: #fff; --card-foreground: #111;
     --border: #ccc; --grid-line: #bbb; --muted: #f2f2f2; --muted-foreground: #555;
-    --free: #dcf2e4; --busy: #fbd9d3; --theory-bg: #fdf3d7; --exam-bg: #e8e2f7; --closed: #ececec;
+    --free: #fff; --confirmed: #dcf2e4; --confirmed-border: #7fbb96;
+    --pre: #fdf3d7; --pre-border: #d9b45c; --theory-bg: #dee7fa; --theory-border: #8ba6dd;
+    --exam-bg: #ecdff5; --exam-border: #b28fce; --closed: #ececec; --cal-open: #dcf2e4;
     --neon-glow: none;
   }
   #sidebar, .page-actions, .no-print, #toast-zone { display: none !important; }
@@ -506,20 +517,4 @@ dialog.cmdk {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
-}
-
-/* ---------- Responsive ---------- */
-@media (max-width: 860px) {
-  #app { flex-direction: column; }
-  #sidebar { width: 100%; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--sidebar-border); }
-  #nav { display: flex; flex-wrap: wrap; padding: 4px 6px; gap: 2px; }
-  #nav a { padding: 6px 10px; font-size: 12.5px; }
-  #nav .nav-section { display: none; }
-  .brand { height: 46px; padding: 0 12px; }
-  #main { padding: 14px 12px 40px; }
-  .page-header h1 { font-size: 17px; }
-  .kpis { grid-template-columns: repeat(2, 1fr); }
-  dialog { width: 96vw; }
-  .theme-pop { bottom: auto; top: calc(100% + 6px); }
-  dialog.cmdk { margin-top: 6vh; }
 }
