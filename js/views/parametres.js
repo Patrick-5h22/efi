@@ -16,27 +16,62 @@ export function renderParametres(main) {
     </div>
 
     <div class="card">
-      <h2>1. Formations, durées (heures) et capacités</h2>
+      <h2>1. Catalogue des formations</h2>
       <div class="table-wrap">
         <table class="data">
-          <thead><tr><th>Code</th><th>Formation</th><th>Recommandation</th><th>Durée Initial (h)</th><th>Durée Recyclage (h)</th><th>Tests obligatoires</th><th>Capacité simultanée</th></tr></thead>
+          <thead><tr>
+            <th>Code</th><th>Formation</th><th>Recommandation</th><th>Séance</th>
+            <th>Durée Initial (h)</th><th>Durée Recyclage (h)</th><th>Tests obligatoires</th>
+            <th>Capacité simultanée</th><th>Charge comptée</th><th></th>
+          </tr></thead>
           <tbody>
             ${state.formations.map((f, idx) => `
               <tr>
                 <td><b>${esc(f.code)}</b></td>
-                <td>${esc(f.label)}</td>
-                <td>${esc(f.reco)}</td>
+                <td><input value="${esc(f.label)}" data-f="${idx}|label" style="min-width:170px"></td>
+                <td><input value="${esc(f.reco)}" data-f="${idx}|reco" style="width:90px"></td>
+                <td>
+                  <select data-f="${idx}|testOnly">
+                    <option value="" ${f.testOnly ? '' : 'selected'}>Formation</option>
+                    <option value="1" ${f.testOnly ? 'selected' : ''}>Épreuve surveillée</option>
+                  </select>
+                </td>
                 <td><input type="number" step="0.5" min="0.5" max="8" value="${f.dureeInitial / 60}" data-f="${idx}|dureeInitial" style="width:70px"></td>
                 <td><input type="number" step="0.5" min="0.5" max="8" value="${f.dureeRecyclage / 60}" data-f="${idx}|dureeRecyclage" style="width:70px"></td>
                 <td style="text-align:center">${f.testOnly
                   ? '<span class="muted" title="Épreuve surveillée : la formation se fait à distance, seule l’épreuve est planifiée — pas de tests séparés">épreuve seule</span>'
                   : `<input type="checkbox" ${f.tests ? 'checked' : ''} data-f="${idx}|tests">`}</td>
-                <td><input type="number" min="1" max="4" value="${f.capacite}" data-f="${idx}|capacite" style="width:60px"></td>
+                <td><input type="number" min="1" max="12" value="${f.capacite}" data-f="${idx}|capacite" style="width:60px"></td>
+                <td style="text-align:center"><input type="checkbox" ${f.chargeComptee !== false ? 'checked' : ''} data-f="${idx}|chargeComptee" title="Décoché : la séance mobilise un intervenant mais sort du plafond quotidien (surveillance)"></td>
+                <td><button class="btn btn-danger btn-sm" data-del-formation="${idx}" title="Retirer du catalogue">🗑</button></td>
               </tr>`).join('')}
           </tbody>
         </table>
       </div>
-      <p class="muted">La capacité simultanée > 1 (ex. R489 Cat 3 : 2 chariots) autorise plusieurs candidats en même temps avec le même formateur, sur la même catégorie uniquement.</p>
+
+      <div class="form-row" style="margin-top:12px;align-items:flex-end">
+        <label class="field">Code <input id="nf-code" placeholder="R482-B" style="width:110px" maxlength="16"></label>
+        <label class="field">Formation <input id="nf-label" placeholder="Pratique R482 Cat B" style="min-width:190px"></label>
+        <label class="field">Recommandation <input id="nf-reco" placeholder="R482" style="width:100px"></label>
+        <label class="field">Séance
+          <select id="nf-testonly">
+            <option value="">Formation</option>
+            <option value="1">Épreuve surveillée</option>
+          </select>
+        </label>
+        <label class="field">Initial (h) <input type="number" id="nf-init" step="0.5" min="0.5" max="8" value="1.5" style="width:80px"></label>
+        <label class="field">Recyclage (h) <input type="number" id="nf-recy" step="0.5" min="0.5" max="8" value="1" style="width:90px"></label>
+        <label class="field">Capacité <input type="number" id="nf-cap" min="1" max="12" value="1" style="width:80px"></label>
+        <label class="expert-toggle"><input type="checkbox" id="nf-tests" checked> Tests obligatoires</label>
+        <label class="expert-toggle"><input type="checkbox" id="nf-charge" checked> Charge comptée</label>
+        <button class="btn" id="btn-add-formation">➕ Ajouter la formation</button>
+      </div>
+
+      <p class="muted">La capacité simultanée > 1 (ex. R489 Cat 3 : 2 chariots) autorise plusieurs candidats en même temps avec le même formateur, sur la même catégorie uniquement.
+      « Épreuve surveillée » = la formation se fait à distance et seule l'épreuve est planifiée, tenue par un testeur (AIPR).
+      « Charge comptée » décochée = la séance n'entre pas dans le plafond quotidien ni dans le taux d'occupation.
+      Le code n'est pas modifiable après création : il relie la formation aux inscriptions et aux habilitations.
+      Toute formation ajoutée apparaît automatiquement dans l'onglet Équipe — pensez à y cocher les habilitations F/T.</p>
     </div>
 
     <div class="card">
@@ -84,11 +119,59 @@ export function renderParametres(main) {
     input.addEventListener('change', () => {
       const [idx, field] = input.dataset.f.split('|');
       const f = state.formations[Number(idx)];
-      if (field === 'tests') f.tests = input.checked;
-      else if (field === 'capacite') f.capacite = Math.max(1, Number(input.value) || 1);
-      else f[field] = Math.round((Number(input.value) || 1) * 60);
+      if (field === 'tests' || field === 'chargeComptee') f[field] = input.checked;
+      else if (field === 'testOnly') {
+        f.testOnly = !!input.value;
+        // Une épreuve surveillée n'a pas de tests séparés à programmer
+        if (f.testOnly) f.tests = false;
+        renderParametres(main); // la colonne Tests change de nature
+      } else if (field === 'capacite') f.capacite = Math.max(1, Number(input.value) || 1);
+      else if (field === 'label' || field === 'reco') {
+        const v = input.value.trim();
+        if (!v) { toast('Ce champ ne peut pas être vide.', 'error'); input.value = f[field]; return; }
+        f[field] = v;
+      } else f[field] = Math.round((Number(input.value) || 1) * 60);
       app.commit();
       toast('Paramètre enregistré.', 'ok');
+    });
+  });
+
+  main.querySelector('#btn-add-formation').addEventListener('click', () => {
+    const code = main.querySelector('#nf-code').value.trim().toUpperCase();
+    const label = main.querySelector('#nf-label').value.trim();
+    const reco = main.querySelector('#nf-reco').value.trim().toUpperCase();
+    if (!code || !label || !reco) { toast('Code, formation et recommandation sont obligatoires.', 'error'); return; }
+    if (state.formations.some((f) => f.code.toUpperCase() === code)) { toast(`Le code « ${code} » existe déjà.`, 'error'); return; }
+    const hours = (sel) => Math.round((Number(main.querySelector(sel).value) || 1) * 60);
+    const testOnly = !!main.querySelector('#nf-testonly').value;
+    state.formations.push({
+      code, label, reco,
+      dureeInitial: hours('#nf-init'),
+      dureeRecyclage: hours('#nf-recy'),
+      tests: testOnly ? false : main.querySelector('#nf-tests').checked,
+      capacite: Math.max(1, Number(main.querySelector('#nf-cap').value) || 1),
+      testOnly,
+      chargeComptee: main.querySelector('#nf-charge').checked,
+    });
+    app.commit();
+    renderParametres(main);
+    toast(`Formation « ${code} » ajoutée — cochez ses habilitations dans Équipe.`, 'ok');
+  });
+
+  main.querySelectorAll('[data-del-formation]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const f = state.formations[Number(b.dataset.delFormation)];
+      // Une formation référencée par des inscriptions ne peut pas disparaître :
+      // les lignes deviendraient orphelines et illisibles.
+      const used = state.inscriptions.filter((i) => i.formation === f.code).length;
+      if (used) { toast(`« ${f.code} » est utilisée par ${used} inscription(s) : retirez-les d'abord.`, 'error'); return; }
+      if (state.formations.length <= 1) { toast('Le catalogue doit garder au moins une formation.', 'error'); return; }
+      if (!confirm(`Retirer « ${f.label} » (${f.code}) du catalogue ?\nLes habilitations correspondantes de l'équipe seront effacées.`)) return;
+      state.formations = state.formations.filter((x) => x.code !== f.code);
+      for (const m of state.team) { if (m.quals) delete m.quals[f.code]; }
+      app.commit();
+      renderParametres(main);
+      toast(`Formation « ${f.code} » retirée.`, 'ok');
     });
   });
 
