@@ -108,7 +108,7 @@ export function renderDashboard(main) {
         </table>
       </div>` : scopeName && rows.length ? `<p class="muted">Aucune activité sur cette portée (${scopeName}).</p>`
       : `<p class="muted">Aucune inscription. Commencez par <a href="#/inscriptions">inscrire un stagiaire</a>
-        ou ouvrez des <a href="#/jours">jours EFI</a>, puis cliquez sur un créneau vert d'une <a href="#/semaine/${weeks[0].week}">grille semaine</a>.</p>`}
+        ou ouvrez des <a href="#/jours">jours EFI</a>, puis cliquez sur un créneau libre d'une <a href="#/semaine/${weeks[0].week}">grille semaine</a>.</p>`}
     </div>
   `;
 

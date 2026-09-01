@@ -23,7 +23,10 @@ export function renderAide(main) {
     <div class="card">
       <h2>Saisie (page Inscriptions)</h2>
       <ol>
-        <li>Saisir le nom, choisir la <b>formation</b> et le <b>type</b> (Initial / Recyclage) → durée automatique (R489 : 1h30 / 1h00 ; R486 et Hab. élec : 2h00).</li>
+        <li>Saisir le nom, choisir la <b>formation</b> et le <b>type</b> (Initial / Recyclage) → durée automatique
+          (R489 : 1h30 / 1h00 ; R486 et Hab. élec : 2h00). Ces durées, comme le reste du catalogue, se règlent dans <b>Paramètres</b>.</li>
+        <li>Renseigner si besoin le <b>n° de dossier YPAREO</b> (10 chiffres) et le <b>chiffre d'affaires</b> de la ligne — les deux
+          sont facultatifs et n'entrent dans aucun contrôle de planification.</li>
         <li>Choisir <b>date + heure de début</b> de la pratique → fin calculée automatiquement.</li>
         <li><b>Tests obligatoires pour R489 / R486</b> :
           <ul>
@@ -35,7 +38,7 @@ export function renderAide(main) {
         </li>
         <li>Un candidat peut faire sa formation et ses tests le même jour en décalant les horaires : seuls les chevauchements réels sont signalés.</li>
       </ol>
-      <p class="muted">Astuce : sur une grille de semaine, cliquer sur un créneau vert préremplit directement le formulaire d'inscription.</p>
+      <p class="muted">Astuce : sur une grille de semaine, cliquer sur un créneau libre préremplit directement le formulaire d'inscription.</p>
       <p class="muted"><b>Saisie guidée</b> : les listes de dates ne proposent que les jours ouverts du plateau, et les heures
       uniquement les créneaux où un intervenant habilité, présent ce jour-là et libre existe. Cocher « Saisie libre »
       dans le formulaire pour réafficher tous les créneaux (les contrôles STATUT restent actifs).</p>
@@ -54,8 +57,10 @@ export function renderAide(main) {
         <li><b>Présence du jour</b> : sur la page Jours EFI, cocher les intervenants présents chaque jour
           (« Tous » par défaut) — l'affectation automatique ne choisit que parmi eux, et un intervenant
           positionné un jour où il n'est pas présent est signalé.</li>
-        <li><b>AIPR</b> : la formation se fait à distance (e-learning) — seule l'épreuve sur site (2h00,
-          tenue par un testeur habilité AIPR) se planifie ici, sans formateur ni autre test.</li>
+        <li><b>AIPR</b> : la formation se fait à distance (e-learning) — seule l'épreuve sur site (2h00) se planifie
+          ici, sans formateur ni autre test. Elle est tenue <b>en surveillance</b> par un testeur habilité AIPR :
+          celui-ci reste identifié sur le créneau mais n'y est pas bloqué, et l'épreuve n'entre ni dans sa charge
+          du jour ni dans le taux d'occupation.</li>
         <li><b>Théorie de la formation</b> (3 modes, par inscription) :
           <b>e-learning hors centre</b> (défaut, rien à planifier) ;
           <b>e-learning en centre</b> (créneau en salle, sans formateur) ;
@@ -81,7 +86,12 @@ export function renderAide(main) {
     <div class="card">
       <h2>Plannings & synthèse</h2>
       <ul>
-        <li><b>Grilles semaine</b> : vert = disponible (cliquer pour inscrire), rouge = occupé, jaune = théorie, gris = fermé.</li>
+        <li><b>Grilles semaine</b> — code couleur repris du classeur :
+          <b>neutre</b> = créneau libre (cliquer pour inscrire), <b>vert</b> = séance confirmée,
+          <b>jaune</b> (contour tireté) = pré-réservée, <b>bleu</b> = théorie,
+          <b>violet</b> = épreuve surveillée (AIPR), <b>gris</b> = jour fermé.
+          Le rouge ne sert plus qu'aux <b>anomalies</b> : une ligne rouge est une ligne à corriger,
+          jamais un simple créneau occupé.</li>
         <li><b>Synthèse semaine</b> : déroulé chronologique imprimable — à remettre au formateur et au testeur du jour.</li>
         <li><b>Plannings formateur / testeur</b> : vue globale des 86 jours (1 ligne/jour, 1 colonne/créneau de 30 min).</li>
       </ul>
@@ -102,10 +112,21 @@ export function renderAide(main) {
           (anomalies, prochaines activités) suivent, et le choix est mémorisé
           (sur votre profil quand vous êtes connecté, sur le poste sinon).</li>
         <li><b>🔥 Heatmap</b> (tableau de bord) : occupation de chaque jour de la période en un coup d'œil
-          (plus le bleu est foncé, plus le jour est chargé ; liseré rouge = anomalie ; cliquer ouvre la semaine).</li>
+          (plus le bleu est foncé, plus le jour est chargé ; listeré rouge = anomalie ; cliquer ouvre la semaine).</li>
         <li><b>🗂 Dossiers</b> : chaque inscription porte une entreprise/SIRET et un statut —
           🕐 pré-réservée, ✓ confirmée, ✕ annulée (avec motif). Une ligne annulée libère immédiatement
           ses créneaux et sort des contrôles, tout en restant visible dans les listes.</li>
+        <li><b>💶 Chiffre d'affaires</b> : reprend l'onglet du classeur — un bloc par mois avec une ligne par
+          formation et son sous-total, puis le total par formation sur l'année avec sa part. Le montant est
+          rattaché au <b>mois de la formation pratique</b>, les lignes annulées sont exclues. Un encadré
+          « Points de vigilance » signale les saisies douteuses (même montant répété sur un même dossier,
+          ligne facturée sans date ou sans n° de dossier) — il alerte, il ne corrige jamais.
+          <br><span class="muted">Un dossier couvrant plusieurs catégories occupe plusieurs lignes :
+          répartir le montant, ou ne le porter que sur une seule, sinon il est compté autant de fois.</span></li>
+        <li><b>⚙ Catalogue des formations</b> (Paramètres) : ajouter, modifier ou retirer une formation —
+          libellé, recommandation, durées initial/recyclage, tests obligatoires, capacité simultanée,
+          type de séance (formation ou épreuve surveillée) et prise en compte dans la charge.
+          Une formation utilisée par des inscriptions ne peut pas être supprimée.</li>
         <li><b>🎨 Thèmes</b> : bouton palette de la barre latérale — 10 presets de couleur (dont « Néon »
           pour le mode sombre) et modes clair / sombre / système, mémorisés sur le poste.</li>
         <li><b>☁ Base partagée (connexion permanente)</b> : l'application reste connectée en continu —
@@ -121,7 +142,7 @@ export function renderAide(main) {
       <h2>Remarques</h2>
       <ul>
         <li>La théorie e-learning en autonomie (3h, tablettes) ne mobilise ni formateur ni testeur : elle n'est pas planifiée dans cet outil.</li>
-        <li>R485 non intégré pour l'instant (accord préalable du service FC requis) — ajout possible dans Paramètres.</li>
+        <li>R485 (catégories 1 et 2) figure au catalogue ; sa commercialisation reste soumise à l'accord préalable du service FC.</li>
         <li>⚠ Les inscriptions préchargées sont des <b>exemples</b> à supprimer avant utilisation réelle.</li>
       </ul>
     </div>
