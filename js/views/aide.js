@@ -112,7 +112,7 @@ export function renderAide(main) {
           (anomalies, prochaines activités) suivent, et le choix est mémorisé
           (sur votre profil quand vous êtes connecté, sur le poste sinon).</li>
         <li><b>🔥 Heatmap</b> (tableau de bord) : occupation de chaque jour de la période en un coup d'œil
-          (plus le bleu est foncé, plus le jour est chargé ; listeré rouge = anomalie ; cliquer ouvre la semaine).</li>
+          (plus le bleu est foncé, plus le jour est chargé ; liseré rouge = anomalie ; cliquer ouvre la semaine).</li>
         <li><b>🗂 Dossiers</b> : chaque inscription porte une entreprise/SIRET et un statut —
           🕐 pré-réservée, ✓ confirmée, ✕ annulée (avec motif). Une ligne annulée libère immédiatement
           ses créneaux et sort des contrôles, tout en restant visible dans les listes.</li>
