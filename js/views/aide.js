@@ -61,6 +61,11 @@ export function renderAide(main) {
           ici, sans formateur ni autre test. Elle est tenue <b>en surveillance</b> par un testeur habilité AIPR :
           celui-ci reste identifié sur le créneau mais n'y est pas bloqué, et l'épreuve n'entre ni dans sa charge
           du jour ni dans le taux d'occupation.</li>
+        <li><b>Pause déjeuner</b> (Paramètres, <b>désactivée par défaut</b>) : une fois active, aucune pratique,
+          aucun test et aucune théorie en centre ne peut la chevaucher — les créneaux concernés ne sont plus
+          proposés et les séances déjà posées dessus sont signalées. Seule la <b>théorie présentielle</b>
+          l’enjambe : une session initiale dure 7h00, elle ne tient dans aucune demi-journée.
+          Avant de l’activer, l’écran Paramètres annonce combien d’inscriptions basculeraient en anomalie.</li>
         <li><b>Théorie de la formation</b> (3 modes, par inscription) :
           <b>e-learning hors centre</b> (défaut, rien à planifier) ;
           <b>e-learning en centre</b> (créneau en salle, sans formateur) ;
