@@ -44,14 +44,22 @@
   --error-bg: oklch(0.95 0.035 25);
   --warn: oklch(0.55 0.12 75);
   --warn-bg: oklch(0.96 0.045 90);
-  --theory-bg: oklch(0.95 0.06 95);
-  --theory-border: oklch(0.8 0.12 95);
-  --free: oklch(0.95 0.045 155);
-  --free-hover: oklch(0.88 0.08 155);
-  --busy: oklch(0.92 0.05 25);
-  --exam-bg: oklch(0.93 0.05 290);
-  --exam-border: oklch(0.75 0.1 290);
+  /* Code couleur des créneaux — aligné sur le classeur EFI :
+     vert = confirmé, jaune = pré-réservé, bleu = théorie, violet = épreuve
+     surveillée (AIPR), gris = fermé, neutre = libre. Le rouge est réservé
+     aux anomalies et n'occupe plus les grilles. */
+  --free: oklch(0.975 0.004 250);
+  --free-hover: oklch(0.93 0.006 250);
+  --confirmed: oklch(0.92 0.055 150);
+  --confirmed-border: oklch(0.72 0.11 150);
+  --pre: oklch(0.94 0.075 92);
+  --pre-border: oklch(0.78 0.12 88);
+  --theory-bg: oklch(0.93 0.05 245);
+  --theory-border: oklch(0.72 0.11 245);
+  --exam-bg: oklch(0.92 0.06 305);
+  --exam-border: oklch(0.73 0.11 305);
   --closed: oklch(0.94 0.005 260);
+  --cal-open: oklch(0.92 0.055 150);
   --grid-line: oklch(0.87 0.01 260);
 }
 
@@ -141,14 +149,19 @@
   --error-bg: oklch(0.3 0.06 25);
   --warn: oklch(0.82 0.12 85);
   --warn-bg: oklch(0.32 0.05 85);
-  --theory-bg: oklch(0.34 0.06 95);
-  --theory-border: oklch(0.55 0.1 95);
-  --free: oklch(0.33 0.05 155);
-  --free-hover: oklch(0.42 0.08 155);
-  --busy: oklch(0.34 0.06 25);
-  --exam-bg: oklch(0.32 0.07 290);
-  --exam-border: oklch(0.55 0.1 290);
+  /* Code couleur des créneaux — mêmes rôles qu'en clair */
+  --free: oklch(0.21 0.004 250);
+  --free-hover: oklch(0.29 0.006 250);
+  --confirmed: oklch(0.33 0.055 150);
+  --confirmed-border: oklch(0.55 0.1 150);
+  --pre: oklch(0.35 0.06 90);
+  --pre-border: oklch(0.58 0.1 88);
+  --theory-bg: oklch(0.32 0.06 245);
+  --theory-border: oklch(0.55 0.1 245);
+  --exam-bg: oklch(0.32 0.07 305);
+  --exam-border: oklch(0.55 0.1 305);
   --closed: oklch(0.24 0.005 260);
+  --cal-open: oklch(0.33 0.055 150);
   --grid-line: oklch(0.35 0.01 260);
 }
 
