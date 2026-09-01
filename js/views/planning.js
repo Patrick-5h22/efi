@@ -4,6 +4,7 @@
 import { app, esc } from '../app.js';
 import { memberName } from '../store.js';
 import { workingDays, daySlots, fmtTime, fmtDateDay, isoWeek } from '../dates.js';
+import { chevauchePause } from '../config.js';
 
 export function renderPlanning(main, args, kind) {
   const state = app.state;
@@ -50,7 +51,11 @@ export function renderPlanning(main, args, kind) {
         return i.dateTestPratique === date && i.debutTestPratique != null && i.debutTestPratique < slotEnd && r.finTestPratique > t;
       });
 
-      if (!occupants.length) return `<td class="slot-free" style="cursor:default"></td>`;
+      if (!occupants.length) {
+        // Pause déjeuner : seulement sur les créneaux restés libres.
+        if (chevauchePause(state.params, t, slotEnd)) return `<td class="slot-pause" title="Pause déjeuner"></td>`;
+        return `<td class="slot-free" style="cursor:default"></td>`;
+      }
       // Épreuves surveillées (AIPR) : couleur dédiée — le superviseur reste
       // disponible. Sinon vert (confirmée) ou jaune (pré-réservée).
       const pre = occupants.every((o) => o.insc.statut === 'pre') ? ' slot-pre' : '';
@@ -76,6 +81,7 @@ export function renderPlanning(main, args, kind) {
       <span><span class="chip" style="background:var(--pre);border-color:var(--pre-border)"></span>Pré-réservée</span>
       ${kind === 'T' ? '<span><span class="chip" style="background:var(--theory-bg);border-color:var(--theory-border)"></span>Théorie</span><span><span class="chip" style="background:var(--exam-bg);border-color:var(--exam-border)"></span>Épreuve surveillée (AIPR)</span>' : ''}
       <span><span class="chip" style="background:#f2f4f8"></span>Jour non ouvert</span>
+      ${state.params.pauseActive ? '<span><span class="chip slot-pause"></span>Pause déjeuner</span>' : ''}
     </div>
     <div class="card"><div class="grid-wrap"><table class="planning">${head}${body}</table></div></div>
   `;

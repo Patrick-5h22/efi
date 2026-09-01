@@ -2,7 +2,7 @@
 // les intervenants effectifs (affectation automatique) et les contrôles (STATUT).
 // Reproduit les règles du classeur "Planification EFI v4.2".
 
-import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee } from './config.js';
+import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee, pauseCreneau, chevauchePause } from './config.js';
 import { isoWeek, overlaps, workingDays, fmtTime, mondayOf, weekDays, toISO } from './dates.js';
 
 // ---------------------------------------------------------------------------
@@ -240,13 +240,19 @@ function validateRows(rows, ctx) {
     else if (!openDays.has(date)) row.errors.push(`${label} : jour non ouvert (EFI)`);
   };
 
-  const checkWindow = (row, start, end, label) => {
+  // enjambePause : réservé à la théorie présentielle, seule séance qui ne
+  // tient pas dans une demi-journée (voir pauseCreneau dans config.js).
+  const checkWindow = (row, start, end, label, enjambePause = false) => {
     if (start == null) return;
     if (start < params.dayStart || end > params.dayEnd) {
       row.errors.push(`${label} : hors plage ${fmtTime(params.dayStart)}–${fmtTime(params.dayEnd)}`);
     }
     if (start % params.slotMinutes !== 0) {
       row.errors.push(`${label} : début non aligné sur un créneau de ${params.slotMinutes} min`);
+    }
+    if (!enjambePause && chevauchePause(params, start, end)) {
+      const p = pauseCreneau(params);
+      row.errors.push(`${label} : chevauche la pause déjeuner (${fmtTime(p.debut)}–${fmtTime(p.fin)})`);
     }
   };
 
@@ -328,7 +334,8 @@ function validateRows(rows, ctx) {
       if (!insc.dateTheorieFormation) row.errors.push(`${label} : date manquante`);
       else checkDay(row, insc.dateTheorieFormation, label);
       if (insc.dateTheorieFormation && insc.debutTheorieFormation == null) row.errors.push(`${label} : heure manquante`);
-      checkWindow(row, insc.debutTheorieFormation, row.finTheorieFormation, label);
+      checkWindow(row, insc.debutTheorieFormation, row.finTheorieFormation, label,
+        insc.modeTheorie === 'presentiel');
       if (insc.modeTheorie === 'presentiel' && row.formateurTheorieEffectif
         && !qualified(row.formateurTheorieEffectif, formation.code, 'F')) {
         row.errors.push('Formateur théorie non habilité');
@@ -629,13 +636,25 @@ export function unionDuration(intervals) {
   return total;
 }
 
+// Minutes réellement offertes dans une journée : la pause déjeuner, quand
+// elle est active, sort du dénominateur — sinon le taux d'occupation
+// plafonnerait mécaniquement sous 100 % sans que personne soit disponible.
+export function minutesOffertes(params) {
+  const p = pauseCreneau(params);
+  const jour = params.dayEnd - params.dayStart;
+  if (!p) return jour;
+  const debut = Math.max(p.debut, params.dayStart);
+  const fin = Math.min(p.fin, params.dayEnd);
+  return jour - Math.max(0, fin - debut);
+}
+
 // ---------------------------------------------------------------------------
 // Occupation par jour (heatmap) : créneaux réservés / créneaux offerts
 // (2 ressources — formateur et testeur — × créneaux de la journée).
 // ---------------------------------------------------------------------------
 export function occupancyByDay(state, schedule) {
   const { params } = state;
-  const slotsPerDay = Math.floor((params.dayEnd - params.dayStart) / params.slotMinutes);
+  const slotsPerDay = Math.floor(minutesOffertes(params) / params.slotMinutes);
   const openSet = new Set(state.openDays);
   const out = new Map(); // date -> { busy, total, ratio, errors }
 
@@ -726,7 +745,7 @@ export function occupationSummary(state, schedule, scope = 'periode', todayISO =
   const ref = win.ref;
 
   const scopeDays = new Set(win.openDays);
-  const slotsPerDay = (params.dayEnd - params.dayStart) / params.slotMinutes;
+  const slotsPerDay = minutesOffertes(params) / params.slotMinutes;
   const total = scopeDays.size * slotsPerDay;
 
   let busy = 0;
@@ -766,7 +785,10 @@ export function suggestSlots(state, { stagiaire, formation: code, type }, exclud
   const duree = dureeFor(formation, type);
   const openDays = workingDays(params).filter((d) => state.openDays.includes(d));
   const slots = [];
-  for (let t = params.dayStart; t + params.slotMinutes <= params.dayEnd; t += params.slotMinutes) slots.push(t);
+  for (let t = params.dayStart; t + params.slotMinutes <= params.dayEnd; t += params.slotMinutes) {
+    if (chevauchePause(params, t, t + params.slotMinutes)) continue;
+    slots.push(t);
+  }
 
   // La théorie de la recommandation est-elle déjà planifiée pour ce stagiaire
   // (hors ligne en cours de replanification) ?
@@ -943,8 +965,12 @@ export function availableSlotsFor(state, { formation: code, type, date, role = '
   const members = team.filter((m) => m.name.trim() && m.quals?.[formation.code]?.[kind] && idx.presentOn(m.id, date));
   if (!members.length) return [];
 
+  // La théorie présentielle est la seule séance autorisée à enjamber la pause.
+  const enjambePause = role === 'theorie';
+
   const out = [];
   for (let t = params.dayStart; t + duration <= params.dayEnd; t += params.slotMinutes) {
+    if (!enjambePause && chevauchePause(params, t, t + duration)) continue;
     if (surveillance || members.some((m) => freeOn(m.id, date, t, t + duration, allowSameCat))) out.push(t);
   }
   return out;

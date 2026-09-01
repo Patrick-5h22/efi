@@ -12,6 +12,12 @@ export const DEFAULT_PARAMS = {
   practicalTestDuration: 60, // 1h00
   maxDailyLoad: 360,         // 6h00 de formation pratique max / jour / formateur
   salleCapacite: 12,         // places en salle de théorie (présentiel + e-learning en centre)
+  // Pause déjeuner — désactivée par défaut, car l'activer fait basculer en
+  // anomalie toute inscription existante qui la chevauche. À ouvrir depuis
+  // Paramètres une fois le planning en place.
+  pauseActive: false,
+  pauseDebut: 720,           // 12:00
+  pauseFin: 780,             // 13:00
   holidays: [
     { date: '2026-11-11', label: 'Armistice 1918' },
     { date: '2026-12-25', label: 'Noël' },
@@ -39,6 +45,27 @@ export const DEFAULT_FORMATIONS = [
 // (cas de la surveillance d'épreuve). Défaut : comptée.
 export function chargeComptee(formation) {
   return formation?.chargeComptee !== false;
+}
+
+// --- Pause déjeuner --------------------------------------------------------
+// Quand elle est active, aucune pratique, aucun test et aucune théorie en
+// centre ne peut la chevaucher. Une seule exception, assumée : la théorie
+// PRÉSENTIELLE. Une session initiale dure 7h00 dans une journée de 9h00 ;
+// pause déduite il ne reste que 8h00, et aucune demi-journée ne peut
+// l'accueillir. Elle enjambe donc la pause, comme une journée de formation
+// ordinaire. (Le classeur d'Emmanuel peint la pause par-dessus le bloc de
+// théorie, ce qui ne délivre que 6h00 — divergence à trancher avec lui.)
+export function pauseCreneau(params) {
+  if (!params?.pauseActive) return null;
+  const debut = params.pauseDebut ?? 720;
+  const fin = params.pauseFin ?? 780;
+  return fin > debut ? { debut, fin } : null;
+}
+
+export function chevauchePause(params, start, end) {
+  const p = pauseCreneau(params);
+  if (!p || start == null || end == null) return false;
+  return start < p.fin && end > p.debut;
 }
 
 // Modèle d'une formation du catalogue : valeurs par défaut d'une création.
