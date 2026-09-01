@@ -11,6 +11,7 @@ import { computeSchedule } from './engine.js';
 import { periodWeeks } from './dates.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderInscriptions } from './views/inscriptions.js';
+import { renderCA } from './views/ca.js';
 import { renderSemaine } from './views/semaine.js';
 import { renderStagiaires } from './views/stagiaires.js';
 import { renderSynthese } from './views/synthese.js';
@@ -294,6 +295,7 @@ const routes = {
   'inscriptions': renderInscriptions,
   'semaine': renderSemaine,
   'stagiaires': renderStagiaires,
+  'ca': renderCA,
   'synthese': renderSynthese,
   'planning-formateur': (m, a) => renderPlanning(m, a, 'F'),
   'planning-testeur': (m, a) => renderPlanning(m, a, 'T'),
@@ -326,6 +328,7 @@ function renderNav() {
     ${link('dashboard', '🏠 Tableau de bord', page === 'dashboard')}
     ${link('inscriptions', `📝 Inscriptions ${errorCount ? `<span class="nav-badge">${errorCount}</span>` : ''}`, page === 'inscriptions')}
     ${link('stagiaires', '🗂 Dossiers', page === 'stagiaires')}
+    ${link('ca', '💶 Chiffre d’affaires', page === 'ca')}
     ${link('synthese', '📋 Synthèse semaine', page === 'synthese')}
     <div class="nav-section">Plannings</div>
     ${link(`semaine/${currentWeek || weeks[0].week}`, '🗓 Grilles semaine', page === 'semaine')}
