@@ -180,8 +180,12 @@ function rowHTML(state, row) {
   const statutBadge = insc.statut === 'annulee'
     ? `<span class="badge badge-cancel" title="${esc(insc.motifAnnulation || '')}">✕ annulée</span>`
     : insc.statut === 'pre' ? '<span class="badge badge-warn">🕐 pré-rés.</span>' : '';
+  // Teinte de ligne alignée sur les grilles : vert = confirmée, jaune =
+  // pré-réservée, rouge = anomalie (prioritaire), grisé = annulée.
+  const statutRow = row.cancelled ? 'row-cancelled'
+    : insc.statut === 'pre' ? 'row-pre' : 'row-confirmed';
   return `
-    <tr class="${row.errors.length ? 'row-error' : ''} ${row.cancelled ? 'row-cancelled' : ''}">
+    <tr class="${statutRow} ${row.errors.length ? 'row-error' : ''}">
       <td>${insc.id}</td>
       <td><b>${esc(insc.stagiaire)}</b>${insc.entreprise ? `<br><span class="muted">${esc(insc.entreprise)}</span>` : ''}${statutBadge ? '<br>' + statutBadge : ''}</td>
       <td>${esc(formation?.label || insc.formation || '?')}</td>
