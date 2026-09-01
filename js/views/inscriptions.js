@@ -7,6 +7,7 @@ import { fmtTime, fmtDateShort, periodWeeks } from '../dates.js';
 import { openInscriptionForm } from './form.js';
 import { buildICS, downloadICS } from '../ics.js';
 import { importInscriptionsCSV } from '../csv.js';
+import { fmtEuros, ypareoValide } from '../ca.js';
 import { addInscription } from '../store.js';
 
 const filters = { search: '', formation: '', week: '', status: '', dossier: '' };
@@ -20,6 +21,8 @@ const SORTERS = {
   date: (r) => `${r.insc.datePratique || '9999'}|${String(r.insc.debutPratique ?? 0).padStart(4, '0')}`,
   semaine: (r) => r.semaine ?? 99,
   statut: (r) => -r.errors.length,
+  dossier: (r) => r.insc.dossierYpareo || '￿',
+  ca: (r) => r.insc.chiffreAffaires ?? -1,
 };
 
 export function renderInscriptions(main) {
@@ -28,7 +31,13 @@ export function renderInscriptions(main) {
   const weeks = periodWeeks(state.params);
 
   const visible = rows.filter((row) => {
-    if (filters.search && !row.insc.stagiaire.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    // La recherche porte aussi sur le n° de dossier : c'est la clé qu'utilisent
+    // les assistantes pour retrouver une inscription.
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      const hay = `${row.insc.stagiaire} ${row.insc.dossierYpareo || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
     if (filters.formation && row.insc.formation !== filters.formation) return false;
     if (filters.week && String(row.semaine) !== filters.week) return false;
     if (filters.status === 'ok' && row.errors.length) return false;
@@ -93,13 +102,13 @@ export function renderInscriptions(main) {
         <table class="data">
           <thead>
             <tr>
-              ${sortableTh('id', 'N°')}${sortableTh('stagiaire', 'Stagiaire')}${sortableTh('formation', 'Formation')}<th>Type</th><th>Durée</th>
+              ${sortableTh('id', 'N°')}${sortableTh('stagiaire', 'Stagiaire')}${sortableTh('dossier', 'N° dossier')}${sortableTh('ca', 'CA')}${sortableTh('formation', 'Formation')}<th>Type</th><th>Durée</th>
               ${sortableTh('date', 'Pratique')}<th>Théorie</th><th>Test pratique</th>
               <th>Formateur</th><th>Testeur</th><th>Reco</th>${sortableTh('semaine', 'Sem.')}${sortableTh('statut', 'Statut')}<th></th>
             </tr>
           </thead>
           <tbody>
-            ${visible.map((row) => rowHTML(state, row)).join('') || `<tr><td colspan="14" class="muted">Aucune inscription${rows.length ? ' ne correspond aux filtres' : ''}.</td></tr>`}
+            ${visible.map((row) => rowHTML(state, row)).join('') || `<tr><td colspan="16" class="muted">Aucune inscription${rows.length ? ' ne correspond aux filtres' : ''}.</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -188,6 +197,10 @@ function rowHTML(state, row) {
     <tr class="${statutRow} ${row.errors.length ? 'row-error' : ''}">
       <td>${insc.id}</td>
       <td><b>${esc(insc.stagiaire)}</b>${insc.entreprise ? `<br><span class="muted">${esc(insc.entreprise)}</span>` : ''}${statutBadge ? '<br>' + statutBadge : ''}</td>
+      <td>${insc.dossierYpareo
+        ? `<span class="mono"${ypareoValide(insc.dossierYpareo) ? '' : ' title="Un n° YPAREO compte 10 chiffres"'}>${esc(insc.dossierYpareo)}${ypareoValide(insc.dossierYpareo) ? '' : ' <span class="badge badge-warn">?</span>'}</span>`
+        : '<span class="muted">—</span>'}</td>
+      <td style="text-align:right">${insc.chiffreAffaires != null ? `<span class="mono">${fmtEuros(insc.chiffreAffaires)}</span>` : '<span class="muted">—</span>'}</td>
       <td>${esc(formation?.label || insc.formation || '?')}</td>
       <td>${esc(insc.type)}</td>
       <td>${fmtTime(row.duree).replace(':', 'h')}</td>
@@ -226,7 +239,7 @@ function theorieFormationCell(state, row) {
 
 function exportCSV(state, rows) {
   const sep = ';';
-  const header = ['N°', 'Stagiaire', 'Formation', 'Type', 'Durée pratique', 'Date pratique', 'Début pratique', 'Fin pratique',
+  const header = ['N°', 'Stagiaire', 'N° dossier YPAREO', 'Chiffre d’affaires', 'Formation', 'Type', 'Durée pratique', 'Date pratique', 'Début pratique', 'Fin pratique',
     'Date théorie', 'Heure théorie', 'Date test pratique', 'Début test', 'Fin test',
     'Mode théorie', 'Date théorie formation', 'Début théorie formation', 'Fin théorie formation', 'Formateur théorie',
     'Formateur effectif', 'Testeur effectif', 'Reco', 'Semaine', 'Statut'];
@@ -234,7 +247,8 @@ function exportCSV(state, rows) {
   const lines = rows.map((row) => {
     const i = row.insc;
     return [
-      i.id, i.stagiaire, row.formation?.label || '', i.type, fmtTime(row.duree),
+      i.id, i.stagiaire, i.dossierYpareo || '', i.chiffreAffaires ?? '',
+      row.formation?.label || '', i.type, fmtTime(row.duree),
       fmtDateShort(i.datePratique), fmtTime(i.debutPratique), fmtTime(row.finPratique),
       fmtDateShort(i.dateTheorie), i.dateTheorie ? fmtTime(row.heureTheorie) : '',
       fmtDateShort(i.dateTestPratique), fmtTime(i.debutTestPratique), fmtTime(row.finTestPratique),
