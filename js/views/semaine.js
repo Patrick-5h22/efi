@@ -1,5 +1,6 @@
 // Grilles hebdomadaires FORMATEUR / TESTEUR — équivalent des onglets « Semaine 36 » à « Semaine 53 ».
-// Vert = disponible (clic = inscrire), rouge = occupé, jaune = théorie, gris = fermé.
+// Code couleur : neutre = libre (clic = inscrire), vert = confirmée, jaune =
+// pré-réservée, bleu = théorie, violet = épreuve surveillée, gris = fermé.
 
 import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
@@ -31,10 +32,10 @@ export function renderSemaine(main, args) {
     </div>
 
     <div class="legend no-print">
-      <span><span class="chip" style="background:var(--free)"></span>Disponible (cliquer pour inscrire)</span>
-      <span><span class="chip" style="background:var(--busy)"></span>Occupé</span>
-      <span><span class="chip" style="background:var(--busy); outline:1px dashed var(--warn); outline-offset:-2px"></span>Pré-réservé</span>
-      <span><span class="chip" style="background:var(--theory-bg);border-color:#e2c14d"></span>Théorie</span>
+      <span><span class="chip" style="background:var(--free)"></span>Libre (cliquer pour inscrire)</span>
+      <span><span class="chip" style="background:var(--confirmed);border-color:var(--confirmed-border)"></span>Confirmée</span>
+      <span><span class="chip" style="background:var(--pre);border-color:var(--pre-border); outline:1px dashed var(--warn); outline-offset:-2px"></span>Pré-réservée</span>
+      <span><span class="chip" style="background:var(--theory-bg);border-color:var(--theory-border)"></span>Théorie</span>
       <span><span class="chip" style="background:var(--exam-bg);border-color:var(--exam-border)"></span>Épreuve surveillée (AIPR) — ne mobilise pas l'intervenant</span>
       <span><span class="chip" style="background:var(--closed)"></span>Fermé</span>
     </div>
