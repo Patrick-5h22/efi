@@ -2,7 +2,7 @@
 // entre la vue Inscriptions et les grilles de semaine.
 
 import { app, esc, toast } from '../app.js';
-import { addInscription, updateInscription } from '../store.js';
+import { addInscription, updateInscription, montantOuNull } from '../store.js';
 import { formationByCode, dureeFor, TYPES, MODES_THEORIE, THEORIE_CENTRE_DUREE_DEFAUT, dureeTheorieFor } from '../config.js';
 import { daySlots, fmtTime, workingDays, fmtDateDay } from '../dates.js';
 import { computeSchedule, memberAvailability, suggestSlots, availableSlotsFor, availableTheorieSlots, roomFreeSlots } from '../engine.js';
@@ -15,6 +15,8 @@ export function openInscriptionForm(options = {}) {
   const editing = options.id != null ? state.inscriptions.find((i) => i.id === options.id) : null;
   const init = editing || {
     stagiaire: options.stagiaire || '',
+    dossierYpareo: options.dossierYpareo || '',
+    chiffreAffaires: options.chiffreAffaires ?? null,
     formation: options.formation || '',
     type: options.type || 'Initial',
     datePratique: options.datePratique || null,
@@ -86,6 +88,14 @@ export function openInscriptionForm(options = {}) {
             <datalist id="stagiaire-list">
               ${[...new Set(state.inscriptions.map((i) => i.stagiaire))].map((s) => `<option value="${esc(s)}">`).join('')}
             </datalist>
+          </label>
+          <label class="field">N° de dossier YPAREO
+            <input name="dossierYpareo" value="${esc(init.dossierYpareo || '')}" placeholder="10 chiffres"
+              inputmode="numeric" maxlength="10" pattern="\\d{10}" title="10 chiffres">
+          </label>
+          <label class="field">Chiffre d’affaires (€)
+            <input name="chiffreAffaires" type="number" min="0" step="0.01" value="${init.chiffreAffaires ?? ''}"
+              placeholder="(facultatif)" title="Montant facturé pour cette ligne">
           </label>
           <label class="field">Formation
             <select name="formation" required>
@@ -177,6 +187,8 @@ export function openInscriptionForm(options = {}) {
 
   const readDraft = () => ({
     stagiaire: $('stagiaire').value.trim(),
+    dossierYpareo: $('dossierYpareo').value.trim() || null,
+    chiffreAffaires: montantOuNull($('chiffreAffaires').value),
     entreprise: $('entreprise').value.trim() || null,
     siret: $('siret').value.trim() || null,
     statut: $('statut').value,

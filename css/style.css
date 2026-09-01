@@ -298,6 +298,14 @@ tr.row-cancelled td b { text-decoration: line-through; }
 .badge-info { background: var(--accent); color: var(--accent-foreground); border-color: var(--border); }
 .badge-cancel { background: var(--muted); color: var(--muted-foreground); text-decoration: line-through; }
 
+/* Chiffres alignés (n° de dossier, montants) */
+.mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* Suivi du chiffre d'affaires */
+table.data tr.ca-total td { background: var(--muted); border-top: 1px solid var(--border); }
+ul.plain-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+ul.plain-list li { font-size: 13px; }
+
 .status-errors { color: var(--error); font-size: 12px; white-space: normal; max-width: 320px; }
 .status-errors li { margin: 1px 0; }
 ul.status-errors { margin: 0; padding-left: 16px; }

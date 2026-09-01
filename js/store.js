@@ -57,10 +57,22 @@ export function seedExamples(state) {
   return state;
 }
 
+// Montant en euros : null si non saisi, sinon un nombre positif. Une saisie
+// invalide vaut « non renseigné » plutôt que zéro, pour ne pas fausser le CA.
+export function montantOuNull(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = typeof v === 'string' ? Number(v.replace(',', '.').replace(/\s/g, '')) : Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 export function addInscription(state, data) {
   const insc = {
     id: state.nextId++,
     stagiaire: (data.stagiaire || '').trim(),
+    // Gestion — saisi par l'assistante : n° de dossier YPAREO (10 chiffres)
+    // et montant facturé de la ligne.
+    dossierYpareo: (data.dossierYpareo || '').trim() || null,
+    chiffreAffaires: montantOuNull(data.chiffreAffaires),
     formation: data.formation || null,
     type: data.type || 'Initial',
     datePratique: data.datePratique || null,
@@ -160,6 +172,9 @@ export function migrate(state) {
   for (const i of state.inscriptions) {
     if (!i.statut) i.statut = 'confirmee';
     if (!i.modeTheorie) i.modeTheorie = 'distance';
+    // Champs de gestion ajoutés au fil des versions
+    if (i.dossierYpareo === undefined) i.dossierYpareo = null;
+    if (i.chiffreAffaires === undefined) i.chiffreAffaires = null;
   }
   state.nextId = state.nextId || (Math.max(0, ...state.inscriptions.map((i) => i.id)) + 1);
   return state;
