@@ -29,7 +29,20 @@ export function artefact(nom) {
 
 export async function lancerNavigateur() {
   const executablePath = process.env.PLAYWRIGHT_EXECUTABLE || undefined;
-  return chromium.launch(executablePath ? { executablePath } : {});
+  try {
+    return await chromium.launch(executablePath ? { executablePath } : {});
+  } catch (e) {
+    // Sans navigateur installé, Playwright renvoie un chemin introuvable :
+    // message peu parlant, alors que la correction tient en une commande.
+    if (/Executable doesn.t exist/i.test(e.message)) {
+      console.error('\n✗ Aucun navigateur Chromium utilisable.\n');
+      console.error('  Installer celui attendu par cette version de Playwright :');
+      console.error('    npx playwright install chromium\n');
+      console.error('  Ou désigner un binaire déjà présent :');
+      console.error('    PLAYWRIGHT_EXECUTABLE=/chemin/vers/chromium npm run test:ui\n');
+    }
+    throw e;
+  }
 }
 
 // Compteur de vérifications partagé, pour que toutes les suites rendent le
