@@ -1,11 +1,16 @@
 name: Tests
 
+# Sur une PR, GitHub émet à la fois « push » (vers la branche) et
+# « pull_request ». Déclencher sur les deux faisait tourner chaque job en
+# double. On garde donc pull_request, plus les push sur main uniquement.
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
 
 jobs:
-  test:
+  unite:
+    name: Tests unitaires
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,7 +18,51 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Installer les dépendances (better-auth, pg)
+      # Les tests unitaires et la route MCP n'ont besoin ni d'ESLint ni de
+      # Playwright : on évite de les installer ici.
+      - name: Installer les dépendances d’exécution
+        run: npm ci --omit=dev
+      - name: Moteur, magasin, outils MCP et route /api/mcp
+        run: npm test
+
+  qualite:
+    name: Lint & secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Installer les dépendances
         run: npm ci
-      - name: Tests unitaires du moteur
-        run: node --test tests/*.test.mjs
+      - name: ESLint
+        run: npm run lint
+      # Ce dépôt est public : aucun code d'accès ni jeton ne doit y entrer.
+      - name: Garde-fou secrets
+        run: npm run secrets
+
+  interface:
+    name: Suites navigateur
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Installer les dépendances
+        run: npm ci
+      - name: Installer Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Grilles, couleurs, catalogue, CA, pause, présence
+        run: npm run test:ui
+      # Les captures ne servent qu'à comprendre un échec après coup.
+      - name: Conserver les captures en cas d’échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-navigateur
+          path: tests/ui/.artefacts/
+          retention-days: 7
+          if-no-files-found: ignore

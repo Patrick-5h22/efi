@@ -1,3 +1,6 @@
 node_modules/
 *.log
 .DS_Store
+
+# Artefacts des suites navigateur (captures de diagnostic)
+tests/ui/.artefacts/

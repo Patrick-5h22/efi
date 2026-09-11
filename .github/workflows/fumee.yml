@@ -1,0 +1,97 @@
+name: Fumée après déploiement
+
+# Vercel déploie tout seul ; ce qu'aucun test unitaire ne voit, c'est une
+# fonction serverless qui part en erreur une fois en ligne. On attend donc que
+# Vercel annonce un déploiement réussi, puis on interroge les routes réelles.
+#
+# Ces vérifications ne demandent aucun secret : elles s'assurent au contraire
+# que les routes protégées REFUSENT bien l'accès.
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: URL à vérifier
+        default: https://efi-rho.vercel.app
+        required: false
+
+jobs:
+  fumee:
+    # Deux filtres, tous deux nécessaires :
+    #  - « state == success » car deployment_status est émis à chaque
+    #    changement d'état, y compris « pending » et « failure » ;
+    #  - environnement de PRODUCTION uniquement. Les déploiements de
+    #    prévisualisation sont derrière l'authentification Vercel et répondent
+    #    302 vers son SSO : les interroger ne dirait rien de l'application.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       contains(fromJSON('["Production", "production"]'),
+                github.event.deployment_status.environment))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Déterminer l’URL
+        id: cible
+        run: |
+          URL="${{ github.event.deployment_status.target_url || inputs.url }}"
+          URL="${URL%/}"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Cible : $URL"
+
+      - name: L’application répond
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 \
+            --retry-all-errors "${{ steps.cible.outputs.url }}/")
+          echo "GET / → $code"
+          if [ "$code" = "302" ] || [ "$code" = "401" ]; then
+            echo "::error::Déploiement protégé (redirection vers le SSO Vercel) : ce n’est pas la production."
+            exit 1
+          fi
+          [ "$code" = "200" ]
+
+      - name: Les modules du moteur sont servis
+        run: |
+          set -euo pipefail
+          for f in js/app.js js/engine.js js/mcp.js js/persisted.js css/style.css; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "${{ steps.cible.outputs.url }}/$f")
+            echo "$f → $code"
+            [ "$code" = "200" ]
+          done
+
+      - name: Le planning partagé exige une session
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /dev/null -w '%{http_code}' "${{ steps.cible.outputs.url }}/api/state")
+          echo "GET /api/state → $code (401 attendu)"
+          [ "$code" = "401" ]
+
+      - name: La route MCP n’est jamais ouverte sans jeton
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+            -H 'content-type: application/json' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' \
+            "${{ steps.cible.outputs.url }}/api/mcp")
+          echo "POST /api/mcp sans jeton → $code"
+          # 503 = jetons non configurés (route fermée), 401 = jeton exigé.
+          # Tout autre code signifierait un accès non protégé.
+          case "$code" in
+            503|401) echo "route protégée" ;;
+            *) echo "::error::la route MCP répond $code sans jeton"; exit 1 ;;
+          esac
+
+      - name: La route MCP refuse un mauvais jeton
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+            -H 'content-type: application/json' \
+            -H 'authorization: Bearer jeton-manifestement-invalide' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' \
+            "${{ steps.cible.outputs.url }}/api/mcp")
+          echo "POST /api/mcp avec mauvais jeton → $code"
+          case "$code" in
+            503|401) echo "refus correct" ;;
+            *) echo "::error::un jeton invalide obtient $code"; exit 1 ;;
+          esac
