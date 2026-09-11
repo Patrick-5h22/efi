@@ -63,7 +63,10 @@ test('persistance : un état ancien sans présence se recharge sans casser', () 
 
 test('persistance : les deux appelants passent par la liste commune', () => {
   // Garde-fou contre la réapparition d'une liste recopiée à la main.
-  for (const fichier of ['js/db.js', 'api/state.js']) {
+  // Les deux endroits qui construisent la charge utile : le navigateur, et le
+  // module d'accès aux RPC côté serveur (dont api/state.js et api/mcp.js
+  // dépendent tous les deux).
+  for (const fichier of ['js/db.js', 'api/_planning.js']) {
     const src = readFileSync(new URL(`../${fichier}`, import.meta.url), 'utf8');
     assert.ok(/pickPersisted/.test(src), `${fichier} doit utiliser pickPersisted()`);
     assert.ok(!/const \{ params, formations, team, openDays/.test(src),
