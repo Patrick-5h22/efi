@@ -1,0 +1,30 @@
+version: 2
+
+# Deux dépendances d'exécution seulement (better-auth, pg) et trois de
+# développement : un regroupement mensuel suffit, et évite une PR par paquet.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps"
+    groups:
+      # Les mises à jour de développement ne touchent pas le produit livré :
+      # une seule PR groupée, à fusionner si la CI passe.
+      developpement:
+        dependency-type: development
+        update-types: [minor, patch]
+      # Les dépendances d'exécution partent séparément, pour être relues une
+      # par une — better-auth porte l'authentification.
+      execution-mineur:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"

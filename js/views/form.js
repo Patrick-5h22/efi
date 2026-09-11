@@ -3,7 +3,7 @@
 
 import { app, esc, toast } from '../app.js';
 import { addInscription, updateInscription, montantOuNull } from '../store.js';
-import { formationByCode, dureeFor, TYPES, MODES_THEORIE, THEORIE_CENTRE_DUREE_DEFAUT, dureeTheorieFor } from '../config.js';
+import { formationByCode, dureeFor, TYPES, MODES_THEORIE, THEORIE_CENTRE_DUREE_DEFAUT } from '../config.js';
 import { daySlots, fmtTime, workingDays, fmtDateDay } from '../dates.js';
 import { computeSchedule, memberAvailability, suggestSlots, availableSlotsFor, availableTheorieSlots, roomFreeSlots } from '../engine.js';
 
