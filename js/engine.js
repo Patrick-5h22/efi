@@ -778,12 +778,13 @@ export function occupationSummary(state, schedule, scope = 'periode', todayISO =
 // Proposition automatique de créneaux : première combinaison
 // pratique (+ test pratique + théorie si obligatoires) sans anomalie.
 // ---------------------------------------------------------------------------
-export function suggestSlots(state, { stagiaire, formation: code, type }, excludeId = null) {
+export function suggestSlots(state, { stagiaire, formation: code, type, aPartirDu = null }, excludeId = null) {
   const { params } = state;
   const formation = formationByCode(state.formations, code);
   if (!formation || !stagiaire) return null;
   const duree = dureeFor(formation, type);
-  const openDays = workingDays(params).filter((d) => state.openDays.includes(d));
+  const openDays = workingDays(params)
+    .filter((d) => state.openDays.includes(d) && (!aPartirDu || d >= aPartirDu));
   const slots = [];
   for (let t = params.dayStart; t + params.slotMinutes <= params.dayEnd; t += params.slotMinutes) {
     if (chevauchePause(params, t, t + params.slotMinutes)) continue;
@@ -1035,4 +1036,123 @@ export function roomFreeSlots(state, { date, duration }, excludeId = null) {
     if (ok) out.push(t);
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Parcours multi-catégories : un stagiaire, plusieurs catégories d'une même
+// recommandation ou de recommandations différentes, groupées au plus tôt.
+//
+// C'est la question que pose un commercial en clientèle — « R489 1A, 3 et 5
+// à partir du 15 septembre, qu'est-ce qu'on peut faire ? » — là où
+// suggestSlots ne traite qu'une catégorie à la fois.
+//
+// Méthode : on pose les catégories l'une après l'autre sur un état simulé,
+// chaque proposition tenant compte des précédentes. La théorie se mutualise
+// d'elle-même, suggestSlots reconnaissant qu'elle est déjà planifiée pour ce
+// stagiaire et cette recommandation.
+// ---------------------------------------------------------------------------
+export function suggestParcours(state, { stagiaire, formations: codes, type = 'Initial', aPartirDu = null, maxOptions = 2 }) {
+  if (!stagiaire || !Array.isArray(codes) || !codes.length) return [];
+
+  const options = [];
+  let depuis = aPartirDu;
+
+  for (let n = 0; n < Math.max(1, maxOptions); n++) {
+    const parcours = composerParcours(state, { stagiaire, codes, type, aPartirDu: depuis });
+    if (!parcours) break;
+    options.push(parcours);
+    // Option suivante : chercher à partir du lendemain du premier jour retenu,
+    // pour proposer des dates réellement distinctes et non deux variantes du
+    // même jour.
+    const lendemain = jourSuivant(state, parcours.jours[0]);
+    if (!lendemain) break;
+    depuis = lendemain;
+  }
+  return options;
+}
+
+function composerParcours(state, { stagiaire, codes, type, aPartirDu }) {
+  const sim = structuredClone(state);
+  const lignes = [];
+
+  for (const code of codes) {
+    const draft = suggestSlots(sim, { stagiaire, formation: code, type, aPartirDu });
+    if (!draft) return null; // une catégorie ne passe pas : le parcours entier échoue
+    const insc = { id: sim.nextId++, statut: 'pre', modeTheorie: 'distance', ...draft };
+    sim.inscriptions.push(insc);
+    lignes.push(insc);
+  }
+
+  const { rows } = computeSchedule(sim);
+  const retenues = rows.filter((r) => lignes.some((l) => l.id === r.insc.id));
+  // Un parcours proposé ne doit comporter aucune anomalie : le commercial
+  // l'annonce au client, il doit être tenable en l'état.
+  if (retenues.some((r) => r.errors.length)) return null;
+
+  const jours = [...new Set(retenues.flatMap((r) => [
+    r.insc.datePratique, r.insc.dateTestPratique, r.insc.dateTheorie,
+  ]).filter(Boolean))].sort();
+
+  return { lignes, jours, seances: seancesDuParcours(state, retenues) };
+}
+
+// Déroulé chronologique, prêt à être lu au client : une séance par entrée,
+// avec son intitulé, ses bornes et l'intervenant retenu.
+function seancesDuParcours(state, rows) {
+  const { params } = state;
+  const out = [];
+  const nom = (id) => memberNameOf(state, id);
+
+  for (const r of rows) {
+    const i = r.insc;
+    // Le libellé du catalogue commence par « Pratique … » ; on l'ôte pour ne
+    // pas dire deux fois le mot dans « Formation pratique — Pratique R489 ».
+    const cat = (r.formation?.label || i.formation || '').replace(/^Pratique\s+/i, '');
+    if (i.datePratique && i.debutPratique != null) {
+      out.push({
+        date: i.datePratique, debut: i.debutPratique, fin: r.finPratique,
+        genre: r.formation?.testOnly ? 'epreuve' : 'pratique',
+        libelle: r.formation?.testOnly ? cat : `Formation pratique — ${cat}`,
+        intervenant: nom(r.formation?.testOnly ? r.testeurEffectif : r.formateurEffectif),
+      });
+    }
+    if (i.dateTheorie) {
+      out.push({
+        date: i.dateTheorie, debut: params.theoryTime, fin: params.theoryTime + params.theoryDuration,
+        genre: 'theorie', reco: r.formation?.reco,
+        libelle: `Test théorique — ${r.formation?.reco || ''}`.trim(),
+        intervenant: nom(r.testeurTheorie),
+      });
+    }
+    if (i.dateTestPratique && i.debutTestPratique != null) {
+      out.push({
+        date: i.dateTestPratique, debut: i.debutTestPratique, fin: r.finTestPratique,
+        genre: 'test', libelle: `Test pratique — ${cat}`,
+        intervenant: nom(r.testeurEffectif),
+      });
+    }
+  }
+
+  // La théorie est commune à une recommandation : une seule entrée par
+  // couple (date, recommandation), même si plusieurs catégories la portent.
+  const vues = new Set();
+  const uniques = out.filter((s) => {
+    if (s.genre !== 'theorie') return true;
+    const cle = `${s.date}|${s.reco}`;
+    if (vues.has(cle)) return false;
+    vues.add(cle);
+    return true;
+  });
+
+  return uniques.sort((a, b) => a.date.localeCompare(b.date) || a.debut - b.debut);
+}
+
+function memberNameOf(state, id) {
+  if (!id) return null;
+  return state.team.find((m) => m.id === id)?.name || null;
+}
+
+function jourSuivant(state, date) {
+  const ouverts = workingDays(state.params).filter((d) => state.openDays.includes(d));
+  return ouverts.find((d) => d > date) || null;
 }
