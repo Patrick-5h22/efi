@@ -13,8 +13,16 @@ on:
     inputs:
       url:
         description: URL à vérifier
-        default: https://efi-rho.vercel.app
         required: false
+
+# Alias de production — ce que les utilisateurs atteignent réellement.
+#
+# On NE se sert PAS de « deployment_status.target_url » : Vercel y met l'URL
+# immuable du déploiement (efi-xxxxxxxx-…), laquelle reste derrière la
+# protection d'accès même en production et répond 302 vers son SSO. Seul
+# l'alias est public, et c'est lui qu'il faut interroger.
+env:
+  PROD_URL: https://efi-rho.vercel.app
 
 jobs:
   fumee:
@@ -34,10 +42,16 @@ jobs:
       - name: Déterminer l’URL
         id: cible
         run: |
-          URL="${{ github.event.deployment_status.target_url || inputs.url }}"
+          URL="${{ inputs.url || env.PROD_URL }}"
           URL="${URL%/}"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Cible : $URL"
+
+      # Vercel bascule l'alias une fois le déploiement prêt : on laisse
+      # quelques secondes pour ne pas interroger l'ancienne version.
+      - name: Laisser l’alias basculer
+        if: github.event_name == 'deployment_status'
+        run: sleep 20
 
       - name: L’application répond
         run: |
