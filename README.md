@@ -62,7 +62,7 @@ efi-placement pour une identité visuelle commune.
    (F = former, T = tester) par spécialité.
 2. **Jours EFI** : cliquer sur le calendrier pour ouvrir les jours du
    plateau technique ; affecter éventuellement un formateur/testeur du jour.
-3. **Inscrire** : depuis la page Inscriptions, un créneau vert d'une grille
+3. **Inscrire** : depuis la page Inscriptions, un créneau libre d'une grille
    semaine, ou le bouton « ➕ » — le bouton « 💡 Proposer des créneaux »
    trouve automatiquement la première combinaison sans conflit.
 4. **Vérifier** : la colonne STATUT signale toute anomalie en rouge
@@ -79,10 +79,26 @@ efi-placement pour une identité visuelle commune.
 ## Tests
 
 ```bash
-node --test tests/*.test.mjs
+npm run verify     # lint + garde-fou secrets + tests unitaires
+npm test           # tests unitaires seuls (moteur, magasin, outils et route MCP)
+npm run test:ui    # vérifications navigateur (démarre le serveur statique)
+npm run lint
+npm run secrets    # aucun code d'accès ni jeton ne doit entrer au dépôt
 ```
 
-Les tests s'exécutent aussi en CI (GitHub Actions) à chaque push.
+Les suites navigateur demandent un Chromium :
+
+```bash
+npx playwright install chromium
+# ou, si un binaire est déjà présent :
+PLAYWRIGHT_EXECUTABLE=/chemin/vers/chromium npm run test:ui
+```
+
+En CI (GitHub Actions), trois jobs tournent en parallèle sur chaque pull
+request : tests unitaires, lint & secrets, suites navigateur. Un quatrième
+workflow interroge la production après chaque déploiement réussi — il vérifie
+notamment que `/api/state` exige une session et que `/api/mcp` refuse l'accès
+sans jeton valide.
 
 ## Architecture
 
@@ -93,15 +109,25 @@ js/config.js        Paramètres par défaut (issus du classeur)
 js/dates.js         Dates, semaines ISO, créneaux
 js/store.js         État, persistance, import/export
 js/engine.js        Moteur : affectation auto + contrôles (STATUT)
+js/persisted.js     Champs réellement enregistrés en base (liste unique)
 js/db.js            Synchronisation base partagée (code d'accès ou API)
 js/auth-client.js   Client Better Auth (session, connexion, déconnexion)
+js/ca.js            Agrégation du chiffre d'affaires (hors moteur)
+js/mcp.js           Outils MCP : recherche de créneaux, pré-réservation
 js/views/…          Vues (inscriptions, semaines, synthèse, plannings…)
-api/                Fonctions serverless Vercel (Better Auth + proxy /api/state)
+api/                Fonctions serverless Vercel (Better Auth, /api/state, /api/mcp)
+scripts/            Outillage de dépôt (garde-fou secrets)
 tests/              Tests unitaires (node:test)
+tests/ui/           Vérifications navigateur (Playwright)
 ```
 
-Le front reste 100 % statique et sans build ; les seules dépendances npm
-(`better-auth`, `pg`) servent aux fonctions serverless du dossier `api/`.
+Le front reste 100 % statique et sans build. Les dépendances d'exécution
+(`better-auth`, `pg`) servent aux fonctions serverless du dossier `api/` ;
+celles de développement (`eslint`, `playwright`) ne servent qu'à la
+vérification et ne partent jamais en production.
+
+Un serveur MCP expose le planning aux commerciaux en clientèle — voir
+[docs/MCP.md](docs/MCP.md) pour sa mise en service et ses limites.
 
 Voir [EVALUATION.md](EVALUATION.md) pour la grille d'évaluation et
 l'historique des itérations.
