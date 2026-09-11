@@ -7,17 +7,17 @@
 //   GET /api/state          → efi_load_state  (état complet du planning)
 //   PUT /api/state  {state} → efi_save_state  (remplacement transactionnel)
 
-import { fromNodeHeaders } from 'better-auth/node';
-import { auth } from './_auth.js';
+import { sessionDeLaRequete } from './_auth.js';
 import { loadState, saveState } from './_planning.js';
 
 export default async function handler(req, res) {
-  const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
-  if (!session?.user) {
-    return res.status(401).json({ message: 'Authentification requise.' });
-  }
-
   try {
+    // Dans le try : une base d'authentification injoignable doit ressortir en
+    // 503 par le mapping ci-dessous, pas en trace d'exécution.
+    if (!await sessionDeLaRequete(req)) {
+      return res.status(401).json({ message: 'Authentification requise.' });
+    }
+
     if (req.method === 'GET') {
       return res.status(200).json(await loadState());
     }
