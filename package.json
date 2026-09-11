@@ -12,8 +12,8 @@
     "start": "python3 -m http.server 8080"
   },
   "dependencies": {
-    "better-auth": "^1.6.23",
-    "pg": "^8.22.0"
+    "better-auth": "^1.7.3",
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
