@@ -3,6 +3,8 @@
 // protégées par un code d'accès ; la clé publishable ci-dessous est publique
 // par conception (le contrôle d'accès est fait côté serveur).
 
+import { pickPersisted } from './persisted.js';
+
 export const SUPABASE_URL = 'https://eeldkggxvkvpvumwvkca.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_6lJ88JCHt4n_lvxQ0UC3qg_c7zz-TV7';
 
@@ -84,9 +86,8 @@ export function loadRemoteState(code) {
 }
 
 export function saveRemoteState(code, state) {
-  // On n'envoie que les champs persistés (pas de dérivés)
-  const { params, formations, team, openDays, dayAssignments, inscriptions } = state;
-  const payload = { params, formations, team, openDays, dayAssignments, inscriptions };
+  // On n'envoie que les champs persistés (pas de dérivés) — liste dans js/persisted.js
+  const payload = pickPersisted(state);
   if (apiMode) return apiState('PUT', payload);
   return rpc('efi_save_state', { p_code: code, p_state: payload });
 }
