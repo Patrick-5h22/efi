@@ -18,11 +18,17 @@ on:
 
 jobs:
   fumee:
-    # deployment_status est émis à chaque changement d'état : on ne réagit
-    # qu'aux succès, sinon le job tourne aussi sur les échecs et les « pending ».
+    # Deux filtres, tous deux nécessaires :
+    #  - « state == success » car deployment_status est émis à chaque
+    #    changement d'état, y compris « pending » et « failure » ;
+    #  - environnement de PRODUCTION uniquement. Les déploiements de
+    #    prévisualisation sont derrière l'authentification Vercel et répondent
+    #    302 vers son SSO : les interroger ne dirait rien de l'application.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event.deployment_status.state == 'success'
+      (github.event.deployment_status.state == 'success' &&
+       contains(fromJSON('["Production", "production"]'),
+                github.event.deployment_status.environment))
     runs-on: ubuntu-latest
     steps:
       - name: Déterminer l’URL
@@ -39,6 +45,10 @@ jobs:
           code=$(curl -sS -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 3 \
             --retry-all-errors "${{ steps.cible.outputs.url }}/")
           echo "GET / → $code"
+          if [ "$code" = "302" ] || [ "$code" = "401" ]; then
+            echo "::error::Déploiement protégé (redirection vers le SSO Vercel) : ce n’est pas la production."
+            exit 1
+          fi
           [ "$code" = "200" ]
 
       - name: Les modules du moteur sont servis
