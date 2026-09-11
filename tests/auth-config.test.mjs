@@ -117,17 +117,75 @@ test('vercel.json : toutes les routes /api/auth/* réécrites vers la fonction',
   );
 });
 
-test('/api/state : refuse sans session (401)', async () => {
-  const stateRoute = await import('../api/state.js');
-  let statusCode = null;
-  let payload = null;
-  const res = {
-    status(c) { statusCode = c; return this; },
-    json(p) { payload = p; return this; },
-    setHeader() {},
+// Réponse Vercel simulée : on ne retient que ce que les routes en font.
+function reponse() {
+  const r = {
+    code: null,
+    corps: null,
+    status(c) { r.code = c; return r; },
+    json(p) { r.corps = p; return r; },
+    setHeader() { return r; },
   };
-  // Requête sans cookie de session → getSession renvoie null sans toucher la base
-  await stateRoute.default({ method: 'GET', headers: {} }, res);
-  assert.equal(statusCode, 401);
-  assert.match(payload.message, /authentification/i);
-});
+  return r;
+}
+
+// getSession remplacé le temps d'un test. L'objet auth étant partagé par
+// import, les routes voient le remplacement sans injection de dépendance.
+async function avecSession(faux, fn) {
+  const vrai = auth.api.getSession;
+  auth.api.getSession = faux;
+  try {
+    await fn();
+  } finally {
+    auth.api.getSession = vrai;
+  }
+}
+
+for (const [nom, module] of [['/api/state', '../api/state.js'], ['/api/prefs', '../api/prefs.js']]) {
+  test(`${nom} : sans session, 401 — jamais d’accès`, async () => {
+    const route = await import(module);
+    const res = reponse();
+    await avecSession(async () => null, async () => {
+      await route.default({ method: 'GET', headers: {} }, res);
+    });
+    assert.equal(res.code, 401);
+    assert.match(res.corps.message, /authentification/i);
+  });
+
+  // Une panne de la base d'authentification n'est pas un refus, et ne doit pas
+  // non plus laisser fuir la trace d'exécution de better-auth en 500.
+  test(`${nom} : base d’authentification injoignable → 503 explicite`, async () => {
+    const route = await import(module);
+    const res = reponse();
+    await avecSession(
+      async () => { throw new Error('connect ECONNREFUSED 127.0.0.1:5432'); },
+      async () => { await route.default({ method: 'GET', headers: {} }, res); },
+    );
+    assert.equal(res.code, 503, 'indisponibilité, pas erreur serveur');
+    assert.match(res.corps.message, /authentification indisponible/i);
+    assert.equal(typeof res.corps.message, 'string');
+    assert.ok(!('stack' in res.corps), 'aucune trace d’exécution dans la réponse');
+  });
+
+  // Sans stub, avec le vrai better-auth et DATABASE_URL sur un port fermé.
+  // Peu importe que la version amont interroge la base sans cookie (1.7) ou
+  // réponde sans y toucher (1.6) : dans les deux cas la route doit rendre un
+  // refus ou une indisponibilité, jamais un accès ni une exception qui remonte.
+  // C'est exactement ce qui a cassé au passage de better-auth 1.6 à 1.7.
+  test(`${nom} : requête anonyme réelle — ni accès, ni exception`, async () => {
+    const route = await import(module);
+    const res = reponse();
+    await route.default({ method: 'GET', headers: {} }, res);
+    assert.ok([401, 503].includes(res.code), `code maîtrisé attendu, reçu ${res.code}`);
+    assert.equal(typeof res.corps?.message, 'string', 'message JSON exploitable');
+  });
+
+  // Le point d'entrée doit être le même partout : une route qui appellerait
+  // getSession en direct retomberait dans le 500 non maîtrisé.
+  test(`${nom} : passe par sessionDeLaRequete`, async () => {
+    const { readFile } = await import('node:fs/promises');
+    const src = await readFile(new URL(module, import.meta.url), 'utf8');
+    assert.match(src, /sessionDeLaRequete\(req\)/, 'session lue par le point d’entrée commun');
+    assert.ok(!/auth\.api\.getSession/.test(src), 'pas d’appel direct à getSession');
+  });
+}

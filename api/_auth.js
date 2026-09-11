@@ -12,6 +12,7 @@
 
 import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
+import { fromNodeHeaders } from 'better-auth/node';
 import pg from 'pg';
 import { parseAllowedGroups, parseGroupRoles, isAllowed, roleFromGroups } from './_groups.js';
 
@@ -156,3 +157,27 @@ export const auth = betterAuth({
   // déploiement courant (permet aussi de tester l'auth sur les previews).
   trustedOrigins: [...new Set([baseURL, prodURL, deployURL].filter(Boolean))],
 });
+
+// Session de la requête, ou null si elle n'est pas authentifiée.
+//
+// Point d'entrée unique de toutes les routes protégées, parce qu'il y a deux
+// issues à ne jamais confondre :
+//
+//   pas de session   → 401, l'appelant doit se connecter ;
+//   base injoignable → 503, personne n'est en cause et il faut réessayer.
+//
+// Sans ce garde-fou, une panne de la base d'authentification remonte en 500
+// avec la trace d'exécution de better-auth : on annonce une panne serveur
+// pour ce qui est une indisponibilité passagère, et on expose l'interne.
+// Le détail de l'implémentation amont compte d'autant plus qu'il bouge :
+// selon la version, better-auth interroge la base même sans cookie.
+export async function sessionDeLaRequete(req) {
+  try {
+    const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+    return session?.user ? session : null;
+  } catch (e) {
+    const panne = new Error(`Service d’authentification indisponible : ${e.message}`);
+    panne.status = 503;
+    throw panne;
+  }
+}

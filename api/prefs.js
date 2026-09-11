@@ -4,8 +4,7 @@
 //   GET /api/prefs                     → { kpiScope }
 //   PUT /api/prefs { kpiScope }        → { ok: true }
 
-import { fromNodeHeaders } from 'better-auth/node';
-import { auth } from './_auth.js';
+import { sessionDeLaRequete } from './_auth.js';
 import pg from 'pg';
 
 const pool = new pg.Pool({
@@ -16,12 +15,13 @@ const pool = new pg.Pool({
 const KPI_SCOPES = ['periode', 'semaine', 'mois'];
 
 export default async function handler(req, res) {
-  const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
-  if (!session?.user) {
-    return res.status(401).json({ message: 'Authentification requise.' });
-  }
-
   try {
+    // Dans le try, comme /api/state : base d'authentification injoignable → 503.
+    const session = await sessionDeLaRequete(req);
+    if (!session) {
+      return res.status(401).json({ message: 'Authentification requise.' });
+    }
+
     if (req.method === 'GET') {
       const r = await pool.query(
         'select kpi_scope from planning.user_prefs where user_id = $1',
@@ -44,6 +44,6 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, PUT');
     return res.status(405).json({ message: 'Méthode non autorisée.' });
   } catch (e) {
-    return res.status(500).json({ message: e.message });
+    return res.status(e.status || 500).json({ message: e.message });
   }
 }

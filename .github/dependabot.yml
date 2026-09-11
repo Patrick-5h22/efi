@@ -11,6 +11,16 @@ updates:
     commit-message:
       prefix: "deps"
     groups:
+      # eslint et @eslint/js sont soudés par une dépendance de pair :
+      # @eslint/js 10 exige eslint ^10. Séparés, les deux majeures ouvrent deux
+      # PR dont chacune fait échouer « npm ci » en ERESOLVE — donc tous les
+      # travaux, tests unitaires compris. Ce groupe est placé en PREMIER (une
+      # dépendance rejoint le premier groupe qui la reconnaît) et sans filtre
+      # update-types, pour qu'ils bougent ensemble, majeures comprises.
+      eslint:
+        patterns:
+          - eslint
+          - "@eslint/*"
       # Les mises à jour de développement ne touchent pas le produit livré :
       # une seule PR groupée, à fusionner si la CI passe.
       developpement:
