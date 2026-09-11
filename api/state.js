@@ -9,6 +9,7 @@
 
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from './_auth.js';
+import { pickPersisted } from '../js/persisted.js';
 
 const SUPABASE_URL = 'https://eeldkggxvkvpvumwvkca.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6lJ88JCHt4n_lvxQ0UC3qg_c7zz-TV7';
@@ -56,11 +57,10 @@ export default async function handler(req, res) {
       if (!state || typeof state !== 'object') {
         return res.status(400).json({ message: 'Corps de requête invalide.' });
       }
-      // On ne relaie que les champs persistés
-      const { params, formations, team, openDays, dayAssignments, inscriptions } = state;
+      // On ne relaie que les champs persistés — liste dans js/persisted.js
       return res.status(200).json(await rpc('efi_save_state', {
         p_code: code,
-        p_state: { params, formations, team, openDays, dayAssignments, inscriptions },
+        p_state: pickPersisted(state),
       }));
     }
     res.setHeader('Allow', 'GET, PUT');
