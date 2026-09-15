@@ -117,6 +117,34 @@ test('vercel.json : toutes les routes /api/auth/* réécrites vers la fonction',
   );
 });
 
+// La découverte OAuth se fait à la RACINE du domaine, pas sous le basePath de
+// better-auth : RFC 9728 pour la ressource, RFC 8414 pour le serveur
+// d'autorisation, toutes deux avec insertion du chemin après « .well-known ».
+// Le défi WWW-Authenticate pointe littéralement vers
+// /.well-known/oauth-protected-resource/api/mcp — vérifié en local contre une
+// vraie base. Sans ces réécritures, le client MCP ne trouve rien et la panne
+// est silencieuse : il abandonne l'autorisation sans message exploitable.
+test('vercel.json : la découverte OAuth est routée depuis la racine', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const cfg = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const vers = (source) => cfg.rewrites?.find((r) => r.source === source)?.destination;
+
+  for (const source of [
+    '/.well-known/oauth-protected-resource',
+    '/.well-known/oauth-protected-resource/:path*',
+    '/.well-known/oauth-authorization-server/:path*',
+  ]) {
+    assert.equal(vers(source), '/api/auth', `${source} doit être routé vers la fonction d’authentification`);
+  }
+
+  // Vercel valide ce fichier strictement : une entrée qui n'est pas un objet
+  // { source, destination } fait échouer le déploiement entier.
+  for (const r of cfg.rewrites || []) {
+    assert.equal(typeof r, 'object', 'chaque réécriture est un objet, jamais une chaîne');
+    assert.ok(r.source && r.destination, 'chaque réécriture porte source et destination');
+  }
+});
+
 // Réponse Vercel simulée : on ne retient que ce que les routes en font.
 function reponse() {
   const r = {
