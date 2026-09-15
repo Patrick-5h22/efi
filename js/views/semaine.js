@@ -72,7 +72,10 @@ export function renderSemaine(main, args) {
   // Clic sur un créneau occupé = éditer l'inscription
   main.querySelectorAll('td.slot-busy[data-insc]').forEach((td) => {
     td.style.cursor = 'pointer';
-    td.title = 'Modifier cette inscription';
+    // On AJOUTE l'affordance, on ne remplace pas : cette ligne écrasait
+    // l'infobulle de contenu — stagiaire, catégorie, statut, intervenant —
+    // qui ne s'est donc jamais affichée sur ces cellules.
+    td.title = `${td.title ? td.title + '\n' : ''}Cliquer pour modifier`;
     td.addEventListener('click', () => openInscriptionForm({ id: Number(td.dataset.insc) }));
   });
 }
@@ -116,9 +119,12 @@ function gridHTML(state, days, kind) {
 
     // Intervenant du jour : affectation manuelle, sinon déduit de l'activité (auto)
     let who;
+    let idsDuJour = new Set();
     if (!open || !inPeriod) who = '—';
-    else if (assignedId) who = esc(memberName(state, assignedId));
-    else {
+    else if (assignedId) {
+      idsDuJour = new Set([assignedId]);
+      who = esc(memberName(state, assignedId));
+    } else {
       const autoIds = new Set();
       for (const r of rows) {
         if (r.cancelled) continue;
@@ -127,10 +133,21 @@ function gridHTML(state, days, kind) {
         if (kind === 'T' && r.formation?.testOnly && r.insc.datePratique === date && r.testeurEffectif) autoIds.add(r.testeurEffectif);
       }
       if (kind === 'T' && theoryTesters.get(date)) autoIds.add(theoryTesters.get(date));
+      idsDuJour = autoIds;
       who = autoIds.size
         ? [...autoIds].map((id) => esc(memberName(state, id))).join(', ') + ' <span class="muted">(auto)</span>'
         : '<span class="who-missing">⚠ à affecter</span>';
     }
+
+    // La colonne « Intervenant » dit déjà qui tient la journée : le répéter
+    // dans chaque cellule allongeait les lignes sans rien apprendre. On ne
+    // nomme donc l'intervenant dans une cellule que s'il s'y ajoute une
+    // information : plusieurs intervenants ce jour-là, quelqu'un d'autre que
+    // celui de la colonne, ou personne d'affecté — cas qui doit se voir.
+    const nommerDansLaCellule = (id) => !(id && idsDuJour.size === 1 && idsDuJour.has(id));
+    const detailQui = (prefixe, id) => (nommerDansLaCellule(id)
+      ? `<span class="slot-detail">${prefixe}${esc(memberName(state, id) || '⚠ à affecter')}</span>`
+      : '');
 
     const cells = fusionner(slots.map((t) => {
       if (!inPeriod) return { cle: 'hors', cls: 'slot-closed', html: '—' };
@@ -145,7 +162,7 @@ function gridHTML(state, days, kind) {
         return {
           cle: 'theorie-test',
           cls: 'slot-theory',
-          html: `<span class="slot-name">THÉORIE (${n} cand.)</span><span class="slot-detail">Testeur : ${esc(memberName(state, theoryTesters.get(date)) || '?')}</span>`,
+          html: `<span class="slot-name">THÉORIE (${n} cand.)</span>${detailQui('Testeur : ', theoryTesters.get(date))}`,
         };
       }
 
@@ -153,7 +170,13 @@ function gridHTML(state, days, kind) {
       if (kind === 'F') {
         const sess = (app.schedule.theorySessions || []).filter((s) => s.date === date && t < s.fin && slotEnd > s.debut);
         if (sess.length) {
-          const label = sess.map((s) => `<span class="slot-name">THÉORIE ${esc(s.reco)} (${s.stagiaires.length})</span><span class="slot-detail">${s.type === 'Initial' ? '7h00' : '3h30'} — Form. : ${esc(memberName(state, s.formateurId) || '⚠')}</span>`).join('');
+          const label = sess.map((s) => {
+            const duree = s.type === 'Initial' ? '7h00' : '3h30';
+            const nom = nommerDansLaCellule(s.formateurId)
+              ? ` — Form. : ${esc(memberName(state, s.formateurId) || '⚠ à affecter')}` : '';
+            return `<span class="slot-name">THÉORIE ${esc(s.reco)} (${s.stagiaires.length})</span>`
+              + `<span class="slot-detail">${duree}${nom}</span>`;
+          }).join('');
           const tip = sess.map((s) => `Théorie ${s.reco} ${s.type} — ${s.stagiaires.join(', ')}`).join(' | ');
           return {
             cle: `theorie-pres:${sess.map((s) => `${s.reco}@${s.debut}`).join('+')}`,
@@ -184,15 +207,21 @@ function gridHTML(state, days, kind) {
 
       if (occupants.length) {
         const tLabel = (r) => r.formation?.testOnly ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || '');
-        const whoLabel = (r) => kind === 'F' ? 'Form. : ' + (memberName(state, r.formateurEffectif) || '?')
-          : (r.formation?.testOnly ? 'Surv. : ' : 'Testeur : ') + (memberName(state, r.testeurEffectif) || '?');
-        const label = occupants.map((r) => `<div class="cell-entry${r.formation?.testOnly ? ' cell-entry-exam' : ''}"><span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span><span class="slot-detail">${esc(whoLabel(r))}</span></div>`).join('');
+        const qui = (r) => (kind === 'F'
+          ? detailQui('Form. : ', r.formateurEffectif)
+          : detailQui(r.formation?.testOnly ? 'Surv. : ' : 'Testeur : ', r.testeurEffectif));
+        const label = occupants.map((r) => `<div class="cell-entry${r.formation?.testOnly ? ' cell-entry-exam' : ''}"><span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span>${qui(r)}</div>`).join('');
         const inscAttr = occupants.length === 1 ? ` data-insc="${occupants[0].insc.id}"` : '';
         // Épreuves surveillées (AIPR) : couleur dédiée — cellule entière si tout
         // est épreuve, sinon pastille violette sur les seules entrées AIPR
         const cls = occupants.every((r) => r.formation?.testOnly) ? 'slot-exam slot-busy' : 'slot-busy';
         const pre = occupants.every((r) => r.insc.statut === 'pre') ? ' slot-pre' : '';
-        const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}${r.formation?.testOnly ? ' (surveillance)' : ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`).join(' | ');
+        // L'intervenant entre toujours dans l'infobulle : la cellule ne le
+        // nomme plus quand il tient toute la journée, mais le survol doit
+        // répondre sans faire relire la colonne de gauche.
+        const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}`
+          + `${r.formation?.testOnly ? ' (surveillance)' : ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`
+          + ` — ${memberName(state, kind === 'F' ? r.formateurEffectif : r.testeurEffectif) || 'à affecter'}`).join(' | ');
         return {
           // Mêmes occupants, créneaux voisins : une seule cellule. Le libellé
           // s'écrit une fois pour toute la durée de la séance.

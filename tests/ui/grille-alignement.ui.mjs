@@ -42,13 +42,20 @@ await p.evaluate(() => {
       dateTestPratique: '2026-09-23', debutTestPratique: 780, testeurId: 'p2',
     },
     {
+      // Second formateur le même jour : la cellule doit alors nommer le sien.
+      id: 3, stagiaire: 'BERNARD Paul', formation: 'R489-5', type: 'Initial', statut: 'confirmee',
+      datePratique: '2026-09-23', debutPratique: 600, formateurId: 'p2',
+      dateTheorie: '2026-09-23',
+      dateTestPratique: '2026-09-23', debutTestPratique: 900, testeurId: 'p2',
+    },
+    {
       id: 2, stagiaire: 'MARTIN Léa', formation: 'R489-5', type: 'Recyclage', statut: 'pre',
       datePratique: '2026-09-24', debutPratique: 480, formateurId: 'p1',
       dateTheorie: '2026-09-24',
       dateTestPratique: '2026-09-24', debutTestPratique: 810, testeurId: 'p2',
     },
   ];
-  st.nextId = 3;
+  st.nextId = 4;
   localStorage.setItem('efi-planning-v1', JSON.stringify(st));
 });
 
@@ -69,12 +76,15 @@ const mesure = await p.evaluate(() => {
     })),
     lignes: [...t.querySelectorAll('tr')].slice(1).map((tr) => ({
       jour: tr.querySelector('td.day-col')?.textContent.trim().slice(0, 9),
+      intervenant: tr.querySelector('td.who-col')?.textContent.trim(),
+      hauteurJour: Math.round(tr.querySelector('td.day-col')?.getBoundingClientRect().height || 0),
       colonnes: [...tr.querySelectorAll('td')].slice(2)
         .reduce((n, td) => n + (Number(td.getAttribute('colspan')) || 1), 0),
       cellules: [...tr.querySelectorAll('td')].slice(2).map((td) => ({
         cls: td.className,
         span: Number(td.getAttribute('colspan')) || 1,
         texte: td.textContent.trim(),
+        titre: td.getAttribute('title') || '',
       })),
     })),
   }));
@@ -114,8 +124,9 @@ check('un jour fermé tient en une seule cellule', fermees.length === 1 && ferme
 // Une séance écrit son libellé une fois, sur une cellule fusionnée.
 const mercredi = f.lignes.find((l) => l.jour?.startsWith('Mer'));
 const seances = mercredi?.cellules.filter((c) => c.cls.includes('slot-busy')) || [];
-check('la séance de pratique est une cellule fusionnée', seances.length === 1 && seances[0].span > 1,
-  `${seances.length} cellule(s), colspan ${seances[0]?.span}`);
+check('chaque séance de pratique est une cellule fusionnée',
+  seances.length === 2 && seances.every((c) => c.span > 1),
+  `${seances.length} cellule(s), colspan ${seances.map((c) => c.span).join(' et ')}`);
 check('le nom du stagiaire n’est écrit qu’une fois sur la ligne',
   (mercredi?.cellules.filter((c) => c.texte.includes('DURAND Thomas')).length || 0) === 1);
 
@@ -124,6 +135,20 @@ const jeudi = f.lignes.find((l) => l.jour?.startsWith('Jeu'));
 const pre = jeudi?.cellules.find((c) => c.texte.includes('MARTIN Léa'));
 check('une pré-réservation fusionnée reste jaune (slot-pre)', !!pre && pre.cls.includes('slot-pre'),
   pre?.cls || 'absente');
+
+// L'intervenant n'est nommé dans une cellule que s'il y apprend quelque chose.
+check('jeudi ne compte qu’un intervenant', jeudi?.intervenant?.includes('MEDAN')
+  && !jeudi?.intervenant?.includes('GARCIA'), jeudi?.intervenant);
+check('il n’est alors pas répété dans la cellule', !!pre && !pre.texte.includes('MEDAN'),
+  pre?.texte.replace(/\s+/g, ' '));
+check('mais l’infobulle le donne toujours', !!pre && pre.titre.includes('MEDAN Dominique'), pre?.titre);
+
+// Mercredi : deux formateurs, la cellule doit dire lequel.
+const deuxFormateurs = mercredi?.intervenant?.includes('MEDAN') && mercredi?.intervenant?.includes('GARCIA');
+check('mercredi compte deux intervenants', deuxFormateurs, mercredi?.intervenant);
+const nommees = mercredi?.cellules.filter((c) => c.cls.includes('slot-busy')) || [];
+check('chaque cellule nomme alors le sien', nommees.length === 2 && nommees.every((c) => c.texte.includes('Form. :')),
+  nommees.map((c) => c.texte.replace(/\s+/g, ' ')).join(' / '));
 
 // Le test théorique de la grille testeur couvre son heure d'un seul bloc.
 const theorie = t.lignes.flatMap((l) => l.cellules).filter((c) => c.cls.includes('slot-theory'));
