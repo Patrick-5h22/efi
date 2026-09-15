@@ -9,7 +9,17 @@ Transport « Streamable HTTP » sans session : chaque requête est autonome et
 authentifiée par son propre jeton. Pas de flux SSE — aucun des deux outils
 n'en a besoin.
 
-## Mise en service
+Deux authentifications cohabitent le temps de la bascule :
+
+| | |
+|---|---|
+| **OAuth 2.1** | l'utilisateur se connecte avec son compte Microsoft CIPECMA. Administrable depuis une organisation Claude Team. |
+| **Jeton statique** | un jeton nominatif déclaré sur Vercel. Ce qui tourne aujourd'hui. |
+
+L'OAuth est essayé en premier, le jeton statique sert de repli. Rien ne casse
+tant que la bascule n'est pas faite.
+
+## Mise en service — jetons statiques
 
 Un jeton par commercial, déclaré **côté serveur uniquement**, dans les
 variables d'environnement du projet Vercel :
@@ -29,6 +39,72 @@ MCP passe par le même module que l'application (`api/_planning.js`).
 
 Côté client, déclarer un serveur MCP distant avec l'en-tête
 `Authorization: Bearer <jeton>`.
+
+## Mise en service — OAuth 2.1
+
+Ce mode remplace les jetons partagés par les comptes Microsoft de chacun.
+L'utilisateur se connecte comme sur l'application ; les groupes Entra
+autorisés et les rôles s'appliquent de la même façon, et un départ coupe
+l'accès MCP sans intervention.
+
+### L'ordre compte, et il n'est pas rattrapable à chaud
+
+> **Le SQL d'abord, la variable ensuite.**
+>
+> Better Auth contrôle le schéma au démarrage et lève une exception **non
+> capturée** si une table manque. `api/_auth.js` étant importé par
+> `/api/state`, `/api/prefs` et `/api/auth`, mettre `MCP_OAUTH` à `1` avant
+> d'avoir appliqué la migration ne casserait pas seulement le MCP : **ça
+> couperait l'authentification de toute l'application**.
+
+1. Appliquer `docs/migrations/001-planning-auth.sql` sur le Postgres Supabase.
+   Huit tables dans un schéma `planning_auth` séparé ; aucune table partagée
+   avec efi-placement n'est touchée.
+2. Vérifier que les tables sont là.
+3. Seulement alors, poser `MCP_OAUTH=1` sur Vercel et redéployer.
+
+### Vérifier que la découverte répond
+
+```bash
+D=https://efi-rho.vercel.app
+curl -s $D/.well-known/oauth-protected-resource/api/mcp | head -c 200
+curl -s $D/.well-known/oauth-authorization-server/api/auth | head -c 200
+curl -sI -X POST $D/api/mcp -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"ping"}' | grep -i www-authenticate
+```
+
+Les deux premières doivent renvoyer du JSON, la troisième un en-tête
+`Bearer resource_metadata="…/.well-known/oauth-protected-resource/api/mcp"`.
+C'est cet en-tête qui dit au client où commencer : **sans lui, le client
+abandonne l'autorisation sans message exploitable.**
+
+### Côté Claude Team
+
+L'administrateur ajoute un connecteur personnalisé pointant sur
+`https://efi-rho.vercel.app/api/mcp`. Rien d'autre à saisir : le client
+s'enregistre tout seul (enregistrement dynamique, RFC 7591), puis chaque
+utilisateur se connecte avec son compte CIPECMA et accorde l'accès sur
+l'écran `/consent`.
+
+Entra ID ne pouvait pas tenir ce rôle directement : le flux de Claude exige
+l'enregistrement dynamique de client, qu'Entra ne propose pas publiquement.
+Better Auth est donc le serveur d'autorisation, avec Entra en amont.
+
+### Deux pièges à connaître
+
+- **Ne tournez pas `BETTER_AUTH_SECRET`.** La clé privée de signature des
+  jetons est chiffrée avec ce secret. Le changer rend les clés illisibles et
+  l'émission de jetons tombe en 500. Si c'est inévitable, vider la table
+  `planning_auth.jwks` dans la foulée : une nouvelle clé sera générée, et les
+  jetons déjà émis seront invalidés.
+- **Une URL de rappel en `http` n'est admise que pour un client « native ».**
+  Un client « web » exige `https`. Claude est en `https`, donc non concerné.
+
+### Retirer les jetons statiques
+
+Une fois la bascule vérifiée avec au moins un commercial, supprimer
+`MCP_TOKENS` de Vercel et redéployer. La route continue de fonctionner en
+OAuth seul, et la traçabilité ne dépend plus de la discipline de distribution.
 
 ## Les deux outils
 
@@ -86,6 +162,8 @@ dépôt.
   Aucune grille tarifaire par produit n'existe à ce jour.
 - **Pas de péremption automatique** des pré-réservations : une ligne oubliée
   bloque son créneau jusqu'à ce qu'on l'annule à la main.
-- **Jetons partagés, pas de comptes nominatifs** : la traçabilité vaut ce que
-  vaut la discipline de distribution des jetons. Un rattachement aux comptes
-  Entra de l'application serait plus solide.
+- **Jetons partagés, pas de comptes nominatifs** — *résolu par l'OAuth, tant
+  qu'il est activé.* En jeton statique, la traçabilité vaut ce que vaut la
+  discipline de distribution : `reservePar` porte l'étiquette du jeton. En
+  OAuth, il porte l'identité réelle, et un départ coupe l'accès par Entra.
+  Cette limite ne disparaît vraiment qu'une fois `MCP_TOKENS` retiré.

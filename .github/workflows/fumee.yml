@@ -96,6 +96,28 @@ jobs:
             *) echo "::error::la route MCP répond $code sans jeton"; exit 1 ;;
           esac
 
+      - name: La découverte OAuth est servie depuis la racine
+        run: |
+          set -euo pipefail
+          # RFC 9728 et 8414 : ces documents se servent à la RACINE du domaine,
+          # avec le chemin inséré après « .well-known ». Ils dépendent de
+          # réécritures dans vercel.json — sans elles, le client MCP ne trouve
+          # rien et abandonne l’autorisation SANS message exploitable. C’est
+          # exactement le genre de panne qu’aucun test unitaire ne voit.
+          #
+          # Tant que MCP_OAUTH n’est pas activé, le plugin n’est pas chargé et
+          # ces routes répondent 404 : c’est normal, on ne fait alors que
+          # vérifier qu’elles ne cassent pas le déploiement.
+          for c in /.well-known/oauth-protected-resource/api/mcp \
+                   /.well-known/oauth-authorization-server/api/auth; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "${{ steps.cible.outputs.url }}$c")
+            echo "$c → $code"
+            case "$code" in
+              200|404) ;;
+              *) echo "::error::$c répond $code — ni servi, ni proprement absent"; exit 1 ;;
+            esac
+          done
+
       - name: La route MCP refuse un mauvais jeton
         run: |
           set -euo pipefail
