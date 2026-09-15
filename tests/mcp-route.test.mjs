@@ -133,6 +133,28 @@ test('route : les deux jetons déclarés sont acceptés', async () => {
   }
 });
 
+// docs/MCP.md recommande « openssl rand -base64 32 », dont la sortie se
+// termine par « = » de remplissage et peut contenir « + » et « / ». Or
+// MCP_TOKENS sépare le nom du jeton sur un « = » : découper sur TOUS les « = »
+// au lieu du premier tronquerait le jeton déclaré à son remplissage, et la
+// route accepterait alors une version raccourcie. Ce test épingle le contrat.
+test('route : un jeton base64 est reconnu entier, remplissage compris', async () => {
+  const base64 = 'aG5Ke3+dPq/R4tZmXcV1wLsN8yUb2EfGhIjKlMnOpQr=';
+  process.env.MCP_TOKENS = `Commercial Base64=${base64}`;
+
+  const bon = await rpc({ jsonrpc: '2.0', id: 1, method: 'ping' }, base64);
+  assert.equal(bon.status, 200, 'le jeton complet doit être accepté');
+
+  // Le même jeton amputé de son remplissage ne doit PAS passer : c'est le
+  // signe qu'on compare bien la valeur entière.
+  const tronque = await rpc({ jsonrpc: '2.0', id: 1, method: 'ping' }, base64.replace(/=+$/, ''));
+  assert.equal(tronque.status, 401, 'un jeton tronqué au remplissage doit être refusé');
+
+  // Et la partie avant le premier « = » — ici le nom — n'ouvre évidemment rien.
+  const nom = await rpc({ jsonrpc: '2.0', id: 1, method: 'ping' }, 'Commercial Base64');
+  assert.equal(nom.status, 401);
+});
+
 test('route : sans MCP_TOKENS, la route est fermée (503) et non ouverte', async () => {
   delete process.env.MCP_TOKENS;
   const r = await rpc({ jsonrpc: '2.0', id: 1, method: 'ping' });
