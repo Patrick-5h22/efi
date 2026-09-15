@@ -8,6 +8,7 @@ import { periodWeeks, weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isW
 import { unionDuration } from '../engine.js';
 import { chargeComptee, chevauchePause } from '../config.js';
 import { openInscriptionForm } from './form.js';
+import { largeurMinGrille } from './grille.js';
 
 export function renderSemaine(main, args) {
   const state = app.state;
@@ -76,6 +77,27 @@ export function renderSemaine(main, args) {
   });
 }
 
+// Réunit les créneaux voisins qui disent la même chose en une seule cellule.
+//
+// Sans cela, une séance d'une heure occupe deux colonnes de trente minutes et
+// y répète son libellé — nom du stagiaire, catégorie, intervenant — deux fois,
+// et un jour fermé écrit « FERMÉ » dix-huit fois. Ce contenu répété élargissait
+// les colonnes occupées et rétrécissait les autres : les deux grilles
+// n'avaient plus les mêmes largeurs, et 10:00 chez le formateur ne tombait pas
+// sous 10:00 chez le testeur.
+//
+// Une case de clé « null » ne fusionne jamais (les créneaux libres restent
+// cliquables à leur propre heure).
+function fusionner(cases) {
+  const groupes = [];
+  for (const c of cases) {
+    const dernier = groupes[groupes.length - 1];
+    if (dernier && c.cle != null && dernier.cle === c.cle) { dernier.n += 1; continue; }
+    groupes.push({ ...c, n: 1 });
+  }
+  return groupes.map((g) => `<td class="${g.cls}"${g.n > 1 ? ` colspan="${g.n}"` : ''}${g.attrs || ''}>${g.html}</td>`).join('');
+}
+
 // Construit la grille (kind = 'F' formateur, 'T' testeur)
 function gridHTML(state, days, kind) {
   const slots = daySlots(state.params);
@@ -110,17 +132,21 @@ function gridHTML(state, days, kind) {
         : '<span class="who-missing">⚠ à affecter</span>';
     }
 
-    const cells = slots.map((t) => {
-      if (!inPeriod) return `<td class="slot-closed">—</td>`;
-      if (isWeekend(date) || holiday) return `<td class="slot-closed">FÉRIÉ</td>`;
-      if (!open) return `<td class="slot-closed">FERMÉ</td>`;
+    const cells = fusionner(slots.map((t) => {
+      if (!inPeriod) return { cle: 'hors', cls: 'slot-closed', html: '—' };
+      if (isWeekend(date) || holiday) return { cle: 'ferie', cls: 'slot-closed', html: 'FÉRIÉ' };
+      if (!open) return { cle: 'ferme', cls: 'slot-closed', html: 'FERMÉ' };
       const slotEnd = t + state.params.slotMinutes;
 
       // Théorie (grille testeur uniquement)
       if (kind === 'T' && theoryTesters.has(date)
         && t < theoryEnd && slotEnd > state.params.theoryTime) {
         const n = app.schedule.theoryCandidates(date);
-        return `<td class="slot-theory"><span class="slot-name">THÉORIE (${n} cand.)</span><span class="slot-detail">Testeur : ${esc(memberName(state, theoryTesters.get(date)) || '?')}</span></td>`;
+        return {
+          cle: 'theorie-test',
+          cls: 'slot-theory',
+          html: `<span class="slot-name">THÉORIE (${n} cand.)</span><span class="slot-detail">Testeur : ${esc(memberName(state, theoryTesters.get(date)) || '?')}</span>`,
+        };
       }
 
       // Sessions de théorie présentielle (grille formateur)
@@ -129,7 +155,12 @@ function gridHTML(state, days, kind) {
         if (sess.length) {
           const label = sess.map((s) => `<span class="slot-name">THÉORIE ${esc(s.reco)} (${s.stagiaires.length})</span><span class="slot-detail">${s.type === 'Initial' ? '7h00' : '3h30'} — Form. : ${esc(memberName(state, s.formateurId) || '⚠')}</span>`).join('');
           const tip = sess.map((s) => `Théorie ${s.reco} ${s.type} — ${s.stagiaires.join(', ')}`).join(' | ');
-          return `<td class="slot-theory" title="${esc(tip)}">${label}</td>`;
+          return {
+            cle: `theorie-pres:${sess.map((s) => `${s.reco}@${s.debut}`).join('+')}`,
+            cls: 'slot-theory',
+            attrs: ` title="${esc(tip)}"`,
+            html: label,
+          };
         }
       }
 
@@ -162,17 +193,31 @@ function gridHTML(state, days, kind) {
         const cls = occupants.every((r) => r.formation?.testOnly) ? 'slot-exam slot-busy' : 'slot-busy';
         const pre = occupants.every((r) => r.insc.statut === 'pre') ? ' slot-pre' : '';
         const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}${r.formation?.testOnly ? ' (surveillance)' : ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`).join(' | ');
-        return `<td class="${cls}${pre}"${inscAttr} title="${esc(tip)}">${label}</td>`;
+        return {
+          // Mêmes occupants, créneaux voisins : une seule cellule. Le libellé
+          // s'écrit une fois pour toute la durée de la séance.
+          cle: `occ:${occupants.map((r) => r.insc.id).join('+')}:${cls}${pre}`,
+          cls: `${cls}${pre}`,
+          attrs: `${inscAttr} title="${esc(tip)}"`,
+          html: label,
+        };
       }
 
       // Pause déjeuner : peinte seulement sur les créneaux restés libres — une
       // séance déjà posée dessus reste visible, son anomalie la signale.
       if (chevauchePause(state.params, t, slotEnd)) {
-        return `<td class="slot-pause" title="Pause déjeuner">PAUSE</td>`;
+        return { cle: 'pause', cls: 'slot-pause', attrs: ' title="Pause déjeuner"', html: 'PAUSE' };
       }
 
-      return `<td class="slot-free" data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button" aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"></td>`;
-    }).join('');
+      // Jamais fusionné : chaque créneau libre est cliquable à son heure.
+      return {
+        cle: null,
+        cls: 'slot-free',
+        attrs: ` data-date="${date}" data-time="${t}" data-kind="${kind}" tabindex="0" role="button"`
+          + ` aria-label="Créneau libre ${fmtDateDay(date)} ${fmtTime(t)}"`,
+        html: '',
+      };
+    }));
 
     // Charge de formation pratique du jour, PAR formateur — en temps de
     // séance (union des intervalles : 2 stagiaires simultanés = 1 séance).
@@ -201,5 +246,8 @@ function gridHTML(state, days, kind) {
     return `<tr><td class="day-col">${fmtDateDay(date)}${loadInfo}</td><td class="who-col">${who}</td>${cells}</tr>`;
   }).join('');
 
-  return `<table class="planning">${head}${body}</table>`;
+  // Les deux grilles ont le même nombre de créneaux, donc la même largeur
+  // minimale, donc les mêmes heures aux mêmes abscisses — l'une sous l'autre.
+  const largeurMin = largeurMinGrille(slots.length, { intervenant: true });
+  return `<table class="planning" style="min-width:${largeurMin}px">${head}${body}</table>`;
 }
