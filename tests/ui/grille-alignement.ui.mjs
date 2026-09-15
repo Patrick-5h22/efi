@@ -42,6 +42,14 @@ await p.evaluate(() => {
       dateTestPratique: '2026-09-23', debutTestPratique: 780, testeurId: 'p2',
     },
     {
+      // Même créneau que DURAND, même catégorie : R489 Cat 3 admet deux
+      // stagiaires (capacité 2). La cellule porte donc DEUX inscriptions.
+      id: 4, stagiaire: 'PETIT Sophie', formation: 'R489-3', type: 'Initial', statut: 'confirmee',
+      datePratique: '2026-09-23', debutPratique: 480, formateurId: 'p1',
+      dateTheorie: '2026-09-23',
+      dateTestPratique: '2026-09-23', debutTestPratique: 840, testeurId: 'p2',
+    },
+    {
       // Second formateur le même jour : la cellule doit alors nommer le sien.
       id: 3, stagiaire: 'BERNARD Paul', formation: 'R489-5', type: 'Initial', statut: 'confirmee',
       datePratique: '2026-09-23', debutPratique: 600, formateurId: 'p2',
@@ -55,7 +63,7 @@ await p.evaluate(() => {
       dateTestPratique: '2026-09-24', debutTestPratique: 810, testeurId: 'p2',
     },
   ];
-  st.nextId = 4;
+  st.nextId = 5;
   localStorage.setItem('efi-planning-v1', JSON.stringify(st));
 });
 
@@ -85,6 +93,9 @@ const mesure = await p.evaluate(() => {
         span: Number(td.getAttribute('colspan')) || 1,
         texte: td.textContent.trim(),
         titre: td.getAttribute('title') || '',
+        // Points d'entrée : une porte par inscription, jamais sur la cellule
+        entrees: [...td.querySelectorAll('.cell-entry[data-insc]')].map((e) => e.dataset.insc),
+        celluleCablee: td.hasAttribute('data-insc'),
       })),
     })),
   }));
@@ -154,6 +165,30 @@ check('chaque cellule nomme alors le sien', nommees.length === 2 && nommees.ever
 const theorie = t.lignes.flatMap((l) => l.cellules).filter((c) => c.cls.includes('slot-theory'));
 check('le test théorique tient en une cellule par jour', theorie.length > 0 && theorie.every((c) => c.span > 1),
   theorie.map((c) => `colspan ${c.span}`).join(', ') || 'aucune');
+
+// Une séance à deux stagiaires doit offrir deux portes, pas zéro.
+//
+// Régression : seule la cellule était cliquable, et seulement quand elle ne
+// portait qu'une inscription — le formulaire n'en éditant qu'une, le code
+// préférait ne rien poser plutôt que de choisir à l'aveugle. Une séance à
+// deux stagiaires n'était donc pas modifiable depuis la grille.
+const cellule2 = mercredi?.cellules.find((c) => c.texte.includes('DURAND Thomas'));
+check('une séance à deux stagiaires porte bien les deux',
+  !!cellule2 && cellule2.texte.includes('PETIT Sophie'), cellule2?.texte.replace(/\s+/g, ' '));
+check('…et offre un point d’entrée par inscription', cellule2?.entrees.length === 2,
+  `${cellule2?.entrees.length} entrée(s) : ${cellule2?.entrees.join(', ')}`);
+check('la cellule elle-même n’est pas câblée (sinon double ouverture)',
+  [...f.lignes, ...t.lignes].every((l) => l.cellules.every((c) => !c.celluleCablee)));
+
+// Et le clic ouvre bien l'inscription de CETTE ligne, pas de l'autre.
+const lignes2 = p.locator('#main td.slot-busy .cell-entry[data-insc]')
+  .filter({ hasText: 'PETIT Sophie' });
+await lignes2.first().click();
+await p.waitForTimeout(500);
+const saisi = await p.locator('dialog[open] input[name=stagiaire]').inputValue().catch(() => '');
+check('cliquer une ligne ouvre l’inscription de ce stagiaire', saisi === 'PETIT Sophie', saisi || 'aucun formulaire');
+await p.keyboard.press('Escape');
+await p.waitForTimeout(300);
 
 await p.screenshot({ path: artefact('grille-alignement.png'), fullPage: true });
 check('aucune erreur JS', errs.length === 0, errs.join(' ; '));
