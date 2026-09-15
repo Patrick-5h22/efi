@@ -327,7 +327,7 @@ table.planning th, table.planning td {
 }
 table.planning th { background: var(--muted); font-size: 10.5px; color: var(--muted-foreground); }
 table.planning th.day-col, table.planning td.day-col {
-  text-align: left; width: 104px; font-weight: 600;
+  text-align: left; width: 126px; font-weight: 600;
   background: var(--muted); position: sticky; left: 0; z-index: 1;
   color: var(--foreground);
 }

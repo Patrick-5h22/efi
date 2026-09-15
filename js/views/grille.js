@@ -9,7 +9,9 @@
 // La largeur fixe supprimant tout plancher par cellule, c'est au tableau de
 // porter sa largeur minimale ; en deçà, c'est à son conteneur de défiler.
 
-export const LARGEUR_JOUR = 104;      // colonne « Jour »
+// « Jour » porte la date ET la charge du jour par formateur
+// (« MEDAN 01h30 / 06h00 ») : plus étroite, cette ligne passait sur deux.
+export const LARGEUR_JOUR = 126;      // colonne « Jour »
 export const LARGEUR_QUI = 112;       // colonne « Intervenant », quand elle existe
 export const LARGEUR_CRENEAU = 58;    // une demi-heure
 
