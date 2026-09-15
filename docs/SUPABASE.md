@@ -20,6 +20,27 @@ local du navigateur).
   `planning.settings` (jamais dans le dépôt). RLS activé sur toutes les
   tables, sans politique : accès direct impossible, même avec la clé anon.
 
+### ⚠ Un champ nouveau exige une colonne ET une mise à jour des RPC
+
+Le schéma est **relationnel**, pas un document JSON : `efi_save_state` écrit
+une liste de colonnes explicite et `efi_load_state` reconstruit le JSON depuis
+ces colonnes. Un champ ajouté côté application est donc **accepté sans erreur
+et perdu en silence** tant que la colonne n'existe pas et que les deux
+fonctions ne la mentionnent pas.
+
+Le corps des RPC ne se trouve pas dans ce dépôt, et aucun test ne peut voir ce
+manque : les tests remplacent Supabase par un faux qui garde tout ce qu'on lui
+donne. C'est ainsi que neuf champs ont été perdus sans bruit — dont le chiffre
+d'affaires, le n° de dossier YPAREO et la traçabilité des pré-réservations
+(voir `docs/migrations/002-colonnes-inscriptions.sql`).
+
+**Avant d'ajouter un champ à `js/persisted.js` ou à une inscription**, vérifier
+ce que la base rend réellement — en lecture seule, sans rien écrire :
+
+```
+EFI_ACCESS_CODE='…' npm run persistance
+```
+
 ## Authentification (Better Auth)
 
 Sur le site déployé (Vercel), l'accès au planning exige un **compte
