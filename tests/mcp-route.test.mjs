@@ -189,6 +189,30 @@ test('route : MCP_OAUTH actif, sans jeton le défi mène aux métadonnées', asy
   }
 });
 
+// Le cas que mon test précédent manquait, et que seule la production a
+// montré : SANS MCP_TOKENS, c'est-à-dire en OAuth seul — la configuration
+// cible une fois la bascule finie — identifierCommercial lève un 503, pas un
+// 401. Le défi était pose sur le statut de l'erreur au lieu du statut final,
+// donc il n'était jamais envoyé dans le seul cas qui compte. Le connecteur
+// recevait un 401 nu et abandonnait sans savoir qu'un flux existait.
+test('route : OAuth seul, sans MCP_TOKENS, le défi est quand même posé', async () => {
+  process.env.MCP_OAUTH = '1';
+  delete process.env.MCP_TOKENS;
+  try {
+    for (const jeton of [null, 'jeton-invente']) {
+      const r = await rpc({ jsonrpc: '2.0', id: 1, method: 'ping' }, jeton);
+      assert.equal(r.status, 401, 'la route attend une autorisation, elle n’est pas fermée');
+      assert.match(
+        r.headers.get('www-authenticate') || '',
+        /resource_metadata="[^"]+\/\.well-known\/oauth-protected-resource\/api\/mcp"/,
+        `défi manquant ou incomplet pour jeton=${jeton}`,
+      );
+    }
+  } finally {
+    delete process.env.MCP_OAUTH;
+  }
+});
+
 test('route : MCP_OAUTH actif, un jeton non déclaré n’ouvre rien', async () => {
   process.env.MCP_OAUTH = '1';
   try {
