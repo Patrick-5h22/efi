@@ -11,6 +11,7 @@
 // dont aucun des deux outils n'a besoin.
 
 import { identifierCommercial } from './_mcp-auth.js';
+import { oauthActif, identifierParOAuth, defiOAuth } from './_mcp-oauth.js';
 import { loadState, saveState, gardeSavedAt } from './_planning.js';
 import { outils, chercherCreneaux, preReserver } from '../js/mcp.js';
 
@@ -125,12 +126,39 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Serveur MCP : POST uniquement (transport sans session, pas de flux SSE).' });
   }
 
-  let commercial;
-  try {
-    commercial = identifierCommercial(req);
-  } catch (e) {
-    if (e.status === 401) res.setHeader('WWW-Authenticate', 'Bearer realm="efi-planning"');
-    return res.status(e.status || 401).json({ message: e.message });
+  // Deux authentifications cohabitent le temps de la bascule. L'OAuth passe en
+  // premier : c'est celle qui porte une identité réelle, et un jeton statique
+  // ne peut pas être confondu avec un jeton signé. Si l'OAuth ne reconnaît
+  // rien, on retombe sur MCP_TOKENS — ce qui fait tourner la production
+  // aujourd'hui, et qui ne doit pas cesser de marcher parce qu'on prépare
+  // la suite.
+  let commercial = null;
+  if (oauthActif()) {
+    try {
+      commercial = await identifierParOAuth(req);
+    } catch {
+      commercial = null; // panne de vérification : on laisse sa chance au repli
+    }
+  }
+
+  if (!commercial) {
+    try {
+      commercial = identifierCommercial(req);
+    } catch (e) {
+      if (e.status === 401) {
+        // Le défi dit au client OÙ commencer l'autorisation. Quand l'OAuth est
+        // actif, c'est lui qu'il faut annoncer, sinon Claude ne saura pas
+        // qu'un flux existe et abandonnera sans message exploitable.
+        res.setHeader('WWW-Authenticate', oauthActif() ? defiOAuth() : 'Bearer realm="efi-planning"');
+      }
+      // 503 « aucun jeton statique déclaré » ne vaut plus quand l'OAuth est
+      // ouvert : la route n'est pas fermée, elle attend une autorisation.
+      const statut = (e.status === 503 && oauthActif()) ? 401 : (e.status || 401);
+      const message = statut === 401 && oauthActif()
+        ? 'Autorisation requise. Connectez-vous avec votre compte CIPECMA.'
+        : e.message;
+      return res.status(statut).json({ message });
+    }
   }
 
   const corps = req.body;

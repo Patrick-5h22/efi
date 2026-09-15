@@ -13,6 +13,8 @@
 import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { fromNodeHeaders } from 'better-auth/node';
+import { jwt } from 'better-auth/plugins';
+import { mcp } from '@better-auth/mcp';
 import pg from 'pg';
 import { parseAllowedGroups, parseGroupRoles, isAllowed, roleFromGroups } from './_groups.js';
 
@@ -31,6 +33,13 @@ export const auth = betterAuth({
   database: new pg.Pool({
     connectionString: process.env.DATABASE_URL,
     max: 1, // serverless : une connexion par instance
+    // Les sept tables du fournisseur OAuth sont propres à cette application ;
+    // user, session, account et verification sont partagées avec
+    // efi-placement et doivent rester où elles sont. En plaçant
+    // « planning_auth » en tête du chemin de recherche, les nouvelles tables
+    // y sont créées et résolues, tandis que les partagées continuent d'être
+    // trouvées dans « public ». Aucune table existante ne bouge.
+    options: '-c search_path=planning_auth,public',
   }),
 
   emailAndPassword: {
@@ -156,6 +165,50 @@ export const auth = betterAuth({
   // Origines acceptées : URL configurée, domaine de production et URL du
   // déploiement courant (permet aussi de tester l'auth sur les previews).
   trustedOrigins: [...new Set([baseURL, prodURL, deployURL].filter(Boolean))],
+
+  // Serveur d'autorisation OAuth 2.1 pour le MCP — activé seulement quand
+  // MCP_OAUTH vaut « 1 ». Le plugin a besoin de sept tables qui n'existent
+  // qu'une fois la migration docs/migrations/001-planning-auth.sql appliquée :
+  // tant qu'elle ne l'est pas, l'activer ferait échouer chaque démarrage à
+  // froid. Le drapeau permet donc de livrer le code avant la base.
+  //
+  // Pourquoi Better Auth comme serveur d'autorisation plutôt qu'Entra ID en
+  // direct : le flux « connecteur personnalisé » de Claude exige
+  // l'enregistrement dynamique de client (RFC 7591), qu'Entra ne propose pas
+  // publiquement. Better Auth le fait, et Entra reste en amont — l'utilisateur
+  // se connecte toujours avec son compte Microsoft CIPECMA, les groupes
+  // autorisés et les rôles s'appliquent comme sur l'application.
+  ...(process.env.MCP_OAUTH === '1' ? {
+    plugins: [
+      // Signe les jetons d'accès et publie le JWKS que la route MCP vérifie.
+      jwt(),
+      mcp({
+        loginPage: '/login',
+        consentPage: '/consent',
+        // Identifiant canonique de la ressource (RFC 8707 / RFC 9728) : les
+        // jetons émis y sont liés par leur audience. Doit correspondre trait
+        // pour trait à l'URL réelle de la route MCP.
+        resource: `${baseURL}/api/mcp`,
+        // Enregistrement dynamique ouvert : c'est ce qu'attend le flux de
+        // Claude. Enregistrer un client n'accorde AUCUN accès par lui-même —
+        // l'utilisateur doit encore se connecter via Entra et consentir. Le
+        // seul coût est une ligne de client en base par enregistrement.
+        allowDynamicClientRegistration: true,
+        allowUnauthenticatedClientRegistration: true,
+      }),
+    ],
+  } : {}),
+});
+
+// Le plugin mcp() interroge la base dès la construction de l'instance
+// (amorçage de la ressource OAuth). Sans ce filet, une base injoignable au
+// démarrage à froid part en rejet non géré et emporte la fonction entière —
+// au lieu du 503 maîtrisé que rendent les routes. On retient l'échec pour
+// pouvoir le dire, plutôt que de le taire.
+export const initOAuth = { ok: true, erreur: null };
+auth.$context?.catch?.((e) => {
+  initOAuth.ok = false;
+  initOAuth.erreur = e?.message || String(e);
 });
 
 // Session de la requête, ou null si elle n'est pas authentifiée.

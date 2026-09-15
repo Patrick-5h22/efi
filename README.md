@@ -115,19 +115,25 @@ js/auth-client.js   Client Better Auth (session, connexion, déconnexion)
 js/ca.js            Agrégation du chiffre d'affaires (hors moteur)
 js/mcp.js           Outils MCP : recherche de créneaux, pré-réservation
 js/views/…          Vues (inscriptions, semaines, synthèse, plannings…)
+consent.html        Écran d'autorisation OAuth (sert /consent et /login)
 api/                Fonctions serverless Vercel (Better Auth, /api/state, /api/mcp)
 scripts/            Outillage de dépôt (garde-fou secrets)
+docs/migrations/    SQL à relire et appliquer à la main sur Supabase
 tests/              Tests unitaires (node:test)
 tests/ui/           Vérifications navigateur (Playwright)
 ```
 
 Le front reste 100 % statique et sans build. Les dépendances d'exécution
-(`better-auth`, `pg`) servent aux fonctions serverless du dossier `api/` ;
+(`better-auth`, `@better-auth/mcp`, `pg`) servent aux fonctions serverless du
+dossier `api/` ;
 celles de développement (`eslint`, `playwright`) ne servent qu'à la
 vérification et ne partent jamais en production.
 
-Un serveur MCP expose le planning aux commerciaux en clientèle — voir
-[docs/MCP.md](docs/MCP.md) pour sa mise en service et ses limites.
+Un serveur MCP expose le planning aux commerciaux en clientèle. Il accepte
+deux authentifications : des jetons nominatifs déclarés sur Vercel, et —
+quand `MCP_OAUTH` est activé — un flux OAuth 2.1 adossé aux comptes Microsoft
+de l'application, administrable depuis une organisation Claude Team. Voir
+[docs/MCP.md](docs/MCP.md), qui donne l'ordre d'activation à respecter.
 
 Voir [EVALUATION.md](EVALUATION.md) pour la grille d'évaluation et
 l'historique des itérations.
