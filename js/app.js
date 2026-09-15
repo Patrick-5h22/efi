@@ -102,7 +102,7 @@ async function connectCloud(code, { silent = false } = {}) {
   try {
     const remote = await loadRemoteState(code);
     setAccessCode(localStorage, code);
-    app.syncer.seenSavedAt(remote.savedAt);
+    app.syncer.seenRemote(remote);
     applyRemoteState(remote);
     app.syncer.setStatus('idle');
     app.syncer.startPolling();
@@ -187,7 +187,7 @@ async function startApiSession(session, { silent = false } = {}) {
   }
   try {
     const remote = await loadRemoteState(null);
-    app.syncer.seenSavedAt(remote.savedAt);
+    app.syncer.seenRemote(remote);
     applyRemoteState(remote);
     app.syncer.setStatus('idle');
     app.syncer.startPolling();

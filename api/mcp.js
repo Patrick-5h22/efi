@@ -12,7 +12,7 @@
 
 import { identifierCommercial } from './_mcp-auth.js';
 import { oauthActif, identifierParOAuth, defiOAuth } from './_mcp-oauth.js';
-import { loadState, saveState, gardeSavedAt } from './_planning.js';
+import { loadState, saveState, relireSiModifie, conflitEcriture } from './_planning.js';
 import { outils, chercherCreneaux, preReserver } from '../js/mcp.js';
 
 const SERVEUR = { name: 'efi-planning', version: '1.0.0' };
@@ -41,12 +41,22 @@ async function appelerOutil(nom, args, commercial) {
   }
 
   if (nom === 'pre_reserver') {
-    const { state, texte: resume } = preReserver(brut, args, { par: commercial.nom });
-    // La sauvegarde remplace l'état entier : on relit d'abord et on refuse si
-    // quelqu'un a enregistré depuis notre lecture.
-    await gardeSavedAt(brut?.savedAt ?? null);
-    await saveState(state);
-    return resume;
+    let sortie = preReserver(brut, args, { par: commercial.nom });
+
+    // La sauvegarde remplace l'état entier : on relit juste avant d'écrire. Si
+    // le planning a bougé pendant notre calcul, on ne l'écrase pas — on
+    // recalcule sur la version fraîche. preReserver refuse de lui-même si le
+    // jour demandé n'est plus tenable, donc rien ne peut être posé de travers.
+    const frais = await relireSiModifie(brut);
+    if (frais) {
+      sortie = preReserver(frais, args, { par: commercial.nom });
+      // Deux collisions de suite : on n'insiste pas, le commercial reprend sa
+      // recherche plutôt que de tourner en boucle.
+      if (await relireSiModifie(frais)) throw conflitEcriture();
+    }
+
+    await saveState(sortie.state);
+    return sortie.texte;
   }
 
   const err = new Error(`Outil inconnu : ${nom}`);

@@ -151,12 +151,18 @@ export function preReserver(brut, args = {}, { par = null } = {}) {
     posees.push(insc);
   }
 
-  // Filet : on ne rend un état à enregistrer que s'il est sain.
-  const { rows } = computeSchedule(suivant);
-  const fautives = rows.filter((r) => r.errors.length);
-  if (fautives.length) {
+  // Filet : on ne pose rien qui CRÉE une anomalie. On compare avant / après,
+  // et non l'état d'arrivée seul : le planning partagé porte parfois déjà des
+  // anomalies (une ligne à compléter par l'assistante), et ce n'est pas au
+  // commercial d'en être empêché. Ce qui est interdit, c'est d'en ajouter —
+  // y compris sur une autre ligne que les nôtres, une capacité dépassée se
+  // lisant sur les deux.
+  const avant = new Set(anomalies(state));
+  const nouvelles = anomalies(suivant).filter((a) => !avant.has(a));
+  if (nouvelles.length) {
+    const libelles = [...new Set(nouvelles.map((a) => a.slice(a.indexOf('|') + 1)))];
     throw erreur('La pré-réservation créerait des anomalies : '
-      + fautives[0].errors.join(', ') + '. Rien n’a été enregistré.');
+      + libelles.join(', ') + '. Rien n’a été enregistré.');
   }
 
   return {
@@ -164,6 +170,14 @@ export function preReserver(brut, args = {}, { par = null } = {}) {
     lignes: posees,
     texte: rendreReservation(state, { stagiaire, entreprise, option, par }),
   };
+}
+
+// Anomalies d'un état, sous une forme comparable d'un état à l'autre :
+// « id de la ligne | libellé ». L'identifiant compte — la même anomalie sur
+// deux lignes différentes fait bien deux problèmes.
+function anomalies(state) {
+  return computeSchedule(state).rows
+    .flatMap((r) => r.errors.map((e) => `${r.insc?.id}|${e}`));
 }
 
 // ---------------------------------------------------------------------------

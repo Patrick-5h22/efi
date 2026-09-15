@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PERSISTED_FIELDS, pickPersisted } from '../js/persisted.js';
+import { PERSISTED_FIELDS, pickPersisted, empreintePersistee } from '../js/persisted.js';
 import { defaultState, migrate } from '../js/store.js';
 
 test('persistance : la présence par jour fait partie des champs enregistrés', () => {
@@ -59,6 +59,39 @@ test('persistance : un état ancien sans présence se recharge sans casser', () 
   delete ancien.dayPresence;
   const recharge = migrate(ancien);
   assert.deepEqual(recharge.dayPresence, {}, 'migrate() comble le champ absent');
+});
+
+// L'empreinte est ce qui permet de savoir si le planning a réellement changé
+// avant d'écrire par-dessus. Elle doit ignorer tout ce qui n'est pas du
+// contenu saisi — l'horodatage `savedAt` en premier lieu, que la base
+// régénère à chaque lecture.
+test('empreinte : insensible à l’ordre des clés et aux champs non persistés', () => {
+  const a = defaultState();
+  a.openDays = ['2026-09-02'];
+  a.dayPresence = { '2026-09-02': ['p1', 'p3'] };
+
+  const b = structuredClone(a);
+  // Même contenu, clés dans un autre ordre (ce que rend un autre encodeur JSON)
+  b.dayPresence = { '2026-09-02': [...a.dayPresence['2026-09-02']] };
+  b.params = Object.fromEntries(Object.entries(a.params).reverse());
+  // …plus tout ce que la base ajoute ou recalcule
+  b.savedAt = new Date().toISOString();
+  b.nextId = 999;
+  b.schedule = { rows: [{ errors: [] }] };
+
+  assert.equal(empreintePersistee(a), empreintePersistee(b),
+    'même contenu saisi ⇒ même empreinte, sinon toute écriture semble en conflit');
+});
+
+test('empreinte : une modification du contenu, même minuscule, se voit', () => {
+  const a = defaultState();
+  const b = structuredClone(a);
+  b.openDays = [...a.openDays, '2026-12-25'];
+  assert.notEqual(empreintePersistee(a), empreintePersistee(b));
+
+  const c = structuredClone(a);
+  c.inscriptions = [{ id: 1, stagiaire: 'UN', formation: 'R489-3' }];
+  assert.notEqual(empreintePersistee(a), empreintePersistee(c));
 });
 
 test('persistance : les deux appelants passent par la liste commune', () => {

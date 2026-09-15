@@ -3,7 +3,7 @@
 // protégées par un code d'accès ; la clé publishable ci-dessous est publique
 // par conception (le contrôle d'accès est fait côté serveur).
 
-import { pickPersisted } from './persisted.js';
+import { pickPersisted, empreintePersistee } from './persisted.js';
 
 export const SUPABASE_URL = 'https://eeldkggxvkvpvumwvkca.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_6lJ88JCHt4n_lvxQ0UC3qg_c7zz-TV7';
@@ -108,7 +108,11 @@ export function createSyncer({ getState, onStatus, onRemoteChange, onAuthError }
   let pending = false;
   let inFlight = false;
   let status = 'off'; // off | idle | saving | error
-  let lastSavedAt = null; // horodatage distant connu (détection de changement)
+  // Contenu distant connu, sous forme d'empreinte. On comparait auparavant
+  // l'horodatage « savedAt » : la base le régénère à chaque lecture, si bien
+  // que chaque tour d'interrogation croyait voir une modification et
+  // rechargeait le planning — avec son message — toutes les 45 secondes.
+  let derniereEmpreinte = null;
 
   const set = (s, detail) => { status = s; onStatus(s, detail); };
 
@@ -118,8 +122,9 @@ export function createSyncer({ getState, onStatus, onRemoteChange, onAuthError }
     inFlight = true;
     set('saving');
     try {
-      const res = await saveRemoteState(getAccessCode(localStorage), getState());
-      lastSavedAt = res.savedAt || lastSavedAt;
+      const envoye = getState();
+      await saveRemoteState(getAccessCode(localStorage), envoye);
+      derniereEmpreinte = empreintePersistee(envoye);
       if (!pending) set('idle');
     } catch (e) {
       if (e.authExpired) {
@@ -144,15 +149,15 @@ export function createSyncer({ getState, onStatus, onRemoteChange, onAuthError }
     if (!remoteEnabled(localStorage) || pending || inFlight || document.hidden) return;
     try {
       const remote = await loadRemoteState(getAccessCode(localStorage));
-      const remoteAt = remote.savedAt || null;
-      if (lastSavedAt == null) {
-        lastSavedAt = remoteAt;
-      } else if (remoteAt && remoteAt !== lastSavedAt) {
+      const empreinte = empreintePersistee(remote);
+      if (derniereEmpreinte == null) {
+        derniereEmpreinte = empreinte;
+      } else if (empreinte !== derniereEmpreinte) {
         // onRemoteChange peut refuser (ex. saisie en cours) : on ne mémorise
-        // l'horodatage que si le changement a bien été appliqué, pour le
+        // l'empreinte que si le changement a bien été appliqué, pour le
         // représenter au tour suivant.
         const applied = onRemoteChange?.(remote);
-        if (applied !== false) lastSavedAt = remoteAt;
+        if (applied !== false) derniereEmpreinte = empreinte;
       }
       if (status === 'error') set('idle'); // reprise après coupure
     } catch (e) {
@@ -197,6 +202,8 @@ export function createSyncer({ getState, onStatus, onRemoteChange, onAuthError }
     startPolling,
     stopPolling,
     setStatus: set,
-    seenSavedAt(at) { lastSavedAt = at || lastSavedAt; },
+    // Après un chargement initial : ce contenu est celui qu'on affiche, il ne
+    // doit pas être signalé comme une modification venue d'ailleurs.
+    seenRemote(remote) { derniereEmpreinte = empreintePersistee(remote); },
   };
 }
