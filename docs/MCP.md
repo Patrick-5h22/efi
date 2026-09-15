@@ -160,9 +160,13 @@ créneau quand il reste libre.
 > jamais le même, si bien que la garde voyait un conflit là où rien n'avait
 > changé. Le simulacre Supabase des tests, lui, le supposait stable — c'est ce
 > qui a laissé passer la panne. Il rend maintenant un horodatage neuf à chaque
-> lecture, comme la vraie base. `savedAt` reste utile au navigateur, qui
-> compare celui rendu à l'enregistrement à celui vu au tour d'interrogation
-> suivant ; on ne peut simplement rien en déduire entre deux lectures.
+> lecture, comme la vraie base.
+>
+> Le synchroniseur du navigateur (`js/db.js`) avait le même défaut, avec un
+> autre symptôme : il croyait voir une modification venue d'un autre poste à
+> chaque tour d'interrogation, et rechargeait le planning toutes les
+> 45 secondes. Il compare lui aussi l'empreinte du contenu, et `savedAt` n'est
+> plus utilisé nulle part pour détecter un changement.
 
 Ce n'est pas une vraie transaction. La supprimer demanderait une écriture
 conditionnelle ou un ajout incrémental côté Supabase, hors de portée de ce
