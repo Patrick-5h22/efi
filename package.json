@@ -8,6 +8,7 @@
     "test:ui": "node tests/ui/run.mjs",
     "lint": "eslint .",
     "secrets": "node scripts/check-secrets.mjs",
+    "persistance": "node scripts/verifier-persistance.mjs",
     "verify": "npm run lint && npm run secrets && npm test",
     "start": "python3 -m http.server 8080"
   },
