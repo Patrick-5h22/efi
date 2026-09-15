@@ -351,6 +351,11 @@ td.slot-exam { background: var(--exam-bg); border-color: var(--exam-border); whi
 /* Entrées multiples d'une même cellule ; les épreuves AIPR gardent leur
    couleur même mélangées à un test classique */
 .cell-entry + .cell-entry { border-top: 1px dashed var(--grid-line); margin-top: 2px; padding-top: 2px; }
+/* Chaque inscription est son propre point d'entrée : le survol et le focus
+   doivent le montrer, ligne par ligne et non cellule par cellule. */
+.cell-entry[data-insc] { cursor: pointer; border-radius: 3px; }
+.cell-entry[data-insc]:hover { background: color-mix(in oklab, var(--ring) 14%, transparent); }
+.cell-entry[data-insc]:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 td.slot-busy:not(.slot-exam) .cell-entry-exam { background: var(--exam-bg); border: 1px solid var(--exam-border); border-radius: 4px; padding: 2px 3px; margin: 1px -1px; }
 td.slot-busy:not(.slot-exam) .cell-entry-exam + .cell-entry,
 td.slot-busy:not(.slot-exam) .cell-entry + .cell-entry-exam { border-top: none; }

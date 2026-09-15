@@ -69,14 +69,16 @@ export function renderSemaine(main, args) {
       : 'réserver un test pratique');
   });
 
-  // Clic sur un créneau occupé = éditer l'inscription
-  main.querySelectorAll('td.slot-busy[data-insc]').forEach((td) => {
-    td.style.cursor = 'pointer';
-    // On AJOUTE l'affordance, on ne remplace pas : cette ligne écrasait
-    // l'infobulle de contenu — stagiaire, catégorie, statut, intervenant —
-    // qui ne s'est donc jamais affichée sur ces cellules.
-    td.title = `${td.title ? td.title + '\n' : ''}Cliquer pour modifier`;
-    td.addEventListener('click', () => openInscriptionForm({ id: Number(td.dataset.insc) }));
+  // Clic sur une inscription = l'éditer. Le point d'entrée est la LIGNE, pas
+  // la cellule : une séance à deux stagiaires offre donc deux portes, et le
+  // formulaire sait laquelle ouvrir. Rien n'est câblé sur la cellule elle-même
+  // — un clic sur la ligne y remonterait et ouvrirait le formulaire deux fois.
+  main.querySelectorAll('.cell-entry[data-insc]').forEach((el) => {
+    const open = () => openInscriptionForm({ id: Number(el.dataset.insc) });
+    el.addEventListener('click', open);
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+    });
   });
 }
 
@@ -210,8 +212,20 @@ function gridHTML(state, days, kind) {
         const qui = (r) => (kind === 'F'
           ? detailQui('Form. : ', r.formateurEffectif)
           : detailQui(r.formation?.testOnly ? 'Surv. : ' : 'Testeur : ', r.testeurEffectif));
-        const label = occupants.map((r) => `<div class="cell-entry${r.formation?.testOnly ? ' cell-entry-exam' : ''}"><span class="slot-name">${esc(r.insc.stagiaire)}</span><span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span>${qui(r)}</div>`).join('');
-        const inscAttr = occupants.length === 1 ? ` data-insc="${occupants[0].insc.id}"` : '';
+        // Chaque inscription porte son propre point d'entrée. Auparavant seule
+        // la cellule était cliquable, et seulement quand elle ne contenait
+        // qu'une inscription : une séance à deux stagiaires n'était donc pas
+        // modifiable depuis la grille — le formulaire n'en éditant qu'une, le
+        // code préférait ne rien poser plutôt que de choisir à l'aveugle. Il
+        // suffisait de laisser choisir : une porte par ligne.
+        const entree = (r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}`
+          + `${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}\nCliquer pour modifier`;
+        const label = occupants.map((r) => `<div class="cell-entry${r.formation?.testOnly ? ' cell-entry-exam' : ''}"`
+          + ` data-insc="${r.insc.id}" tabindex="0" role="button" title="${esc(entree(r))}"`
+          + ` aria-label="Modifier l’inscription de ${esc(r.insc.stagiaire)}">`
+          + `<span class="slot-name">${esc(r.insc.stagiaire)}</span>`
+          + `<span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span>`
+          + `${qui(r)}</div>`).join('');
         // Épreuves surveillées (AIPR) : couleur dédiée — cellule entière si tout
         // est épreuve, sinon pastille violette sur les seules entrées AIPR
         const cls = occupants.every((r) => r.formation?.testOnly) ? 'slot-exam slot-busy' : 'slot-busy';
@@ -227,7 +241,7 @@ function gridHTML(state, days, kind) {
           // s'écrit une fois pour toute la durée de la séance.
           cle: `occ:${occupants.map((r) => r.insc.id).join('+')}:${cls}${pre}`,
           cls: `${cls}${pre}`,
-          attrs: `${inscAttr} title="${esc(tip)}"`,
+          attrs: ` title="${esc(tip)}"`,
           html: label,
         };
       }
