@@ -155,6 +155,67 @@ test('route : un jeton base64 est reconnu entier, remplissage compris', async ()
   assert.equal(nom.status, 401);
 });
 
+// --- Cohabitation OAuth / jetons statiques ----------------------------------
+//
+// Le flux OAuth complet — connexion, enregistrement dynamique, autorisation,
+// échange de code, vérification du jeton — a été éprouvé contre un vrai
+// PostgreSQL, et rend bien « NEAU Emmanuel » plutôt qu'une étiquette de jeton.
+// Il ne peut pas tourner ici : la CI n'a pas de base d'authentification. Ce
+// qui est épinglé ci-dessous, c'est ce qui DOIT rester vrai sans base — que
+// l'arrivée de l'OAuth n'a rien cassé, et que le défi mène quelque part.
+
+test('route : MCP_OAUTH actif, les jetons statiques fonctionnent toujours', async () => {
+  process.env.MCP_OAUTH = '1';
+  try {
+    const r = await rpc({ jsonrpc: '2.0', id: 1, method: 'ping' }, JETON);
+    assert.equal(r.status, 200, 'la bascule ne doit pas couper ce qui tourne en production');
+  } finally {
+    delete process.env.MCP_OAUTH;
+  }
+});
+
+test('route : MCP_OAUTH actif, sans jeton le défi mène aux métadonnées', async () => {
+  process.env.MCP_OAUTH = '1';
+  try {
+    const r = await rpc({ jsonrpc: '2.0', id: 1, method: 'ping' }, null);
+    assert.equal(r.status, 401);
+    const defi = r.headers.get('www-authenticate') || '';
+    // RFC 9728 : c'est resource_metadata qui dit au client où commencer.
+    // Sans lui, Claude abandonne l'autorisation sans message exploitable.
+    assert.match(defi, /resource_metadata="[^"]+\/\.well-known\/oauth-protected-resource\/api\/mcp"/,
+      `le défi doit pointer vers les métadonnées de ressource, reçu : ${defi}`);
+  } finally {
+    delete process.env.MCP_OAUTH;
+  }
+});
+
+test('route : MCP_OAUTH actif, un jeton non déclaré n’ouvre rien', async () => {
+  process.env.MCP_OAUTH = '1';
+  try {
+    const r = await rpc({ jsonrpc: '2.0', id: 1, method: 'ping' }, 'jeton-invente');
+    assert.equal(r.status, 401);
+    assert.ok(!JSON.stringify(r.json).includes(JETON), 'aucun jeton déclaré ne doit fuir');
+  } finally {
+    delete process.env.MCP_OAUTH;
+  }
+});
+
+test('mcp-oauth : un jeton statique ne déclenche aucune vérification OAuth', async () => {
+  process.env.MCP_OAUTH = '1';
+  try {
+    const { identifierParOAuth } = await import('../api/_mcp-oauth.js');
+    // Un jeton OAuth est un JWT — trois segments. Un jeton de MCP_TOKENS,
+    // tiré au hasard, n'en a aucun. Sans ce filtre, chaque requête d'un
+    // commercial resté en jeton statique paierait un appel JWKS pour rien.
+    const t0 = Date.now();
+    const r = await identifierParOAuth({ headers: { authorization: `Bearer ${JETON}` } });
+    assert.equal(r, null);
+    assert.ok(Date.now() - t0 < 100, 'aucun accès réseau ne doit être tenté');
+  } finally {
+    delete process.env.MCP_OAUTH;
+  }
+});
+
 test('route : sans MCP_TOKENS, la route est fermée (503) et non ouverte', async () => {
   delete process.env.MCP_TOKENS;
   const r = await rpc({ jsonrpc: '2.0', id: 1, method: 'ping' });
