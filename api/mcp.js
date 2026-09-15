@@ -145,15 +145,19 @@ export default async function handler(req, res) {
     try {
       commercial = identifierCommercial(req);
     } catch (e) {
-      if (e.status === 401) {
-        // Le défi dit au client OÙ commencer l'autorisation. Quand l'OAuth est
-        // actif, c'est lui qu'il faut annoncer, sinon Claude ne saura pas
-        // qu'un flux existe et abandonnera sans message exploitable.
-        res.setHeader('WWW-Authenticate', oauthActif() ? defiOAuth() : 'Bearer realm="efi-planning"');
-      }
       // 503 « aucun jeton statique déclaré » ne vaut plus quand l'OAuth est
       // ouvert : la route n'est pas fermée, elle attend une autorisation.
       const statut = (e.status === 503 && oauthActif()) ? 401 : (e.status || 401);
+
+      // Le défi se pose sur le statut FINAL, pas sur celui de l'erreur reçue.
+      // La nuance a coûté cher : sans MCP_TOKENS — c'est-à-dire en OAuth seul,
+      // la configuration cible — identifierCommercial lève un 503. En testant
+      // « e.status === 401 », le défi n'était jamais posé dans le seul cas qui
+      // compte vraiment, et le connecteur MCP abandonnait sans rien dire.
+      if (statut === 401) {
+        res.setHeader('WWW-Authenticate', oauthActif() ? defiOAuth() : 'Bearer realm="efi-planning"');
+      }
+
       const message = statut === 401 && oauthActif()
         ? 'Autorisation requise. Connectez-vous avec votre compte CIPECMA.'
         : e.message;
