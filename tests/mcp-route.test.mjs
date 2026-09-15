@@ -9,6 +9,26 @@ import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { defaultState } from '../js/store.js';
+import { addDays, dayOfWeek, dateDuJour } from '../js/dates.js';
+
+// Cette suite passe par la route HTTP : elle n'injecte pas « aujourd'hui »,
+// c'est l'horloge réelle qui décide. Les jours ouverts sont donc calculés à
+// partir d'aujourd'hui — datés en dur, ils seraient tombés dans le passé et
+// la règle « une disponibilité est à venir » aurait fait échouer la suite du
+// jour au lendemain.
+const AUJ = dateDuJour();
+function joursOuvres(depuis, combien) {
+  const out = [];
+  let d = depuis;
+  while (out.length < combien) {
+    if (dayOfWeek(d) <= 5) out.push(d);
+    d = addDays(d, 1);
+  }
+  return out;
+}
+const J = joursOuvres(AUJ, 4);          // J[0] = aujourd'hui ou le prochain jour ouvré
+const PASSE = addDays(AUJ, -14);
+const LOINTAIN = addDays(J[3], 30);
 
 const JETON = 'jeton-de-test-valide';
 const AUTRE = 'second-jeton-de-test';
@@ -33,7 +53,7 @@ function etatInitial() {
     { id: 'p1', name: 'MEDAN Dominique', quals: structuredClone(QUALS) },
     { id: 'p2', name: 'GARCIA Thierry', quals: structuredClone(QUALS) },
   ];
-  s.openDays = ['2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17'];
+  s.openDays = [...J];
   s.inscriptions = [];
   return s;
 }
@@ -313,7 +333,7 @@ test('route : tools/list expose les deux outils, alimentés par le catalogue', a
 test('route : une recherche rend un déroulé lisible sans rien écrire', async () => {
   const r = await rpc({
     jsonrpc: '2.0', id: 1, method: 'tools/call',
-    params: { name: 'chercher_creneaux', arguments: { formations: ['R489-3', 'R489-5'], a_partir_du: '2026-09-15', nb_options: 1 } },
+    params: { name: 'chercher_creneaux', arguments: { formations: ['R489-3', 'R489-5'], a_partir_du: J[0], nb_options: 1 } },
   });
   const t = texteOutil(r);
   assert.match(t, /Possibilités pour/);
@@ -346,7 +366,7 @@ test('route : une pré-réservation écrit des lignes traçables', async () => {
     jsonrpc: '2.0', id: 1, method: 'tools/call',
     params: {
       name: 'pre_reserver',
-      arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3', 'R489-5'], jour: '2026-09-15', entreprise: 'BTP Charente' },
+      arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3', 'R489-5'], jour: J[0], entreprise: 'BTP Charente' },
     },
   });
   assert.ok(!r.json.result.isError, texteOutil(r));
@@ -361,22 +381,46 @@ test('route : une pré-réservation écrit des lignes traçables', async () => {
 });
 
 test('route : la présence par jour survit à l’écriture du MCP', async () => {
-  base.dayPresence = { '2026-09-15': ['p1', 'p2'] };
+  base.dayPresence = { [J[0]]: ['p1', 'p2'] };
   await rpc({
     jsonrpc: '2.0', id: 1, method: 'tools/call',
-    params: { name: 'pre_reserver', arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3'], jour: '2026-09-15' } },
+    params: { name: 'pre_reserver', arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3'], jour: J[0] } },
   });
-  assert.deepEqual(base.dayPresence, { '2026-09-15': ['p1', 'p2'] },
+  assert.deepEqual(base.dayPresence, { [J[0]]: ['p1', 'p2'] },
     'le MCP ne doit pas perdre la présence en réécrivant l’état');
 });
 
 test('route : un jour indisponible est refusé, pas décalé', async () => {
   const r = await rpc({
     jsonrpc: '2.0', id: 1, method: 'tools/call',
-    params: { name: 'pre_reserver', arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3'], jour: '2026-09-01' } },
+    params: { name: 'pre_reserver', arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3'], jour: LOINTAIN } },
   });
   assert.equal(r.json.result.isError, true);
   assert.equal(sauvegardes, 0, 'rien ne doit être écrit sur un refus');
+});
+
+// Une disponibilité est toujours à venir — vérifié ici de bout en bout, avec
+// l'horloge réelle : c'est « aujourd'hui » du serveur qui doit faire le
+// plancher, pas une date injectée par le test.
+test('route : le passé n’est ni proposé ni pré-réservable', async () => {
+  base.openDays = [PASSE, ...J];
+
+  const cherche = await rpc({
+    jsonrpc: '2.0', id: 1, method: 'tools/call',
+    params: { name: 'chercher_creneaux', arguments: { formations: ['R489-3'], nb_options: 3 } },
+  });
+  const texte = texteOutil(cherche);
+  assert.ok(!texte.includes(PASSE.slice(8) + '/' + PASSE.slice(5, 7)),
+    `journée écoulée proposée : ${texte}`);
+  assert.match(texte, /à partir d’aujourd’hui/);
+
+  const pose = await rpc({
+    jsonrpc: '2.0', id: 1, method: 'tools/call',
+    params: { name: 'pre_reserver', arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3'], jour: PASSE } },
+  });
+  assert.equal(pose.json.result.isError, true);
+  assert.match(texteOutil(pose), /déjà passé/);
+  assert.equal(sauvegardes, 0, 'aucune écriture pour une date passée');
 });
 
 // --- Garde d'écriture -------------------------------------------------------
@@ -385,7 +429,7 @@ test('route : un jour indisponible est refusé, pas décalé', async () => {
 // tests décrivent le seul comportement acceptable — ne jamais refuser pour un
 // horodatage qui bouge tout seul, ne jamais effacer le travail d'un autre.
 
-const preReservation = (jour = '2026-09-15') => ({
+const preReservation = (jour = J[0]) => ({
   jsonrpc: '2.0', id: 1, method: 'tools/call',
   params: { name: 'pre_reserver', arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3'], jour } },
 });
@@ -402,13 +446,13 @@ test('route : un planning inchangé n’est jamais pris pour un conflit', async 
 test('route : une modification concurrente est préservée, pas écrasée', async () => {
   // Une assistante enregistre entre notre lecture et notre écriture.
   avantChaqueLecture = (n) => {
-    if (n === 2) base.openDays = [...base.openDays, '2026-09-18'];
+    if (n === 2) base.openDays = [...base.openDays, LOINTAIN];
   };
 
   const r = await rpc(preReservation());
   assert.ok(!r.json.result?.isError, texteOutil(r));
   assert.equal(sauvegardes, 1);
-  assert.ok(base.openDays.includes('2026-09-18'),
+  assert.ok(base.openDays.includes(LOINTAIN),
     'recalculer sur l’état frais, sinon la modification de l’assistante disparaît');
   assert.ok(base.inscriptions.some((i) => i.stagiaire === 'DURAND Thomas' && i.statut === 'pre'),
     'la pré-réservation doit tout de même être posée');
@@ -416,7 +460,7 @@ test('route : une modification concurrente est préservée, pas écrasée', asyn
 
 test('route : un planning qui bouge sans arrêt fait refuser l’écriture', async () => {
   let n = 0;
-  avantChaqueLecture = () => { base.openDays = [...base.openDays, `2026-10-0${n += 1}`]; };
+  avantChaqueLecture = () => { base.openDays = [...base.openDays, addDays(LOINTAIN, n += 1)]; };
 
   const r = await rpc(preReservation());
   assert.equal(r.json.result.isError, true);
@@ -429,7 +473,7 @@ test('route : une anomalie déjà présente n’empêche pas de pré-réserver a
   // filet doit refuser d'en CRÉER, pas refuser tout un planning imparfait.
   base.inscriptions = [{
     id: 99, stagiaire: 'À COMPLÉTER', formation: 'R489-3', type: 'Initial',
-    datePratique: '2026-09-17', debutPratique: 480, statut: 'confirmee',
+    datePratique: J[3], debutPratique: 480, statut: 'confirmee',
   }];
 
   const r = await rpc(preReservation());
@@ -442,7 +486,7 @@ test('route : une panne d’écriture amont n’est pas silencieuse', async () =
   refuserEcriture = true;
   const r = await rpc({
     jsonrpc: '2.0', id: 1, method: 'tools/call',
-    params: { name: 'pre_reserver', arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3'], jour: '2026-09-15' } },
+    params: { name: 'pre_reserver', arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3'], jour: J[0] } },
   });
   assert.ok(r.json.error || r.json.result?.isError, 'un échec d’écriture doit remonter');
 });
