@@ -5,6 +5,7 @@ import { app, esc } from '../app.js';
 import { memberName } from '../store.js';
 import { workingDays, daySlots, fmtTime, fmtDateDay, isoWeek } from '../dates.js';
 import { chevauchePause } from '../config.js';
+import { largeurMinGrille } from './grille.js';
 
 export function renderPlanning(main, args, kind) {
   const state = app.state;
@@ -83,6 +84,6 @@ export function renderPlanning(main, args, kind) {
       <span><span class="chip" style="background:#f2f4f8"></span>Jour non ouvert</span>
       ${state.params.pauseActive ? '<span><span class="chip slot-pause"></span>Pause déjeuner</span>' : ''}
     </div>
-    <div class="card"><div class="grid-wrap"><table class="planning">${head}${body}</table></div></div>
+    <div class="card"><div class="grid-wrap"><table class="planning" style="min-width:${largeurMinGrille(slots.length)}px">${head}${body}</table></div></div>
   `;
 }
