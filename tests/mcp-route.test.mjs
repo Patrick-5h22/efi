@@ -16,12 +16,16 @@ const AUTRE = 'second-jeton-de-test';
 const QUALS = { 'R489-3': { F: true, T: true }, 'R489-5': { F: true, T: true } };
 
 let base;          // état partagé simulé
-let savedAt;
+let lectures;      // nombre de lectures reçues
 let sauvegardes;   // nombre d'écritures reçues
 let refuserEcriture = false;
+let avantChaqueLecture = null; // simule un autre poste qui enregistre
 let serveur;
 let url;
 let vraiFetch;
+
+let tic = 0;
+const horodatage = () => new Date(Date.UTC(2026, 8, 11, 10, 0, 0) + (tic += 1000)).toISOString();
 
 function etatInitial() {
   const s = defaultState();
@@ -48,14 +52,19 @@ before(async () => {
       if (body.p_code !== 'code-de-test') {
         return new Response('{"message":"code refusé"}', { status: 403 });
       }
-      return Response.json({ ...base, savedAt });
+      lectures += 1;
+      avantChaqueLecture?.(lectures);
+      // « savedAt » est REGÉNÉRÉ À CHAQUE LECTURE, comme le fait la vraie RPC.
+      // Ce simulacre le supposait stable, et c'est précisément pour cela que
+      // les tests laissaient passer une garde d'écriture qui refusait toute
+      // pré-réservation en production.
+      return Response.json({ ...base, savedAt: horodatage() });
     }
     if (u.includes('/rpc/efi_save_state')) {
       if (refuserEcriture) return new Response('{"message":"refus"}', { status: 500 });
       sauvegardes += 1;
       base = JSON.parse(opts.body).p_state;
-      savedAt = new Date(Date.now() + sauvegardes * 1000).toISOString();
-      return Response.json({ savedAt });
+      return Response.json({ savedAt: horodatage() });
     }
     return vraiFetch(cible, opts);
   };
@@ -90,9 +99,10 @@ after(async () => {
 
 beforeEach(() => {
   base = etatInitial();
-  savedAt = '2026-09-11T10:00:00Z';
+  lectures = 0;
   sauvegardes = 0;
   refuserEcriture = false;
+  avantChaqueLecture = null;
   process.env.MCP_TOKENS = `Jean Dupont=${JETON},Marie Martin=${AUTRE}`;
 });
 
@@ -367,6 +377,65 @@ test('route : un jour indisponible est refusé, pas décalé', async () => {
   });
   assert.equal(r.json.result.isError, true);
   assert.equal(sauvegardes, 0, 'rien ne doit être écrit sur un refus');
+});
+
+// --- Garde d'écriture -------------------------------------------------------
+//
+// La sauvegarde remplace l'état entier : deux écrivains s'écrasent. Ces trois
+// tests décrivent le seul comportement acceptable — ne jamais refuser pour un
+// horodatage qui bouge tout seul, ne jamais effacer le travail d'un autre.
+
+const preReservation = (jour = '2026-09-15') => ({
+  jsonrpc: '2.0', id: 1, method: 'tools/call',
+  params: { name: 'pre_reserver', arguments: { stagiaire: 'DURAND Thomas', formations: ['R489-3'], jour } },
+});
+
+test('route : un planning inchangé n’est jamais pris pour un conflit', async () => {
+  // La base rend un « savedAt » neuf à chaque lecture. Comparer ces
+  // horodatages refusait TOUTE pré-réservation ; seul le contenu compte.
+  const r = await rpc(preReservation());
+  assert.ok(!r.json.result?.isError, texteOutil(r));
+  assert.doesNotMatch(texteOutil(r), /modifié entre-temps/);
+  assert.equal(sauvegardes, 1);
+});
+
+test('route : une modification concurrente est préservée, pas écrasée', async () => {
+  // Une assistante enregistre entre notre lecture et notre écriture.
+  avantChaqueLecture = (n) => {
+    if (n === 2) base.openDays = [...base.openDays, '2026-09-18'];
+  };
+
+  const r = await rpc(preReservation());
+  assert.ok(!r.json.result?.isError, texteOutil(r));
+  assert.equal(sauvegardes, 1);
+  assert.ok(base.openDays.includes('2026-09-18'),
+    'recalculer sur l’état frais, sinon la modification de l’assistante disparaît');
+  assert.ok(base.inscriptions.some((i) => i.stagiaire === 'DURAND Thomas' && i.statut === 'pre'),
+    'la pré-réservation doit tout de même être posée');
+});
+
+test('route : un planning qui bouge sans arrêt fait refuser l’écriture', async () => {
+  let n = 0;
+  avantChaqueLecture = () => { base.openDays = [...base.openDays, `2026-10-0${n += 1}`]; };
+
+  const r = await rpc(preReservation());
+  assert.equal(r.json.result.isError, true);
+  assert.match(texteOutil(r), /modifié entre-temps/);
+  assert.equal(sauvegardes, 0, 'rien ne doit être écrit sur un conflit');
+});
+
+test('route : une anomalie déjà présente n’empêche pas de pré-réserver ailleurs', async () => {
+  // Ligne incomplète laissée par l'assistante : elle porte ses anomalies. Le
+  // filet doit refuser d'en CRÉER, pas refuser tout un planning imparfait.
+  base.inscriptions = [{
+    id: 99, stagiaire: 'À COMPLÉTER', formation: 'R489-3', type: 'Initial',
+    datePratique: '2026-09-17', debutPratique: 480, statut: 'confirmee',
+  }];
+
+  const r = await rpc(preReservation());
+  assert.ok(!r.json.result?.isError, texteOutil(r));
+  assert.equal(sauvegardes, 1);
+  assert.ok(base.inscriptions.some((i) => i.id === 99), 'la ligne imparfaite reste intacte');
 });
 
 test('route : une panne d’écriture amont n’est pas silencieuse', async () => {

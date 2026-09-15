@@ -31,3 +31,27 @@ export function pickPersisted(state) {
   }
   return out;
 }
+
+// Empreinte des données saisies : deux états qui portent le même contenu
+// donnent la même chaîne, quel que soit l'ordre des clés. Ne dépend donc
+// d'aucun horodatage.
+//
+// C'est ce qui permet de savoir si le planning a RÉELLEMENT changé. On s'était
+// fié à « savedAt » : la base le régénère à chaque lecture, si bien que deux
+// lectures consécutives semblaient toujours en conflit et que toute
+// pré-réservation était refusée. Le contenu, lui, ne ment pas.
+export function empreintePersistee(state) {
+  return canonique(pickPersisted(state));
+}
+
+function canonique(valeur) {
+  if (Array.isArray(valeur)) return `[${valeur.map(canonique).join(',')}]`;
+  if (valeur && typeof valeur === 'object') {
+    const paires = Object.keys(valeur).sort()
+      .map((k) => `${JSON.stringify(k)}:${canonique(valeur[k])}`);
+    return `{${paires.join(',')}}`;
+  }
+  // JSON.stringify(undefined) rend undefined : on le ramène à « null » pour
+  // que la chaîne reste comparable.
+  return JSON.stringify(valeur) ?? 'null';
+}

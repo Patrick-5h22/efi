@@ -146,11 +146,23 @@ décalage silencieux.
 `efi_save_state` **remplace l'état entier**, sans écriture conditionnelle.
 Deux écrivains simultanés s'écrasent donc l'un l'autre.
 
-Atténuation en place (`gardeSavedAt`) : avant d'enregistrer, le serveur relit
-l'état et refuse si l'horodatage `savedAt` a changé depuis sa lecture. La
-fenêtre de collision se réduit à la durée d'une sauvegarde, et le cas courant
-— une assistante qui modifie le planning pendant qu'un commercial
-pré-réserve — est attrapé et signalé.
+Atténuation en place (`relireSiModifie`) : avant d'enregistrer, le serveur
+relit l'état et compare l'**empreinte du contenu persisté**. Si le planning a
+bougé, il ne l'écrase pas — il recalcule la pré-réservation sur la version
+fraîche, et `preReserver` refuse de lui-même si le jour annoncé au client n'est
+plus tenable. Deux collisions de suite font un refus explicite. La modification
+de l'assistante est ainsi préservée, et le commercial obtient tout de même son
+créneau quand il reste libre.
+
+> **Pourquoi pas `savedAt`.** C'était la première version, et elle refusait
+> *toute* pré-réservation en production. La RPC `efi_load_state` régénère cet
+> horodatage **à chaque lecture** : deux lectures consécutives n'en portent
+> jamais le même, si bien que la garde voyait un conflit là où rien n'avait
+> changé. Le simulacre Supabase des tests, lui, le supposait stable — c'est ce
+> qui a laissé passer la panne. Il rend maintenant un horodatage neuf à chaque
+> lecture, comme la vraie base. `savedAt` reste utile au navigateur, qui
+> compare celui rendu à l'enregistrement à celui vu au tour d'interrogation
+> suivant ; on ne peut simplement rien en déduire entre deux lectures.
 
 Ce n'est pas une vraie transaction. La supprimer demanderait une écriture
 conditionnelle ou un ajout incrémental côté Supabase, hors de portée de ce

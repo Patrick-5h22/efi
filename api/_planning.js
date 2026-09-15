@@ -9,10 +9,16 @@
 //
 // Attention : la sauvegarde REMPLACE l'état entier, sans écriture
 // conditionnelle. Deux écrivains simultanés s'écrasent donc l'un l'autre.
-// Tout appelant qui écrit doit relire juste avant et comparer « savedAt »
-// (voir gardeSavedAt plus bas).
+// Tout appelant qui écrit doit relire juste avant et comparer le contenu
+// (voir relireSiModifie plus bas).
+//
+// « savedAt » ne sert PAS à cela : la base le régénère à chaque lecture, deux
+// lectures consécutives ne portent donc jamais le même. Il reste utile au
+// navigateur, qui compare celui qu'on lui rend à l'enregistrement à celui vu
+// au tour d'interrogation suivant — mais on ne peut rien en déduire entre deux
+// lectures.
 
-import { pickPersisted } from '../js/persisted.js';
+import { pickPersisted, empreintePersistee } from '../js/persisted.js';
 
 const SUPABASE_URL = 'https://eeldkggxvkvpvumwvkca.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_6lJ88JCHt4n_lvxQ0UC3qg_c7zz-TV7';
@@ -58,18 +64,21 @@ export function saveState(state) {
   return rpc('efi_save_state', { p_code: accessCode(), p_state: pickPersisted(state) });
 }
 
-// Garde optimiste : relit l'état et refuse d'écrire si quelqu'un a enregistré
-// entre-temps. Ne remplace pas une vraie écriture conditionnelle — la fenêtre
-// de collision se réduit à la durée d'une sauvegarde — mais attrape le cas
-// courant : une assistante qui modifie le planning pendant qu'un commercial
-// pré-réserve.
-export async function gardeSavedAt(savedAtAttendu) {
+// Relit l'état juste avant d'écrire et rend la version fraîche si le contenu a
+// changé depuis la lecture de départ, « null » sinon.
+//
+// Ne remplace pas une vraie écriture conditionnelle — la fenêtre de collision
+// se réduit à la durée d'une sauvegarde — mais attrape le cas courant : une
+// assistante qui modifie le planning pendant qu'un commercial pré-réserve.
+// Comme la sauvegarde remplace l'état entier, écrire par-dessus effacerait sa
+// modification : à l'appelant de recalculer sur l'état rendu ici.
+export async function relireSiModifie(etatLu) {
   const frais = await loadState();
-  const actuel = frais?.savedAt ?? null;
-  if (savedAtAttendu != null && actuel !== savedAtAttendu) {
-    const err = new Error('Le planning a été modifié entre-temps. Relancez la recherche : les créneaux proposés ne sont peut-être plus libres.');
-    err.status = 409;
-    throw err;
-  }
-  return frais;
+  return empreintePersistee(frais) === empreintePersistee(etatLu) ? null : frais;
+}
+
+export function conflitEcriture() {
+  const err = new Error('Le planning a été modifié entre-temps. Relancez la recherche : les créneaux proposés ne sont peut-être plus libres.');
+  err.status = 409;
+  return err;
 }
