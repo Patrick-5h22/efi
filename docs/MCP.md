@@ -114,6 +114,17 @@ Paramètres : `formations` (codes du catalogue, obligatoire), `type`
 (Initial / Recyclage), `a_partir_du` (AAAA-MM-JJ), `stagiaire`, `nb_options`
 (1 à 3, 2 par défaut).
 
+**Une disponibilité est toujours à venir.** Sans `a_partir_du`, la recherche
+part d'aujourd'hui — heure locale du centre, pas l'UTC du serveur, sans quoi
+la journée en cours passerait pour écoulée après minuit à Paris. Une date
+demandée déjà passée est ramenée à aujourd'hui, et la réponse le dit : sinon
+les dates rendues ne correspondraient pas à la question, sans explication.
+`pre_reserver` refuse une date passée au lieu de la décaler en silence.
+
+> Ce plancher manquait : la recherche partait du début de la période. En
+> clientèle, l'outil a proposé des journées déjà écoulées, que l'assistant a
+> dû écarter lui-même.
+
 Renvoie un déroulé en français, prêt à être lu au client. Tient compte du
 planning réel : jours ouverts, habilitations et présence des intervenants,
 capacité des plateaux et de la salle, plafond de charge quotidien, pause

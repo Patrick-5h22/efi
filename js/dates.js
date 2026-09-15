@@ -10,6 +10,17 @@ export function toISO(date) {
   return date.toISOString().slice(0, 10);
 }
 
+// Date du jour, aux heures locales du centre.
+//
+// Le serveur tourne en UTC : passé minuit à Paris, « toISOString » rend encore
+// la veille, et une recherche de disponibilités proposerait alors la journée
+// écoulée. On ne déduit donc jamais « aujourd'hui » d'un horodatage UTC.
+export function dateDuJour(maintenant = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(maintenant);
+}
+
 export function addDays(iso, n) {
   const d = parseISO(iso);
   d.setUTCDate(d.getUTCDate() + n);

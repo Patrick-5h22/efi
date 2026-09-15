@@ -13,7 +13,7 @@
 import { migrate } from './store.js';
 import { suggestParcours, computeSchedule } from './engine.js';
 import { formationByCode } from './config.js';
-import { fmtTime, fmtDateDay } from './dates.js';
+import { fmtTime, fmtDateDay, dateDuJour } from './dates.js';
 
 const TYPES = ['Initial', 'Recyclage'];
 const MAX_OPTIONS = 3;
@@ -48,7 +48,7 @@ export function outils(state) {
         properties: {
           formations: formationsSchema,
           type: { type: 'string', enum: TYPES, description: 'Initial ou Recyclage. Par défaut : Initial.' },
-          a_partir_du: { type: 'string', description: 'Date au format AAAA-MM-JJ. Par défaut : dès que possible.' },
+          a_partir_du: { type: 'string', description: 'Date au format AAAA-MM-JJ, à venir. Par défaut : dès aujourd’hui.' },
           stagiaire: { type: 'string', description: 'Nom du stagiaire, s\'il est connu.' },
           nb_options: { type: 'integer', minimum: 1, maximum: MAX_OPTIONS, description: `Nombre de dates à proposer (1 à ${MAX_OPTIONS}, 2 par défaut).` },
         },
@@ -80,12 +80,19 @@ export function outils(state) {
 // ---------------------------------------------------------------------------
 // chercher_creneaux
 // ---------------------------------------------------------------------------
-export function chercherCreneaux(brut, args = {}) {
+export function chercherCreneaux(brut, args = {}, { aujourdHui = dateDuJour() } = {}) {
   const state = migrate(structuredClone(brut));
   const { formations, type } = valider(state, args);
   const stagiaire = (args.stagiaire || '').trim() || '(prospect)';
-  const aPartirDu = normaliserDate(args.a_partir_du);
+  const demandee = normaliserDate(args.a_partir_du);
   const nbOptions = borner(args.nb_options, 1, MAX_OPTIONS, 2);
+
+  // Une disponibilité est toujours à venir. Sans date de départ, on cherche
+  // depuis aujourd'hui — pas depuis le début de la période, ce qui faisait
+  // proposer des journées écoulées ; et une date demandée déjà passée est
+  // ramenée à aujourd'hui plutôt que d'être prise au mot.
+  const aPartirDu = demandee && demandee > aujourdHui ? demandee : aujourdHui;
+  const ramenee = !!demandee && demandee < aujourdHui;
 
   const options = suggestParcours(state, {
     stagiaire, formations, type, aPartirDu, maxOptions: nbOptions,
@@ -97,14 +104,17 @@ export function chercherCreneaux(brut, args = {}) {
       jours: o.jours,
       seances: o.seances,
     })),
-    texte: rendreOptions(state, { formations, type, aPartirDu, options }),
+    texte: rendreOptions(state, {
+      formations, type, aPartirDu, options,
+      implicite: !demandee, ramenee: ramenee ? demandee : null,
+    }),
   };
 }
 
 // ---------------------------------------------------------------------------
 // pre_reserver — recalcule plutôt que de faire confiance à ce qu'on lui passe
 // ---------------------------------------------------------------------------
-export function preReserver(brut, args = {}, { par = null } = {}) {
+export function preReserver(brut, args = {}, { par = null, aujourdHui = dateDuJour() } = {}) {
   const state = migrate(structuredClone(brut));
   const { formations, type } = valider(state, args);
 
@@ -113,6 +123,12 @@ export function preReserver(brut, args = {}, { par = null } = {}) {
 
   const jour = normaliserDate(args.jour);
   if (!jour) throw erreur('Le jour de l’option retenue est obligatoire (format AAAA-MM-JJ).');
+  // Refus explicite, et non un décalage silencieux vers la prochaine date
+  // libre : le commercial doit savoir qu'il a visé une journée écoulée.
+  if (jour < aujourdHui) {
+    throw erreur(`Le ${fmtDateDay(jour)} est déjà passé : on ne pré-réserve pas dans le passé. `
+      + 'Relancez la recherche pour obtenir des dates à venir.');
+  }
 
   const [option] = suggestParcours(state, {
     stagiaire, formations, type, aPartirDu: jour, maxOptions: 1,
@@ -223,17 +239,26 @@ function libelleCategories(state, codes) {
     .join(', ');
 }
 
-function rendreOptions(state, { formations, type, aPartirDu, options }) {
+function rendreOptions(state, { formations, type, aPartirDu, options, implicite = false, ramenee = null }) {
   const quoi = libelleCategories(state, formations);
-  const depuis = aPartirDu ? ` à partir du ${fmtDateDay(aPartirDu)}` : '';
+  // « aujourd'hui » plutôt qu'une date brute quand personne n'a demandé de
+  // date : le commercial voit ainsi que la recherche part du jour même.
+  const depuis = implicite
+    ? ` à partir d’aujourd’hui (${fmtDateDay(aPartirDu)})`
+    : ` à partir du ${fmtDateDay(aPartirDu)}`;
+  // Si la date demandée était passée, le dire : sans cela les dates rendues
+  // ne correspondraient pas à la question, sans explication.
+  const note = ramenee
+    ? `\n\nLe ${fmtDateDay(ramenee)} demandé est déjà passé ; la recherche part d’aujourd’hui.`
+    : '';
 
   if (!options.length) {
-    return `Aucune possibilité pour ${quoi} en ${type.toLowerCase()}${depuis}.\n\n`
+    return `Aucune possibilité pour ${quoi} en ${type.toLowerCase()}${depuis}.${note}\n\n`
       + 'Le plateau est saturé, ou aucun intervenant habilité n’est présent sur la période. '
       + 'Essayez une date plus tardive, ou vérifiez avec le centre.';
   }
 
-  const lignes = [`Possibilités pour ${quoi} — ${type.toLowerCase()}${depuis} :`];
+  const lignes = [`Possibilités pour ${quoi} — ${type.toLowerCase()}${depuis} :${note}`];
 
   options.forEach((o, n) => {
     lignes.push('');
