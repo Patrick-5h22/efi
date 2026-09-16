@@ -121,8 +121,8 @@ demandée déjà passée est ramenée à aujourd'hui, et la réponse le dit : si
 les dates rendues ne correspondraient pas à la question, sans explication.
 `pre_reserver` refuse une date passée au lieu de la décaler en silence.
 
-> Ce plancher manquait : la recherche partait du début de la période. En
-> clientèle, l'outil a proposé des journées déjà écoulées, que l'assistant a
+> Ce plancher manquait : la recherche partait du début de la fenêtre affichée.
+> En clientèle, l'outil a proposé des journées déjà écoulées, que l'assistant a
 > dû écarter lui-même.
 
 Renvoie un déroulé en français, prêt à être lu au client. Tient compte du

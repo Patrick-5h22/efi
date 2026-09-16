@@ -3,7 +3,7 @@
 // Reproduit les règles du classeur "Planification EFI v4.2".
 
 import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee, pauseCreneau, chevauchePause } from './config.js';
-import { isoWeek, overlaps, workingDays, fmtTime, mondayOf, weekDays, dateDuJour } from './dates.js';
+import { isoWeek, overlaps, workingDays, joursOuvrables, bornesDuMois, fenetreAffichage, addDays, fmtTime, mondayOf, dateDuJour, isWeekend, semainesAffichees } from './dates.js';
 
 // ---------------------------------------------------------------------------
 // Calcul principal : retourne un tableau de "lignes calculées" alignées sur
@@ -12,7 +12,11 @@ import { isoWeek, overlaps, workingDays, fmtTime, mondayOf, weekDays, dateDuJour
 export function computeSchedule(state) {
   const { params, formations, team, inscriptions } = state;
   const openDays = new Set(state.openDays);
-  const validDays = new Set(workingDays(params));
+  // Un jour tenable est un jour OUVRABLE — ni week-end, ni férié. La fenêtre
+  // d'affichage n'entre pas dans ce jugement : une séance de la semaine
+  // dernière est passée, pas anormale.
+  const feries = new Set((params.holidays || []).map((h) => h.date || h));
+  const ouvrable = (d) => !isWeekend(d) && !feries.has(d);
   const theoryEnd = params.theoryTime + params.theoryDuration;
 
   const rows = inscriptions.map((insc) => {
@@ -211,7 +215,7 @@ export function computeSchedule(state) {
   }
 
   // --- Contrôles ----------------------------------------------------------
-  validateRows(active, { state, params, openDays, validDays, theoryDays, theoryTesters, qualified, presentOn, theorySessions });
+  validateRows(active, { state, params, openDays, ouvrable, theoryDays, theoryTesters, qualified, presentOn, theorySessions });
 
   return {
     rows,
@@ -229,14 +233,14 @@ export function computeSchedule(state) {
 // Contrôles automatiques — colonne STATUT
 // ---------------------------------------------------------------------------
 function validateRows(rows, ctx) {
-  const { state, params, openDays, validDays, theoryTesters, qualified, presentOn, theorySessions = [] } = ctx;
+  const { state, params, openDays, ouvrable, theoryTesters, qualified, presentOn, theorySessions = [] } = ctx;
   const theoryEnd = params.theoryTime + params.theoryDuration;
   const pratiqueLabel = (row) => (row.formation?.testOnly ? 'Épreuve' : 'Pratique');
   const memberNameOf = (st, id) => st.team.find((m) => m.id === id)?.name || id;
 
   const checkDay = (row, date, label) => {
     if (!date) return;
-    if (!validDays.has(date)) row.errors.push(`${label} : hors période ou jour non ouvré`);
+    if (!ouvrable(date)) row.errors.push(`${label} : week-end ou jour férié`);
     else if (!openDays.has(date)) row.errors.push(`${label} : jour non ouvert (EFI)`);
   };
 
@@ -715,27 +719,54 @@ export function scopeWindow(state, scope = 'periode', todayISO = null) {
   // Heures locales du centre, jamais l'UTC : passé minuit à Paris, un « today »
   // déduit de toISOString rendrait la veille, et la portée « semaine » pourrait
   // basculer d'une semaine.
-  const today = todayISO || dateDuJour();
-  const ref = today < params.periodStart ? params.periodStart
-    : today > params.periodEnd ? params.periodEnd : today;
+  //
+  // Plus rien à ramener dans une période réglée à la main : chaque portée porte
+  // ses propres bornes.
+  const ref = todayISO || dateDuJour();
 
-  let isIn = () => true;
+  // Chaque portée définit son intervalle — et non l'intersection avec la
+  // fenêtre d'affichage : « le mois en cours » est le mois entier. Intersecté,
+  // il ne comptait plus, le 15 septembre, que la seconde quinzaine, et la
+  // carte d'occupation du mois s'effondrait à zéro.
+  let debut;
+  let fin;
   if (scope === 'semaine') {
-    const week = new Set(weekDays(mondayOf(ref)));
-    isIn = (d) => week.has(d);
+    debut = mondayOf(ref);
+    fin = addDays(debut, 6);
   } else if (scope === 'mois') {
-    const ym = ref.slice(0, 7);
-    isIn = (d) => !!d && d.startsWith(ym);
+    ({ debut, fin } = bornesDuMois(ref));
+  } else {
+    ({ debut, fin } = fenetreAffichage(ref));
   }
+  const isIn = (d) => !!d && d >= debut && d <= fin;
 
-  const working = workingDays(params).filter(isIn);
+  const working = joursOuvrables(params, debut, fin);
   const openDays = state.openDays.filter((d) => working.includes(d));
-  return { scope, ref, isIn, workingCount: working.length, openDays };
+  return { scope, ref, debut, fin, isIn, workingCount: working.length, openDays };
 }
 
 // Une ligne appartient à la portée si l'une de ses activités (pratique ou
 // test pratique) y a lieu. Sur la période complète, tout compte — y compris
 // les inscriptions pas encore planifiées.
+// Semaines qu'on peut ouvrir dans les grilles : la fenêtre d'affichage, plus
+// celles qui portent déjà une séance.
+//
+// La fenêtre glisse et commence à la semaine en cours. Sans ce complément, une
+// séance de la semaine dernière deviendrait inconsultable : le lien « S37 » de
+// la liste des anomalies atterrirait sur une autre semaine, et il n'y aurait
+// plus aucun moyen de relire ce qui s'est passé.
+export function semainesConsultables(state, aujourdHui = dateDuJour()) {
+  const par = new Map(semainesAffichees(aujourdHui).map((w) => [w.monday, w]));
+  for (const i of state.inscriptions || []) {
+    for (const d of [i.datePratique, i.dateTestPratique, i.dateTheorie, i.dateTheorieFormation]) {
+      if (!d) continue;
+      const monday = mondayOf(d);
+      if (!par.has(monday)) par.set(monday, { week: isoWeek(monday), monday });
+    }
+  }
+  return [...par.values()].sort((a, b) => (a.monday < b.monday ? -1 : 1));
+}
+
 export function rowInScope(row, win) {
   if (win.scope === 'periode') return true;
   return !!(row.insc.datePratique && win.isIn(row.insc.datePratique))
@@ -796,7 +827,7 @@ export function occupationSummary(state, schedule, scope = 'periode', todayISO =
 
   return {
     scope,
-    ref, // date de référence (ramenée dans la période) — pour le libellé
+    ref, // date de référence (le jour même) — pour le libellé
     days: scopeDays.size,
     pct: total ? Math.min(100, Math.round((busy / total) * 100)) : 0,
     hours: busy * params.slotMinutes / 60,
@@ -807,12 +838,15 @@ export function occupationSummary(state, schedule, scope = 'periode', todayISO =
 // Proposition automatique de créneaux : première combinaison
 // pratique (+ test pratique + théorie si obligatoires) sans anomalie.
 // ---------------------------------------------------------------------------
-export function suggestSlots(state, { stagiaire, formation: code, type, aPartirDu = null }, excludeId = null) {
+export function suggestSlots(state, { stagiaire, formation: code, type, aPartirDu = null, aujourdHui = dateDuJour() }, excludeId = null) {
   const { params } = state;
   const formation = formationByCode(state.formations, code);
   if (!formation || !stagiaire) return null;
   const duree = dureeFor(formation, type);
-  const openDays = workingDays(params)
+  // La fenêtre d'affichage borne les propositions : on ne planifie pas dans le
+  // passé, ni à plus de seize semaines. « aujourdHui » est un point d'entrée
+  // pour les tests — sans lui ils dériveraient avec le calendrier réel.
+  const openDays = workingDays(params, aujourdHui)
     .filter((d) => state.openDays.includes(d) && (!aPartirDu || d >= aPartirDu));
   const slots = [];
   for (let t = params.dayStart; t + params.slotMinutes <= params.dayEnd; t += params.slotMinutes) {

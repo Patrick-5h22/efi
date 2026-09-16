@@ -3,7 +3,8 @@
 // Navigation, semaines, dossiers, actions et thèmes, filtrés en direct.
 
 import { app, esc, navigate } from '../app.js';
-import { periodWeeks, fmtDateShort } from '../dates.js';
+import { fmtDateShort } from '../dates.js';
+import { semainesConsultables } from '../engine.js';
 import { openInscriptionForm } from './form.js';
 import { THEME_PRESETS, setTheme, getTheme } from '../theme.js';
 
@@ -28,7 +29,7 @@ function buildItems() {
     { group: 'Actions', label: '↩ Annuler la dernière action', run: () => app.undo() },
   );
 
-  for (const { week, monday } of periodWeeks(state.params)) {
+  for (const { week, monday } of semainesConsultables(state)) {
     items.push({
       group: 'Semaines',
       label: `🗓 Semaine ${week} — ${fmtDateShort(monday)}`,

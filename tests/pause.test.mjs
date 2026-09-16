@@ -127,7 +127,9 @@ test('occupation : le taux monte quand la pause réduit les créneaux offerts', 
   const build = (pause) => {
     const state = fixture({ pause });
     state.inscriptions = [inscription({ debutPratique: 480 })]; // 08:00 → 10:00
-    return occupationSummary(state, computeSchedule(state), 'periode');
+    // Date de référence explicite : la fenêtre d'affichage glisse avec le
+    // calendrier, et sans elle ce test mentirait dès que le 01/09 en sortirait.
+    return occupationSummary(state, computeSchedule(state), 'periode', '2026-09-01');
   };
   const sans = build(false);
   const avec = build(true);

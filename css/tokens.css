@@ -50,6 +50,12 @@
      aux anomalies et n'occupe plus les grilles. */
   --free: oklch(0.975 0.004 250);
   --free-hover: oklch(0.93 0.006 250);
+  /* Bandes horizontales des grilles : une ligne sur deux est teintée pour
+     qu'on suive un jour d'un bout à l'autre des dix-huit créneaux. L'écart
+     avec --free et --muted reste faible — il s'agit de guider l'œil, pas de
+     concurrencer le code couleur des créneaux, qui porte le sens. */
+  --zebra: oklch(0.945 0.005 250);
+  --zebra-tete: oklch(0.925 0.004 260);
   --confirmed: oklch(0.92 0.055 150);
   --confirmed-border: oklch(0.72 0.11 150);
   --pre: oklch(0.94 0.075 92);
@@ -152,6 +158,8 @@
   /* Code couleur des créneaux — mêmes rôles qu'en clair */
   --free: oklch(0.21 0.004 250);
   --free-hover: oklch(0.29 0.006 250);
+  --zebra: oklch(0.255 0.005 250);
+  --zebra-tete: oklch(0.315 0.004 260);
   --confirmed: oklch(0.33 0.055 150);
   --confirmed-border: oklch(0.55 0.1 150);
   --pre: oklch(0.35 0.06 90);

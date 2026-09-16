@@ -12,6 +12,7 @@
 // fois. Aucun calcul métier n'en dépend : c'est une alerte de saisie.
 
 import { formationByCode } from './config.js';
+import { fenetreAffichage } from './dates.js';
 
 const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
@@ -31,15 +32,14 @@ function lignesFacturees(state) {
 }
 
 // Années civiles proposables : celles des pratiques facturées, plus celles
-// couvertes par la période de planification.
+// couvertes par la fenêtre d'affichage.
 export function anneesDisponibles(state) {
   const set = new Set();
   for (const i of lignesFacturees(state)) {
     if (i.datePratique) set.add(i.datePratique.slice(0, 4));
   }
-  for (const d of [state.params?.periodStart, state.params?.periodEnd]) {
-    if (d) set.add(d.slice(0, 4));
-  }
+  const fenetre = fenetreAffichage();
+  for (const d of [fenetre.debut, fenetre.fin]) set.add(d.slice(0, 4));
   return [...set].sort();
 }
 

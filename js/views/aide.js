@@ -1,14 +1,15 @@
 // Mode d'emploi intégré — adapté de l'onglet « Mode d'emploi » du classeur.
 
 import { app } from '../app.js';
-import { fmtTime, fmtDateShort } from '../dates.js';
+import { fmtTime, fmtDateShort, fenetreAffichage, SEMAINES_AFFICHEES } from '../dates.js';
 
 export function renderAide(main) {
   const p = app.state.params;
+  const fenetre = fenetreAffichage();
   main.innerHTML = `
     <div class="page-header">
       <h1>Mode d'emploi</h1>
-      <span class="sub">Prise de rendez-vous — formations pratiques & tests (${fmtDateShort(p.periodStart)} → ${fmtDateShort(p.periodEnd)})</span>
+      <span class="sub">Prise de rendez-vous — formations pratiques &amp; tests (${SEMAINES_AFFICHEES} semaines : ${fmtDateShort(fenetre.debut)} → ${fmtDateShort(fenetre.fin)})</span>
     </div>
 
     <div class="card">
@@ -98,7 +99,12 @@ export function renderAide(main) {
           Le rouge ne sert plus qu'aux <b>anomalies</b> : une ligne rouge est une ligne à corriger,
           jamais un simple créneau occupé.</li>
         <li><b>Synthèse semaine</b> : déroulé chronologique imprimable — à remettre au formateur et au testeur du jour.</li>
-        <li><b>Plannings formateur / testeur</b> : vue globale des 86 jours (1 ligne/jour, 1 colonne/créneau de 30 min).</li>
+        <li><b>Plannings formateur / testeur</b> : vue globale de la fenêtre affichée (1 ligne/jour, 1 colonne/créneau de 30 min).</li>
+        <li><b>Ce qui est affiché</b> : ${SEMAINES_AFFICHEES} semaines à partir de la semaine en cours
+          (${fmtDateShort(fenetre.debut)} → ${fmtDateShort(fenetre.fin)}). La fenêtre glisse d'elle-même :
+          il n'y a pas de dates de début et de fin à régler. Une séance déjà passée reste consultable —
+          les grilles proposent aussi les semaines qui portent une inscription — et n'est
+          <b>jamais</b> comptée comme une anomalie : passée n'est pas fautive.</li>
       </ul>
     </div>
 

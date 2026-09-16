@@ -2,7 +2,7 @@
 
 import { app, esc, render } from '../app.js';
 import { memberName } from '../store.js';
-import { periodWeeks, fmtDateShort, fmtTime, isoWeek, weekDays, fmtDateDay, dateDuJour, mondayOf } from '../dates.js';
+import { semainesAffichees, fenetreAffichage, SEMAINES_AFFICHEES, fmtDateShort, fmtTime, isoWeek, weekDays, fmtDateDay, dateDuJour, mondayOf } from '../dates.js';
 import { occupancyByDay, occupationSummary, scopeWindow, rowInScope, prochainesActivites, OCCUPATION_SCOPES } from '../engine.js';
 import { getKpiScope, setKpiScope } from '../prefs.js';
 import { openInscriptionForm } from './form.js';
@@ -10,7 +10,10 @@ import { openInscriptionForm } from './form.js';
 export function renderDashboard(main) {
   const state = app.state;
   const { rows } = app.schedule;
-  const weeks = periodWeeks(state.params);
+  // Seize semaines à partir de la semaine EN COURS : la fenêtre glisse avec
+  // le calendrier, il n'y a plus de dates de début et de fin à régler.
+  const weeks = semainesAffichees();
+  const fenetre = fenetreAffichage();
 
   // Portée commune du tableau de bord : période / semaine / mois — un clic
   // sur n'importe quelle carte KPI la fait tourner, choix mémorisé (profil
@@ -34,12 +37,12 @@ export function renderDashboard(main) {
   const { lignes: upcoming, passees } = prochainesActivites(scopedRows);
 
   const occ = occupationSummary(state, app.schedule, scope);
-  const occLabel = scopeName || 'jours ouverts (période)';
+  const occLabel = scopeName || `jours ouverts (${SEMAINES_AFFICHEES} semaines)`;
 
   main.innerHTML = `
     <div class="page-header">
       <h1>Tableau de bord</h1>
-      <span class="sub">Formations pratiques & tests — ${fmtDateShort(state.params.periodStart)} → ${fmtDateShort(state.params.periodEnd)}</span>
+      <span class="sub">Formations pratiques &amp; tests — ${SEMAINES_AFFICHEES} semaines à partir de la semaine en cours : ${fmtDateShort(fenetre.debut)} → ${fmtDateShort(fenetre.fin)}</span>
       <div class="page-actions">
         <a class="btn" href="#/inscriptions" id="quick-add">➕ Inscrire un stagiaire</a>
       </div>
@@ -57,7 +60,7 @@ export function renderDashboard(main) {
     </div>
 
     <div class="card">
-      <h2>🔥 Occupation de la période</h2>
+      <h2>🔥 Occupation — ${SEMAINES_AFFICHEES} semaines à partir de la semaine en cours</h2>
       ${heatmapHTML(state, weeks)}
     </div>
 
@@ -107,7 +110,7 @@ export function renderDashboard(main) {
       </div>` : passees ? `<p class="muted">Aucune activité à venir${suffix} — ${passees} déjà passée(s), voir <a href="#/inscriptions">Inscriptions</a>.</p>`
       : scopeName && rows.length ? `<p class="muted">Aucune activité sur cette portée (${scopeName}).</p>`
       : `<p class="muted">Aucune inscription. Commencez par <a href="#/inscriptions">inscrire un stagiaire</a>
-        ou ouvrez des <a href="#/jours">jours EFI</a>, puis cliquez sur un créneau libre d'une <a href="#/semaine/${weeks[0].week}">grille semaine</a>.</p>`}
+        ou ouvrez des <a href="#/jours">jours EFI</a>, puis cliquez sur un créneau libre d'une <a href="#/semaine">grille semaine</a>.</p>`}
     </div>
   `;
 
@@ -152,13 +155,11 @@ function heatmapHTML(state, weeks) {
 
   const cols = weeks.map(({ week, monday }) => {
     const cells = weekDays(monday).map((date) => {
-      const inPeriod = date >= state.params.periodStart && date <= state.params.periodEnd;
       // Le repère du jour vaut pour TOUTE case, y compris un jour fermé ou
       // férié : c'est précisément quand aujourd'hui n'est pas ouvert qu'on a
       // besoin de savoir où l'on se trouve sur la carte.
       const cejour = date === aujourdHui ? ' hm-today' : '';
       const jourDit = cejour ? ' — aujourd’hui' : '';
-      if (!inPeriod) return `<span class="hm-cell hm-out${cejour}"${cejour ? ` title="${fmtDateDay(date)}${jourDit}"` : ''}></span>`;
       if (holidays.has(date)) return `<span class="hm-cell hm-holiday${cejour}" title="${fmtDateDay(date)} — férié${jourDit}"></span>`;
       if (!openSet.has(date)) return `<span class="hm-cell hm-closed${cejour}" title="${fmtDateDay(date)} — fermé (EFI)${jourDit}"></span>`;
       const d = occ.get(date) || { busy: 0, total: 0, ratio: 0, errors: 0 };

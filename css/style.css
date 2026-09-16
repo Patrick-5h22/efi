@@ -334,6 +334,34 @@ table.planning th.day-col, table.planning td.day-col {
 table.planning th.who-col, table.planning td.who-col {
   text-align: left; width: 112px; background: var(--muted); font-size: 11px;
 }
+/* Hauteur de ligne uniforme (la valeur vient de js/views/grille.js, posée en
+   style d'attribut sur le tableau). Sans elle, chaque ligne se dimensionnait
+   sur son contenu : un jour vide faisait 22 px, un jour chargé 48 px, et la
+   grille montait et descendait en escalier. C'est un PLANCHER, pas un
+   plafond — une cellule à deux stagiaires pousse encore sa ligne plutôt que
+   de rogner un nom. */
+table.planning td { height: var(--h-ligne, auto); vertical-align: middle; }
+
+/* Plannings globaux : 86 jours d'affilée, une ligne par jour. Leurs cellules
+   ne fusionnent pas — un nom de stagiaire y est réécrit à chaque demi-heure —
+   et replié sur trois lignes dans 58 px il faisait des lignes de 74 px à côté
+   de lignes de 42. Une ligne par cellule, coupée par des points de
+   suspension : la page devient régulière et deux fois plus courte. Le nom
+   entier reste dans l'infobulle, portée par chaque cellule. */
+table.planning.planning-global td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.planning.planning-global td.day-col { white-space: nowrap; }
+
+/* Bandes horizontales : une ligne sur deux est teintée, pour suivre un jour
+   sur toute la largeur sans changer de ligne en route. La teinte ne touche
+   que les cellules NEUTRES — libre, hors service, et les deux colonnes de
+   gauche. Les couleurs d'état (confirmée, pré-réservée, théorie, épreuve,
+   fermé, pause) portent du sens : les rayer les rendrait ambiguës. */
+table.planning tr.ligne-alt td.day-col,
+table.planning tr.ligne-alt td.who-col,
+table.planning tr.ligne-alt td.slot-off { background: var(--zebra-tete); }
+table.planning tr.ligne-alt td.slot-free { background: var(--zebra); }
+table.planning tr.ligne-alt td.slot-free:hover,
+table.planning tr.ligne-alt td.slot-free:focus-visible { background: var(--free-hover); }
 /* Créneau libre : fond neutre (le vert sert désormais aux confirmations).
    L'affordance de clic passe par le survol et le focus. */
 td.slot-free { background: var(--free); cursor: pointer; }
@@ -462,7 +490,6 @@ table.cal td.cal-empty { background: var(--background); }
 .hm-4 { background: var(--primary); box-shadow: var(--neon-glow, none); }
 .hm-closed { background: var(--background); border: 1px dashed var(--grid-line); }
 .hm-holiday { background: repeating-linear-gradient(45deg, var(--closed), var(--closed) 3px, var(--background) 3px, var(--background) 6px); }
-.hm-out { background: transparent; }
 .hm-alert { box-shadow: inset 0 0 0 2px var(--destructive); }
 .hm-pre { outline: 1px dashed var(--warn); outline-offset: 1px; }
 .kpi { transition: border-color .15s ease; }
@@ -533,6 +560,10 @@ dialog.cmdk {
     --free: #fff; --confirmed: #dcf2e4; --confirmed-border: #7fbb96;
     --pre: #fdf3d7; --pre-border: #d9b45c; --theory-bg: #dee7fa; --theory-border: #8ba6dd;
     --exam-bg: #ecdff5; --exam-border: #b28fce; --closed: #ececec; --cal-open: #dcf2e4;
+    /* Les bandes survivent à l'impression : c'est là qu'on suit une ligne du
+       doigt, et « print-color-adjust: exact » plus bas empêche le navigateur
+       de les blanchir. */
+    --zebra: #f4f4f6; --zebra-tete: #e8e8ea;
     --neon-glow: none;
   }
   #sidebar, .page-actions, .no-print, #toast-zone { display: none !important; }

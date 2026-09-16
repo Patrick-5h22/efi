@@ -3,7 +3,8 @@
 
 import { app, esc, toast } from '../app.js';
 import { removeInscription, memberName } from '../store.js';
-import { fmtTime, fmtDateShort, periodWeeks } from '../dates.js';
+import { fmtTime, fmtDateShort } from '../dates.js';
+import { semainesConsultables } from '../engine.js';
 import { openInscriptionForm } from './form.js';
 import { buildICS, downloadICS } from '../ics.js';
 import { importInscriptionsCSV } from '../csv.js';
@@ -28,7 +29,10 @@ const SORTERS = {
 export function renderInscriptions(main) {
   const state = app.state;
   const { rows } = app.schedule;
-  const weeks = periodWeeks(state.params);
+  // Le filtre par semaine offre la fenêtre à venir ET les semaines qui
+  // portent déjà une séance : sans cela, on ne pourrait plus filtrer sur une
+  // séance passée, que la liste continue pourtant d'afficher.
+  const weeks = semainesConsultables(state);
 
   const visible = rows.filter((row) => {
     // La recherche porte aussi sur le n° de dossier : c'est la clé qu'utilisent

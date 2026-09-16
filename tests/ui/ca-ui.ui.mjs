@@ -20,7 +20,12 @@ await page.fill('input[name=stagiaire]', 'NEAU Emmanuel');
 await page.fill('input[name=dossierYpareo]', '0123456789');
 await page.fill('input[name=chiffreAffaires]', '1250');
 await page.selectOption('select[name=formation]', 'HAB-ELEC'); await page.waitForTimeout(300);
-await page.selectOption('select[name=datePratique]', '2026-09-01'); await page.waitForTimeout(400);
+// Premier jour OUVERT proposé, et non une date écrite en clair : les jours
+// ouverts d'une installation neuve suivent la fenêtre glissante (seize
+// semaines depuis la semaine en cours), ils ne sont plus datés en dur.
+const jour = await page.locator('select[name=datePratique] option').evaluateAll(
+  (opts) => opts.map((o) => o.value).filter((v) => v)[0]);
+await page.selectOption('select[name=datePratique]', jour); await page.waitForTimeout(400);
 // Premier créneau réellement proposé (les exemples du classeur en occupent déjà)
 const creneau = await page.locator('select[name=debutPratique] option').evaluateAll(
   (opts) => opts.map((o) => o.value).filter((v) => v)[0]);
