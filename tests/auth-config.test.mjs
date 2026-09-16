@@ -145,6 +145,30 @@ test('vercel.json : la découverte OAuth est routée depuis la racine', async ()
   }
 });
 
+// « cleanUrls » transforme chaque fichier .html en REDIRECTION 308 vers son
+// chemin sans extension : /consent.html répond 308 vers /consent, et n'est
+// donc pas une page servie. Une réécriture qui vise un .html pointe alors
+// vers une redirection, et Vercel rend 404.
+//
+// C'est exactement ce qui est arrivé à /login → /consent.html : la découverte
+// OAuth fonctionnait, le consentement aussi, mais la page de connexion — la
+// première que voit un utilisateur non connecté — répondait 404. Le connecteur
+// MCP s'arrêtait là, sur un écran « This page doesn't exist ».
+test('vercel.json : aucune réécriture ne vise un .html quand cleanUrls est actif', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const cfg = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+  if (!cfg.cleanUrls) return;
+
+  const fautives = (cfg.rewrites || []).filter((r) => r.destination.endsWith('.html'));
+  assert.deepEqual(fautives, [],
+    'avec cleanUrls, la destination doit être le chemin propre (/consent) et non le fichier (/consent.html)');
+
+  // Et la page de connexion doit bien être routée : sans elle, l'autorisation
+  // OAuth s'interrompt avant même de commencer.
+  const vers = (cfg.rewrites || []).find((r) => r.source === '/login')?.destination;
+  assert.equal(vers, '/consent', 'la page de connexion OAuth doit être servie');
+});
+
 // Réponse Vercel simulée : on ne retient que ce que les routes en font.
 function reponse() {
   const r = {

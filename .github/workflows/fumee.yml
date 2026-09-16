@@ -118,6 +118,26 @@ jobs:
             esac
           done
 
+      - name: Les pages de connexion et de consentement sont servies
+        run: |
+          set -euo pipefail
+          # Ces deux pages sont le début du flux d'autorisation OAuth : un
+          # utilisateur non connecté arrive sur /login. Elles sont statiques,
+          # donc servies même sans MCP_OAUTH — un 404 ici n'est jamais normal.
+          #
+          # C'est la panne qu'aucun test ne voyait : « cleanUrls » fait de
+          # /consent.html une redirection 308, si bien qu'une réécriture qui le
+          # visait rendait 404. La découverte OAuth répondait, le consentement
+          # aussi, et la page de connexion non — le connecteur s'arrêtait là.
+          for c in /login /consent; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "${{ steps.cible.outputs.url }}$c")
+            echo "$c → $code"
+            if [ "$code" != "200" ]; then
+              echo "::error::$c répond $code — le flux d’autorisation OAuth est rompu"
+              exit 1
+            fi
+          done
+
       - name: La route MCP refuse un mauvais jeton
         run: |
           set -euo pipefail

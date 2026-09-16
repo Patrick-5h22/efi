@@ -37,9 +37,10 @@ export function pickPersisted(state) {
 // d'aucun horodatage.
 //
 // C'est ce qui permet de savoir si le planning a RÉELLEMENT changé. On s'était
-// fié à « savedAt » : la base le régénère à chaque lecture, si bien que deux
-// lectures consécutives semblaient toujours en conflit et que toute
-// pré-réservation était refusée. Le contenu, lui, ne ment pas.
+// fié à « savedAt », que la RPC rendait avec « now() » : deux lectures
+// consécutives semblaient toujours en conflit et toute pré-réservation était
+// refusée. La migration 003 a corrigé la RPC, mais le contenu reste le seul
+// juge sûr — il ne dépend d'aucune horloge.
 export function empreintePersistee(state) {
   return canonique(pickPersisted(state));
 }

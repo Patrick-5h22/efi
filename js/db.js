@@ -109,9 +109,10 @@ export function createSyncer({ getState, onStatus, onRemoteChange, onAuthError }
   let inFlight = false;
   let status = 'off'; // off | idle | saving | error
   // Contenu distant connu, sous forme d'empreinte. On comparait auparavant
-  // l'horodatage « savedAt » : la base le régénère à chaque lecture, si bien
-  // que chaque tour d'interrogation croyait voir une modification et
-  // rechargeait le planning — avec son message — toutes les 45 secondes.
+  // l'horodatage « savedAt », que la RPC rendait avec « now() » : chaque tour
+  // d'interrogation croyait voir une modification et rechargeait le planning —
+  // avec son message — toutes les 45 secondes. La migration 003 a corrigé la
+  // RPC ; l'empreinte du contenu reste plus sûre qu'un horodatage.
   let derniereEmpreinte = null;
 
   const set = (s, detail) => { status = s; onStatus(s, detail); };

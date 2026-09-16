@@ -64,7 +64,7 @@ test('persistance : un état ancien sans présence se recharge sans casser', () 
 // L'empreinte est ce qui permet de savoir si le planning a réellement changé
 // avant d'écrire par-dessus. Elle doit ignorer tout ce qui n'est pas du
 // contenu saisi — l'horodatage `savedAt` en premier lieu, que la base
-// régénère à chaque lecture.
+// régénérait à chaque lecture avant la migration 003.
 test('empreinte : insensible à l’ordre des clés et aux champs non persistés', () => {
   const a = defaultState();
   a.openDays = ['2026-09-02'];
