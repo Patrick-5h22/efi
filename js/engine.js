@@ -3,7 +3,7 @@
 // Reproduit les règles du classeur "Planification EFI v4.2".
 
 import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee, pauseCreneau, chevauchePause } from './config.js';
-import { isoWeek, overlaps, workingDays, fmtTime, mondayOf, weekDays, toISO } from './dates.js';
+import { isoWeek, overlaps, workingDays, fmtTime, mondayOf, weekDays, dateDuJour } from './dates.js';
 
 // ---------------------------------------------------------------------------
 // Calcul principal : retourne un tableau de "lignes calculées" alignées sur
@@ -712,7 +712,10 @@ export const OCCUPATION_SCOPES = ['periode', 'semaine', 'mois'];
 // bord (le même choix de portée gouverne l'ensemble des indicateurs).
 export function scopeWindow(state, scope = 'periode', todayISO = null) {
   const { params } = state;
-  const today = todayISO || toISO(new Date());
+  // Heures locales du centre, jamais l'UTC : passé minuit à Paris, un « today »
+  // déduit de toISOString rendrait la veille, et la portée « semaine » pourrait
+  // basculer d'une semaine.
+  const today = todayISO || dateDuJour();
   const ref = today < params.periodStart ? params.periodStart
     : today > params.periodEnd ? params.periodEnd : today;
 
@@ -737,6 +740,32 @@ export function rowInScope(row, win) {
   if (win.scope === 'periode') return true;
   return !!(row.insc.datePratique && win.isIn(row.insc.datePratique))
     || !!(row.insc.dateTestPratique && win.isIn(row.insc.dateTestPratique));
+}
+
+// « Prochaines activités » : les séances À VENIR, de la plus proche à la plus
+// lointaine.
+//
+// Le tableau de bord prenait les premières lignes de la portée triées par
+// date, sans plancher : sur la portée « période », il affichait donc les
+// activités les plus ANCIENNES — septembre en décembre. Le titre promettait
+// l'avenir, le contenu montrait un passé révolu, et rien ne bougeait d'un
+// jour à l'autre.
+//
+// Les journées en cours comptent comme à venir : une séance de cet
+// après-midi n'est pas du passé.
+export function prochainesActivites(rows, { aujourdHui = dateDuJour(), max = 8 } = {}) {
+  const datees = rows.filter((r) => r.insc.datePratique);
+  const aVenir = datees.filter((r) => r.insc.datePratique >= aujourdHui);
+  return {
+    lignes: aVenir
+      .sort((a, b) => a.insc.datePratique.localeCompare(b.insc.datePratique)
+        || (a.insc.debutPratique ?? 0) - (b.insc.debutPratique ?? 0))
+      .slice(0, max),
+    // Distingue « rien de planifié » de « tout est passé » : les deux méritent
+    // un message différent, et la seconde n'est pas une anomalie en fin de
+    // période.
+    passees: datees.length - aVenir.length,
+  };
 }
 
 export function occupationSummary(state, schedule, scope = 'periode', todayISO = null) {

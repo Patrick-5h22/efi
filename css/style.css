@@ -469,6 +469,11 @@ table.cal td.cal-empty { background: var(--background); }
 .kpi:hover { border-color: var(--ring); }
 .hm-week { font-size: 10px; color: var(--muted-foreground); text-align: center; height: 14px; cursor: pointer; border-radius: 4px; }
 .hm-week:hover { color: var(--primary); font-weight: 700; }
+/* Repère du jour : sur une carte de quatre mois, on doit voir où l'on en est
+   sans compter les colonnes. Un liseré, pas un aplat — la couleur des cases
+   porte déjà le taux d'occupation et ne doit pas être masquée. */
+.hm-cell.hm-today { box-shadow: inset 0 0 0 2px var(--primary); }
+.hm-week-courante { color: var(--primary); font-weight: 700; }
 
 /* ---------- Sélecteur de thème ---------- */
 #theme-menu { position: relative; }

@@ -2,8 +2,8 @@
 
 import { app, esc, render } from '../app.js';
 import { memberName } from '../store.js';
-import { periodWeeks, fmtDateShort, fmtTime, isoWeek, weekDays, fmtDateDay } from '../dates.js';
-import { occupancyByDay, occupationSummary, scopeWindow, rowInScope, OCCUPATION_SCOPES } from '../engine.js';
+import { periodWeeks, fmtDateShort, fmtTime, isoWeek, weekDays, fmtDateDay, dateDuJour, mondayOf } from '../dates.js';
+import { occupancyByDay, occupationSummary, scopeWindow, rowInScope, prochainesActivites, OCCUPATION_SCOPES } from '../engine.js';
 import { getKpiScope, setKpiScope } from '../prefs.js';
 import { openInscriptionForm } from './form.js';
 
@@ -29,11 +29,9 @@ export function renderDashboard(main) {
   const nbPre = scopedRows.filter((r) => r.insc.statut === 'pre').length;
   const openCount = win.openDays.length;
 
-  // Prochaines activités de la portée (à partir du premier jour planifié)
-  const upcoming = scopedRows
-    .filter((r) => r.insc.datePratique)
-    .sort((a, b) => a.insc.datePratique.localeCompare(b.insc.datePratique) || (a.insc.debutPratique ?? 0) - (b.insc.debutPratique ?? 0))
-    .slice(0, 8);
+  // Prochaines activités : à partir d'AUJOURD'HUI, jamais du premier jour
+  // planifié de la période — c'est ce qui figeait la carte sur le passé.
+  const { lignes: upcoming, passees } = prochainesActivites(scopedRows);
 
   const occ = occupationSummary(state, app.schedule, scope);
   const occLabel = scopeName || 'jours ouverts (période)';
@@ -106,7 +104,8 @@ export function renderDashboard(main) {
               </tr>`).join('')}
           </tbody>
         </table>
-      </div>` : scopeName && rows.length ? `<p class="muted">Aucune activité sur cette portée (${scopeName}).</p>`
+      </div>` : passees ? `<p class="muted">Aucune activité à venir${suffix} — ${passees} déjà passée(s), voir <a href="#/inscriptions">Inscriptions</a>.</p>`
+      : scopeName && rows.length ? `<p class="muted">Aucune activité sur cette portée (${scopeName}).</p>`
       : `<p class="muted">Aucune inscription. Commencez par <a href="#/inscriptions">inscrire un stagiaire</a>
         ou ouvrez des <a href="#/jours">jours EFI</a>, puis cliquez sur un créneau libre d'une <a href="#/semaine/${weeks[0].week}">grille semaine</a>.</p>`}
     </div>
@@ -143,6 +142,10 @@ const MONTHS_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.',
 
 function heatmapHTML(state, weeks) {
   const occ = occupancyByDay(state, app.schedule);
+  // Repère du jour : sur une carte de quatre mois, savoir où l'on en est vaut
+  // mieux que de compter les colonnes.
+  const aujourdHui = dateDuJour();
+  const lundiCourant = mondayOf(aujourdHui);
   const openSet = new Set(state.openDays);
   const holidays = new Set((state.params.holidays || []).map((h) => h.date || h));
   const level = (ratio) => ratio <= 0 ? 0 : ratio <= 0.25 ? 1 : ratio <= 0.5 ? 2 : ratio <= 0.75 ? 3 : 4;
@@ -150,19 +153,27 @@ function heatmapHTML(state, weeks) {
   const cols = weeks.map(({ week, monday }) => {
     const cells = weekDays(monday).map((date) => {
       const inPeriod = date >= state.params.periodStart && date <= state.params.periodEnd;
-      if (!inPeriod) return '<span class="hm-cell hm-out"></span>';
-      if (holidays.has(date)) return `<span class="hm-cell hm-holiday" title="${fmtDateDay(date)} — férié"></span>`;
-      if (!openSet.has(date)) return `<span class="hm-cell hm-closed" title="${fmtDateDay(date)} — fermé (EFI)"></span>`;
+      // Le repère du jour vaut pour TOUTE case, y compris un jour fermé ou
+      // férié : c'est précisément quand aujourd'hui n'est pas ouvert qu'on a
+      // besoin de savoir où l'on se trouve sur la carte.
+      const cejour = date === aujourdHui ? ' hm-today' : '';
+      const jourDit = cejour ? ' — aujourd’hui' : '';
+      if (!inPeriod) return `<span class="hm-cell hm-out${cejour}"${cejour ? ` title="${fmtDateDay(date)}${jourDit}"` : ''}></span>`;
+      if (holidays.has(date)) return `<span class="hm-cell hm-holiday${cejour}" title="${fmtDateDay(date)} — férié${jourDit}"></span>`;
+      if (!openSet.has(date)) return `<span class="hm-cell hm-closed${cejour}" title="${fmtDateDay(date)} — fermé (EFI)${jourDit}"></span>`;
       const d = occ.get(date) || { busy: 0, total: 0, ratio: 0, errors: 0 };
       const dayRows = app.schedule.rows.filter((r) => !r.cancelled && (r.insc.datePratique === date || r.insc.dateTestPratique === date));
       const allPre = dayRows.length > 0 && dayRows.every((r) => r.insc.statut === 'pre');
       const pct = Math.round(d.ratio * 100);
       const hours = (d.busy * state.params.slotMinutes / 60).toFixed(1).replace('.', ',').replace(',0', '');
       const title = `${fmtDateDay(date)} — ${pct} % (${hours} h réservées)${d.errors ? ` — ⚠ ${d.errors} anomalie(s)` : ''}`;
-      return `<span class="hm-cell hm-${level(d.ratio)} ${d.errors ? 'hm-alert' : ''} ${allPre ? 'hm-pre' : ''}" data-week="${week}"
-        tabindex="0" role="button" title="${title}${allPre ? ' — pré-réservé' : ''}" aria-label="${title}"></span>`;
+      return `<span class="hm-cell hm-${level(d.ratio)} ${d.errors ? 'hm-alert' : ''} ${allPre ? 'hm-pre' : ''}${cejour}" data-week="${week}"
+        tabindex="0" role="button" title="${title}${allPre ? ' — pré-réservé' : ''}${jourDit}" aria-label="${title}"></span>`;
     }).join('');
-    return `<div class="hm-col">${cells}<span class="hm-week" data-week="${week}">${week}</span></div>`;
+    const courante = monday === lundiCourant;
+    return `<div class="hm-col${courante ? ' hm-col-courante' : ''}">${cells}`
+      + `<span class="hm-week${courante ? ' hm-week-courante' : ''}" data-week="${week}"`
+      + `${courante ? ' title="semaine en cours"' : ''}>${week}</span></div>`;
   }).join('');
 
   // Ligne des mois : un label au début de chaque mois (au moins 2 semaines visibles)

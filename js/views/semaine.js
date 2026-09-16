@@ -4,7 +4,7 @@
 
 import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
-import { periodWeeks, weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isWeekend } from '../dates.js';
+import { periodWeeks, weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isWeekend, semaineParDefaut } from '../dates.js';
 import { unionDuration } from '../engine.js';
 import { chargeComptee, chevauchePause } from '../config.js';
 import { openInscriptionForm } from './form.js';
@@ -13,7 +13,9 @@ import { largeurMinGrille } from './grille.js';
 export function renderSemaine(main, args) {
   const state = app.state;
   const weeks = periodWeeks(state.params);
-  const defaultWeek = app.schedule.rows.map((r) => r.semaine).filter(Boolean).sort((a, b) => a - b)[0] || weeks[0].week;
+  // Par défaut, la semaine EN COURS — pas la première semaine qui porte une
+  // inscription, qui laissait la vue figée sur le passé.
+  const defaultWeek = semaineParDefaut(state.params, weeks) || weeks[0].week;
   const weekNum = Number(args[0]) || defaultWeek;
   const week = weeks.find((w) => w.week === weekNum) || weeks[0];
   const days = weekDays(week.monday);
