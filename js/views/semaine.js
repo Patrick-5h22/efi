@@ -8,7 +8,7 @@ import { periodWeeks, weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isW
 import { unionDuration } from '../engine.js';
 import { chargeComptee, chevauchePause } from '../config.js';
 import { openInscriptionForm } from './form.js';
-import { largeurMinGrille } from './grille.js';
+import { styleGrille, classeLigne } from './grille.js';
 
 export function renderSemaine(main, args) {
   const state = app.state;
@@ -222,12 +222,31 @@ function gridHTML(state, days, kind) {
         // suffisait de laisser choisir : une porte par ligne.
         const entree = (r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}`
           + `${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}\nCliquer pour modifier`;
+
+        // Ce que les occupants ont en commun s'écrit UNE fois, sous la liste
+        // des noms ; chaque entrée ne porte que ce qui la distingue.
+        //
+        // Deux stagiaires dans une même cellule partagent par construction la
+        // même formation — c'est sa capacité qui les autorise à être deux — et
+        // le plus souvent le même intervenant. Répétée par entrée, cette
+        // formation faisait six lignes là où trois suffisent : la ligne du
+        // mercredi montait à 103 px quand les autres en faisaient 46, et la
+        // grille repartait en escalier. Un seul occupant garde tout DANS son
+        // entrée : le libellé y reste cliquable avec le nom.
+        const detail = (r) => esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r));
+        const commun = (f) => (occupants.length > 1 && new Set(occupants.map(f)).size === 1 ? f(occupants[0]) : null);
+        const detailCommun = commun(detail);
+        const quiCommun = commun(qui);
+
         const label = occupants.map((r) => `<div class="cell-entry${r.formation?.testOnly ? ' cell-entry-exam' : ''}"`
           + ` data-insc="${r.insc.id}" tabindex="0" role="button" title="${esc(entree(r))}"`
           + ` aria-label="Modifier l’inscription de ${esc(r.insc.stagiaire)}">`
           + `<span class="slot-name">${esc(r.insc.stagiaire)}</span>`
-          + `<span class="slot-detail">${esc(kind === 'F' ? (r.formation?.label || '') : tLabel(r))}</span>`
-          + `${qui(r)}</div>`).join('');
+          + (detailCommun === null ? `<span class="slot-detail">${detail(r)}</span>` : '')
+          + (quiCommun === null ? qui(r) : '')
+          + '</div>').join('')
+          + (detailCommun ? `<span class="slot-detail">${detailCommun}</span>` : '')
+          + (quiCommun || '');
         // Épreuves surveillées (AIPR) : couleur dédiée — cellule entière si tout
         // est épreuve, sinon pastille violette sur les seules entrées AIPR
         const cls = occupants.every((r) => r.formation?.testOnly) ? 'slot-exam slot-busy' : 'slot-busy';
@@ -288,11 +307,11 @@ function gridHTML(state, days, kind) {
         loadInfo = `<br><span style="font-weight:400;font-size:10px">${parts.join(' · ')} <span style="color:var(--muted-foreground)">/ ${maxLabel}</span></span>`;
       }
     }
-    return `<tr><td class="day-col">${fmtDateDay(date)}${loadInfo}</td><td class="who-col">${who}</td>${cells}</tr>`;
+    return `<tr${classeLigne(date)}><td class="day-col">${fmtDateDay(date)}${loadInfo}</td><td class="who-col">${who}</td>${cells}</tr>`;
   }).join('');
 
   // Les deux grilles ont le même nombre de créneaux, donc la même largeur
-  // minimale, donc les mêmes heures aux mêmes abscisses — l'une sous l'autre.
-  const largeurMin = largeurMinGrille(slots.length, { intervenant: true });
-  return `<table class="planning" style="min-width:${largeurMin}px">${head}${body}</table>`;
+  // minimale et la même hauteur de ligne, donc les mêmes heures aux mêmes
+  // abscisses — l'une sous l'autre.
+  return `<table class="planning" style="${styleGrille(slots.length, { intervenant: true })}">${head}${body}</table>`;
 }

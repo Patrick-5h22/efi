@@ -8,7 +8,7 @@ import { showLoginOverlay } from './views/login.js';
 import { applyTheme, watchSystemTheme, setupThemeMenu, setTheme, THEME_PRESETS } from './theme.js';
 import { setupCommandPalette, openCommandPalette } from './views/command.js';
 import { computeSchedule } from './engine.js';
-import { periodWeeks } from './dates.js';
+
 import { renderDashboard } from './views/dashboard.js';
 import { renderInscriptions } from './views/inscriptions.js';
 import { renderCA } from './views/ca.js';
@@ -318,7 +318,10 @@ export function navigate(path) {
 function renderNav() {
   const { page, args } = currentRoute();
   const errorCount = app.schedule.rows.filter((r) => r.errors.length).length;
-  const weeks = periodWeeks(app.state.params);
+  // Sans numéro, le lien laisse la vue choisir sa semaine par défaut — la
+  // semaine EN COURS. Le recopier ici (weeks[0].week, la première semaine de
+  // la période) figeait la barre latérale sur le passé : la vue ouvrait bien
+  // S38 quand on tapait #/semaine, mais personne ne tape l'URL — on clique.
   const currentWeek = page === 'semaine' ? Number(args[0]) : null;
 
   const link = (path, label, active) =>
@@ -331,7 +334,7 @@ function renderNav() {
     ${link('ca', '💶 Chiffre d’affaires', page === 'ca')}
     ${link('synthese', '📋 Synthèse semaine', page === 'synthese')}
     <div class="nav-section">Plannings</div>
-    ${link(`semaine/${currentWeek || weeks[0].week}`, '🗓 Grilles semaine', page === 'semaine')}
+    ${link(currentWeek ? `semaine/${currentWeek}` : 'semaine', '🗓 Grilles semaine', page === 'semaine')}
     ${link('planning-formateur', '👷 Planning formateur', page === 'planning-formateur')}
     ${link('planning-testeur', '🔎 Planning testeur', page === 'planning-testeur')}
     <div class="nav-section">Configuration</div>

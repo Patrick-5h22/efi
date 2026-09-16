@@ -190,6 +190,95 @@ check('cliquer une ligne ouvre l’inscription de ce stagiaire', saisi === 'PETI
 await p.keyboard.press('Escape');
 await p.waitForTimeout(300);
 
+// ---------------------------------------------------------------------------
+// Bandes horizontales et hauteur de ligne
+//
+// « Pas facile à lire » : dix-huit colonnes de trente minutes, et rien pour
+// tenir la ligne d'un bout à l'autre. Une ligne sur deux est donc teintée —
+// mais seulement ses cellules NEUTRES : rayer une cellule confirmée ou
+// pré-réservée rendrait sa couleur, qui porte le sens, ambiguë.
+//
+// Les hauteurs, ensuite : à hauteur libre, un jour fermé faisait 22 px et un
+// jour chargé 46, la grille montait et descendait en escalier.
+// ---------------------------------------------------------------------------
+const bandes = await p.evaluate(() => {
+  const tbl = document.querySelector('#main table.planning');
+  const fond = (el) => (el ? getComputedStyle(el).backgroundColor : null);
+  return [...tbl.querySelectorAll('tr')].slice(1).map((tr) => ({
+    jour: tr.querySelector('td.day-col')?.textContent.trim().slice(0, 3),
+    alt: tr.classList.contains('ligne-alt'),
+    h: Math.round(tr.getBoundingClientRect().height),
+    fondJour: fond(tr.querySelector('td.day-col')),
+    fondLibre: fond(tr.querySelector('td.slot-free')),
+    // Une cellule d'état ne doit PAS être teintée par la bande : sa couleur
+    // doit rester exactement celle de la même cellule sur une ligne paire.
+    fondOccupee: fond(tr.querySelector('td.slot-busy:not(.slot-pre)')),
+    fondFermee: fond(tr.querySelector('td.slot-closed')),
+  }));
+});
+
+check('une ligne sur deux porte la bande',
+  bandes.filter((l) => l.alt).length === 2 && bandes.filter((l) => !l.alt).length === 3,
+  bandes.map((l) => `${l.jour}${l.alt ? '*' : ''}`).join(' '));
+check('la bande suit le jour de la semaine (mardi, jeudi)',
+  bandes.every((l) => l.alt === ['Mar', 'Jeu'].includes(l.jour)),
+  bandes.filter((l) => l.alt).map((l) => l.jour).join(', '));
+
+const [alt] = bandes.filter((l) => l.alt);
+const [normale] = bandes.filter((l) => !l.alt);
+check('la colonne « Jour » change de fond d’une bande à l’autre',
+  alt.fondJour !== normale.fondJour, `${alt.fondJour} vs ${normale.fondJour}`);
+const libreAlt = bandes.find((l) => l.alt && l.fondLibre)?.fondLibre;
+const libreNormal = bandes.find((l) => !l.alt && l.fondLibre)?.fondLibre;
+check('un créneau libre est teinté sur la bande, pas ailleurs',
+  !!libreAlt && !!libreNormal && libreAlt !== libreNormal,
+  `hors bande ${libreNormal} · sur bande ${libreAlt}`);
+
+// Le point délicat : la bande ne doit pas mordre sur le code couleur.
+const occupees = [...new Set(bandes.filter((l) => l.fondOccupee).map((l) => l.fondOccupee))];
+check('une cellule confirmée garde sa couleur sur la bande comme ailleurs',
+  occupees.length === 1, occupees.join(' vs '));
+const fondsFermes = [...new Set(bandes.filter((l) => l.fondFermee).map((l) => l.fondFermee))];
+check('un jour fermé garde la sienne', fondsFermes.length === 1, fondsFermes.join(' vs '));
+
+// Hauteurs. Une cellule qui porte DEUX stagiaires écrit un nom de plus : sa
+// ligne dépasse donc, mais d'une ligne de texte — pas du double. Avant, la
+// formation était réécrite pour chaque stagiaire et mercredi faisait 103 px
+// contre 46 aux autres.
+const sansPile = bandes.filter((l) => !['Mer'].includes(l.jour));
+check('toutes les lignes ordinaires ont exactement la même hauteur',
+  new Set(sansPile.map((l) => l.h)).size === 1,
+  sansPile.map((l) => `${l.jour} ${l.h}px`).join(' | '));
+const mer = bandes.find((l) => l.jour === 'Mer');
+const ordinaire = sansPile[0].h;
+check('une cellule à deux stagiaires n’ajoute qu’une ligne de texte',
+  mer.h > ordinaire && mer.h < ordinaire * 2,
+  `${mer.h}px contre ${ordinaire}px — écart ${mer.h - ordinaire}px`);
+check('la formation n’est écrite qu’une fois dans une cellule à deux stagiaires',
+  (cellule2?.texte.match(/Pratique R489 Cat 3/g) || []).length === 1,
+  cellule2?.texte.replace(/\s+/g, ' '));
+
+// Les plannings globaux : mêmes bandes, et leurs lignes sont toutes égales —
+// leurs cellules ne fusionnant pas, un nom réécrit à chaque demi-heure s'y
+// repliait sur trois lignes et faisait des lignes de 74 px à côté de 42.
+await p.goto(BASE + '/#/planning-formateur');
+await p.waitForTimeout(1200);
+const global = await p.evaluate(() => {
+  const tbl = document.querySelector('#main table.planning');
+  const trs = [...tbl.querySelectorAll('tr')].filter((tr) => tr.querySelector('td.day-col:not([colspan])'));
+  return {
+    n: trs.length,
+    alt: trs.filter((tr) => tr.classList.contains('ligne-alt')).length,
+    hauteurs: [...new Set(trs.map((tr) => Math.round(tr.getBoundingClientRect().height)))].sort((a, b) => a - b),
+  };
+});
+check('le planning global porte aussi les bandes', global.alt > 0 && global.alt < global.n,
+  `${global.alt} lignes teintées sur ${global.n}`);
+check('et toutes ses lignes ont la même hauteur', global.hauteurs.length === 1,
+  `${global.hauteurs.join(', ')} px sur ${global.n} lignes`);
+
+await p.goto(BASE + '/#/semaine/39');
+await p.waitForTimeout(800);
 await p.screenshot({ path: artefact('grille-alignement.png'), fullPage: true });
 check('aucune erreur JS', errs.length === 0, errs.join(' ; '));
 

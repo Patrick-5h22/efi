@@ -99,6 +99,34 @@ const titreSynthese = await p.evaluate(() => document.querySelector('#main h1')?
 check('la synthèse aussi', titreSynthese === `Synthèse semaine ${repères.semaineAuj}`,
   `${titreSynthese} — attendu « Synthèse semaine ${repères.semaineAuj} »`);
 
+// Le chemin que prend un humain : le lien de la barre latérale, pas l'URL.
+//
+// Régression : la vue ouvrait bien la semaine en cours quand on tapait
+// « #/semaine », mais le lien « 🗓 Grilles semaine » recopiait un numéro en
+// dur — la PREMIÈRE semaine de la période — et ramenait donc au passé à
+// chaque clic. Le correctif était invisible à qui n'ouvrait pas l'URL à la
+// main : c'est ce lien qu'il faut suivre ici.
+await p.goto(BASE + '/#/');
+await p.waitForTimeout(600);
+const hrefNav = await p.evaluate(() => [...document.querySelectorAll('#nav a')]
+  .find((a) => a.textContent.includes('Grilles semaine'))?.getAttribute('href'));
+await p.evaluate(() => [...document.querySelectorAll('#nav a')]
+  .find((a) => a.textContent.includes('Grilles semaine')).click());
+await p.waitForTimeout(800);
+const titreClic = await p.evaluate(() => document.querySelector('#main h1')?.textContent.trim());
+check('le lien « Grilles semaine » de la barre latérale ouvre la semaine en cours',
+  titreClic === `Semaine ${repères.semaineAuj}`,
+  `${titreClic} via ${hrefNav} — attendu « Semaine ${repères.semaineAuj} »`);
+
+// Et, une fois sur une semaine choisie, le lien ne ramène pas au présent :
+// on reste où l'on est.
+await p.goto(BASE + `/#/semaine/${repères.semainePasse}`);
+await p.waitForTimeout(700);
+const hrefDepuisSemaine = await p.evaluate(() => [...document.querySelectorAll('#nav a')]
+  .find((a) => a.textContent.includes('Grilles semaine'))?.getAttribute('href'));
+check('depuis une semaine choisie, le lien garde cette semaine',
+  hrefDepuisSemaine === `#/semaine/${repères.semainePasse}`, hrefDepuisSemaine);
+
 await p.goto(BASE + '/#/');
 await p.waitForTimeout(600);
 await p.screenshot({ path: artefact('tableau-de-bord.png'), fullPage: true });

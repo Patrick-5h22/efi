@@ -5,7 +5,7 @@ import { app, esc } from '../app.js';
 import { memberName } from '../store.js';
 import { workingDays, daySlots, fmtTime, fmtDateDay, isoWeek } from '../dates.js';
 import { chevauchePause } from '../config.js';
-import { largeurMinGrille } from './grille.js';
+import { styleGrille, classeLigne, HAUTEUR_LIGNE_GLOBALE } from './grille.js';
 
 export function renderPlanning(main, args, kind) {
   const state = app.state;
@@ -67,7 +67,7 @@ export function renderPlanning(main, args, kind) {
       return `<td class="${cls}" title="${esc((r.formation?.label || '') + (r.formation?.testOnly ? ' (surveillance)' : '') + ' — ' + (memberName(state, who) || '?'))}">${esc(r.insc.stagiaire)}</td>`;
     }).join('');
 
-    return `${weekSep}<tr><td class="day-col">${fmtDateDay(date)}${open ? '' : ' <span class="muted">(fermé)</span>'}</td>${cells}</tr>`;
+    return `${weekSep}<tr${classeLigne(date)}><td class="day-col">${fmtDateDay(date)}${open ? '' : ' <span class="muted">(fermé)</span>'}</td>${cells}</tr>`;
   }).join('');
 
   main.innerHTML = `
@@ -84,6 +84,6 @@ export function renderPlanning(main, args, kind) {
       <span><span class="chip" style="background:#f2f4f8"></span>Jour non ouvert</span>
       ${state.params.pauseActive ? '<span><span class="chip slot-pause"></span>Pause déjeuner</span>' : ''}
     </div>
-    <div class="card"><div class="grid-wrap"><table class="planning" style="min-width:${largeurMinGrille(slots.length)}px">${head}${body}</table></div></div>
+    <div class="card"><div class="grid-wrap"><table class="planning planning-global" style="${styleGrille(slots.length, { hauteur: HAUTEUR_LIGNE_GLOBALE })}">${head}${body}</table></div></div>
   `;
 }
