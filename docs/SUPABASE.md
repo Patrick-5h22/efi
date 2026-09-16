@@ -9,8 +9,8 @@ local du navigateur).
 - Projet Supabase : `efi-placement` (organisation CIPECMA, eu-central-1)
 - Schéma dédié **`planning`**, isolé de l'application existante du projet :
   `params`, `formations`, `team_members`, `open_days`, `day_assignments`,
-  `inscriptions`, `settings`, `user_prefs` (préférences par utilisateur,
-  ex. portée de la carte d'occupation — servie par `/api/prefs`)
+  `inscriptions`, `day_presence`, `settings`, `user_prefs` (préférences par
+  utilisateur, ex. portée de la carte d'occupation — servie par `/api/prefs`)
 - Les tables ne sont **pas exposées** par l'API REST. La seule surface
   d'accès est constituée de deux fonctions RPC (`SECURITY DEFINER`) :
   - `public.efi_load_state(p_code)` — renvoie l'état complet (jsonb)
@@ -31,8 +31,21 @@ fonctions ne la mentionnent pas.
 Le corps des RPC ne se trouve pas dans ce dépôt, et aucun test ne peut voir ce
 manque : les tests remplacent Supabase par un faux qui garde tout ce qu'on lui
 donne. C'est ainsi que neuf champs ont été perdus sans bruit — dont le chiffre
-d'affaires, le n° de dossier YPAREO et la traçabilité des pré-réservations
-(voir `docs/migrations/002-colonnes-inscriptions.sql`).
+d'affaires, le n° de dossier YPAREO et la traçabilité des pré-réservations —
+ainsi que `dayPresence` en entier, faute de table. Réparé par
+`docs/migrations/003-persister-tous-les-champs.sql`, éprouvée par un
+aller-retour contre une réplique du schéma : dix pertes avant, zéro après.
+
+`planning.day_presence` stocke la présence en JSONB, dans une table à une
+seule ligne comme `params`, et non en relationnel : une journée présente avec
+une liste **vide** signifie « personne ce jour-là », une journée absente
+signifie « tout le monde ». Une table de couples (jour, personne) perdrait la
+première et la retournerait en « tout le monde » — le contraire exact, sur
+lequel le moteur choisit les intervenants.
+
+`savedAt` rendait `now()`, donc une valeur neuve à chaque lecture : la garde
+d'écriture du serveur MCP y voyait un conflit permanent. La 003 rend
+l'horodatage de la dernière écriture.
 
 **Avant d'ajouter un champ à `js/persisted.js` ou à une inscription**, vérifier
 ce que la base rend réellement — en lecture seule, sans rien écrire :

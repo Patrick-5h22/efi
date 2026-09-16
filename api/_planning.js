@@ -12,11 +12,12 @@
 // Tout appelant qui écrit doit relire juste avant et comparer le contenu
 // (voir relireSiModifie plus bas).
 //
-// « savedAt » ne sert PAS à cela : la base le régénère à chaque lecture, deux
-// lectures consécutives ne portent donc jamais le même. Il reste utile au
-// navigateur, qui compare celui qu'on lui rend à l'enregistrement à celui vu
-// au tour d'interrogation suivant — mais on ne peut rien en déduire entre deux
-// lectures.
+// « savedAt » ne sert PAS à cela. La RPC le rendait avec « now() » : deux
+// lectures consécutives n'en portaient jamais le même, et cette garde y voyait
+// un conflit permanent — plus aucune pré-réservation ne pouvait aboutir. La
+// migration 003 rend désormais l'horodatage de la dernière écriture, mais on
+// continue de comparer le CONTENU : il ne dépend d'aucune horloge, d'aucune
+// convention de fuseau, et d'aucune version de la base.
 
 import { pickPersisted, empreintePersistee } from '../js/persisted.js';
 

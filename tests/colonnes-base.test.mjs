@@ -14,37 +14,35 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultState, addInscription } from '../js/store.js';
 
-// Relevé de planning.inscriptions au 15/09/2026 (information_schema.columns).
-// À mettre à jour en même temps que toute migration SQL.
+// Colonnes de planning.inscriptions telles que les migrations du dépôt les
+// définissent — et telles que les deux RPC les écrivent et les relisent
+// (docs/migrations/003-persister-tous-les-champs.sql). À mettre à jour en même
+// temps que toute migration.
+//
+// Ce que déclare cette liste, c'est la CIBLE. Une base où la migration n'a pas
+// encore été appliquée perd toujours les champs : la vérifier demande
+// « EFI_ACCESS_CODE=… npm run persistance », qui interroge la vraie base.
 const COLONNES = [
   'id', 'stagiaire', 'formation', 'type',
   'date_pratique', 'debut_pratique', 'date_theorie',
   'date_test_pratique', 'debut_test_pratique',
   'formateur_id', 'testeur_id', 'updated_at',
   'entreprise', 'siret', 'statut', 'motif_annulation',
+  // Ajoutés par les migrations 002 et 003
+  'dossier_ypareo', 'chiffre_affaires', 'mode_theorie',
+  'date_theorie_formation', 'debut_theorie_formation', 'duree_theorie_centre',
+  'formateur_theorie_id', 'reserve_par', 'reserve_le',
 ];
 
 // Champs posés par le serveur MCP (js/mcp.js) et non par addInscription :
 // la trace de l'origine d'une pré-réservation.
 const CHAMPS_MCP = ['reservePar', 'reserveLe'];
 
-// Écart CONNU, constaté le 15/09/2026 : ces champs n'ont pas de colonne et
-// sont perdus à chaque sauvegarde. docs/migrations/002-colonnes-inscriptions.sql
-// ajoute les colonnes ; la 003 devra apprendre aux deux RPC à les lire et à
-// les écrire. Cette liste doit se VIDER à ce moment-là — et le test échouera
-// tant qu'elle ne correspondra plus à la réalité, dans un sens comme dans
-// l'autre.
-const SANS_COLONNE_CONNUS = [
-  'dossierYpareo',
-  'chiffreAffaires',
-  'modeTheorie',
-  'dateTheorieFormation',
-  'debutTheorieFormation',
-  'dureeTheorieCentre',
-  'formateurTheorieId',
-  'reservePar',
-  'reserveLe',
-];
+// Écart toléré : aucun. Neuf champs étaient perdus en silence jusqu'à la
+// migration 003, qui a appris aux deux RPC à les écrire et à les relire —
+// vérifié par un aller-retour contre une réplique du schéma. Cette liste doit
+// rester vide : tout champ nouveau sans colonne fait échouer ce test.
+const SANS_COLONNE_CONNUS = [];
 
 const snake = (champ) => champ.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
 
