@@ -115,6 +115,27 @@ export function periodWeeks(params) {
   return [...seen.entries()].map(([week, monday]) => ({ week, monday }));
 }
 
+// Semaine à afficher quand aucune n'est demandée : celle d'aujourd'hui,
+// bornée à la période.
+//
+// Le défaut était « la première semaine qui porte une inscription », donc la
+// plus ancienne : les vues s'ouvraient figées sur un passé révolu, et il
+// fallait cliquer autant de fois que de semaines écoulées pour revenir au
+// présent. Un tableau de bord parle d'abord d'aujourd'hui.
+//
+// Hors période : avant, la première semaine ; après, la dernière. Si la
+// semaine du jour ne figure pas dans la liste (vacances, jours fermés), on
+// prend la suivante qui y figure — jamais une précédente.
+export function semaineParDefaut(params, weeks, aujourdHui = dateDuJour()) {
+  if (!weeks?.length) return null;
+  const ref = aujourdHui < params.periodStart ? params.periodStart
+    : aujourdHui > params.periodEnd ? params.periodEnd : aujourdHui;
+  const lundi = mondayOf(ref);
+  const exacte = weeks.find((w) => w.monday === lundi);
+  const suivante = weeks.find((w) => w.monday >= lundi);
+  return (exacte || suivante || weeks[weeks.length - 1]).week;
+}
+
 // Jours lun-ven d'une semaine donnée par son lundi
 export function weekDays(monday) {
   return [0, 1, 2, 3, 4].map((i) => addDays(monday, i));

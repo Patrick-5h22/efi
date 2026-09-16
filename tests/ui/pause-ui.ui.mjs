@@ -6,6 +6,11 @@ page.on('dialog', (d) => d.accept());
 let pass = 0, fail = 0;
 const check = (l, ok, x = '') => { ok ? pass++ : fail++; console.log(`${ok ? '✓' : '✗'} ${l}${x ? ' — ' + x : ''}`); };
 
+// Semaine de la séance semée plus bas (02/09/2026). Les grilles s'ouvrent
+// désormais sur la semaine EN COURS — un défaut qui ne dépend plus des
+// données — donc une suite qui vise une semaine précise doit la nommer.
+const SEMAINE = 36;
+
 await page.goto(BASE + '/');
 await page.evaluate(() => localStorage.clear());
 await page.reload(); await page.waitForTimeout(800);
@@ -35,7 +40,7 @@ check('avertissement chiffré avant activation',
   /Activer la pause ferait basculer/.test(avant) && /inscription\(s\)/.test(avant), '');
 
 // 3. Grille : pas de pause tant que c'est inactif
-await page.goto(BASE + '/#/semaine'); await page.waitForTimeout(600);
+await page.goto(BASE + `/#/semaine/${SEMAINE}`); await page.waitForTimeout(600);
 check('aucune cellule PAUSE tant que c’est inactif', await page.locator('td.slot-pause').count() === 0);
 const libresAvant = await page.locator('td.slot-free').count();
 
@@ -49,7 +54,7 @@ check('le message bascule au présent après activation',
   /sont signalées en anomalie/.test(apres) && !/ferait basculer/.test(apres), '');
 
 // 5. Grille : la pause se voit, et mange des créneaux libres
-await page.goto(BASE + '/#/semaine'); await page.waitForTimeout(700);
+await page.goto(BASE + `/#/semaine/${SEMAINE}`); await page.waitForTimeout(700);
 const nbPause = await page.locator('td.slot-pause').count();
 check('cellules PAUSE peintes', nbPause > 0, `${nbPause}`);
 const libresApres = await page.locator('td.slot-free').count();
@@ -81,7 +86,7 @@ await page.goto(BASE + '/#/inscriptions'); await page.waitForTimeout(600);
 check('anomalie « chevauche la pause déjeuner »',
   (await page.locator('table.data').innerText()).includes('pause déjeuner'));
 
-await page.goto(BASE + '/#/semaine'); await page.waitForTimeout(600);
+await page.goto(BASE + `/#/semaine/${SEMAINE}`); await page.waitForTimeout(600);
 await page.screenshot({ path: artefact('pause-semaine.png'), fullPage: true });
 
 check('aucune erreur JS', errors.length === 0, errors.join(' ; '));

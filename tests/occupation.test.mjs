@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultState } from '../js/store.js';
-import { computeSchedule, occupationSummary, scopeWindow, rowInScope } from '../js/engine.js';
+import { computeSchedule, occupationSummary, scopeWindow, rowInScope, prochainesActivites } from '../js/engine.js';
 
 // État minimal : 2 jours ouverts en septembre (S36 et S37) + 1 en octobre.
 // 18 créneaux de 30 min par jour (08:00 → 17:00).
@@ -99,4 +99,43 @@ test('occupation : portée sans jour ouvert → 0 % sans division par zéro', ()
   const occ = occupationSummary(state, computeSchedule(state), 'mois', '2026-12-15');
   assert.equal(occ.days, 0);
   assert.equal(occ.pct, 0);
+});
+
+// « Prochaines activités » du tableau de bord. La carte prenait les premières
+// lignes triées par date, sans plancher : sur la portée « période » elle
+// affichait donc les plus ANCIENNES — septembre en décembre. Le titre
+// promettait l'avenir, le contenu montrait un passé révolu.
+test('prochaines activités : à partir d’aujourd’hui, les plus proches d’abord', () => {
+  const state = fixture();
+  const { rows } = computeSchedule(state);
+
+  const avant = prochainesActivites(rows, { aujourdHui: '2026-09-01' });
+  assert.deepEqual(avant.lignes.map((r) => r.insc.stagiaire), ['UN', 'DEUX', 'TROIS'],
+    'tout est à venir, du plus proche au plus lointain');
+  assert.equal(avant.passees, 0);
+
+  // Le 08/09 lui-même compte comme à venir : une séance du jour n'est pas
+  // du passé.
+  const leJour = prochainesActivites(rows, { aujourdHui: '2026-09-08' });
+  assert.deepEqual(leJour.lignes.map((r) => r.insc.stagiaire), ['DEUX', 'TROIS']);
+  assert.equal(leJour.passees, 1, 'la séance du 01/09 est passée');
+
+  // Tout est passé : aucune ligne, et le compte permet de le DIRE au lieu
+  // d'afficher un tableau vide sans explication.
+  const apres = prochainesActivites(rows, { aujourdHui: '2026-11-01' });
+  assert.deepEqual(apres.lignes, []);
+  assert.equal(apres.passees, 3);
+
+  // Le plafond est respecté
+  assert.equal(prochainesActivites(rows, { aujourdHui: '2026-09-01', max: 2 }).lignes.length, 2);
+});
+
+test('prochaines activités : une inscription sans date n’y figure pas', () => {
+  const state = fixture();
+  state.inscriptions.push({ id: 99, stagiaire: 'SANS DATE', formation: 'HAB-ELEC', type: 'Initial', statut: 'confirmee' });
+  const { rows } = computeSchedule(state);
+  const r = prochainesActivites(rows, { aujourdHui: '2026-09-01' });
+  assert.ok(!r.lignes.some((l) => l.insc.stagiaire === 'SANS DATE'),
+    'une ligne non planifiée n’est ni à venir ni passée : elle n’a pas de date');
+  assert.equal(r.passees, 0);
 });
