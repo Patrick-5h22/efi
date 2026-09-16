@@ -5,7 +5,7 @@ import { computeSchedule } from '../js/engine.js';
 import { buildICS } from '../js/ics.js';
 
 test('export ICS : événements pratiques, tests et théorie', () => {
-  const state = seedExamples(defaultState());
+  const state = seedExamples(defaultState(), { jours: ['2026-09-01', '2026-09-02'] });
   const ics = buildICS(state, computeSchedule(state));
   assert.ok(ics.startsWith('BEGIN:VCALENDAR'));
   assert.ok(ics.includes('SUMMARY:Formation R489 Cat 1A — EXEMPLE - DUPONT Jean'));

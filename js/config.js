@@ -1,9 +1,14 @@
+import { dateDuJour, fenetreAffichage, joursOuvrables } from './dates.js';
+
 // Configuration par défaut — reprise du classeur "Planification EFI v4.2"
 // Les durées sont exprimées en minutes, les heures en minutes depuis minuit.
 
+// Plus de periodStart / periodEnd : la fenetre affichee glisse avec le
+// calendrier (voir SEMAINES_AFFICHEES dans js/dates.js). Reglees a la main,
+// ces deux dates servaient a la fois a decider ce qu'on affiche et a decider
+// qu'une date est tenable : avancer le debut faisait basculer en anomalie
+// toute seance planifiee avant, alors qu'elle etait seulement passee.
 export const DEFAULT_PARAMS = {
-  periodStart: '2026-09-01',
-  periodEnd: '2026-12-31',
   dayStart: 480,             // 08:00
   dayEnd: 1020,              // 17:00
   slotMinutes: 30,
@@ -109,7 +114,15 @@ export const DEFAULT_TEAM = [
 ];
 
 // Jours d'ouverture du plateau technique livrés en exemple
-export const DEFAULT_OPEN_DAYS = ['2026-09-01', '2026-09-02'];
+// Jours ouverts d'une installation neuve : les deux premiers jours ouvrables
+// de la fenêtre affichée, et non deux dates fixes.
+//
+// Datés en dur (01 et 02/09/2026), ils tombaient hors de la fenêtre dès que
+// celle-ci avait glissé : une installation neuve s'ouvrait sur une grille
+// vide, et les quatre inscriptions d'exemple restaient invisibles.
+export function joursOuvertsParDefaut(aujourdHui = dateDuJour()) {
+  return joursOuvrables(DEFAULT_PARAMS, ...Object.values(fenetreAffichage(aujourdHui))).slice(0, 2);
+}
 
 export function formationByCode(formations, code) {
   return formations.find((f) => f.code === code) || null;

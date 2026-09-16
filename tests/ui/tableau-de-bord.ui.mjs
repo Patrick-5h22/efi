@@ -127,6 +127,87 @@ const hrefDepuisSemaine = await p.evaluate(() => [...document.querySelectorAll('
 check('depuis une semaine choisie, le lien garde cette semaine',
   hrefDepuisSemaine === `#/semaine/${repères.semainePasse}`, hrefDepuisSemaine);
 
+// ---------------------------------------------------------------------------
+// Seize semaines à partir de la semaine en cours — et le passé n'est plus une
+// anomalie
+//
+// Défaut signalé en production : les dates de début et de fin de période,
+// réglées à la main, servaient à la fois à décider CE QU'ON AFFICHE et à
+// décider QU'UNE DATE EST TENABLE. En avançant le début au lundi de la semaine
+// en cours, toutes les séances antérieures — jour ouvert, intervenant présent,
+// horaires corrects — ont basculé en « hors période ou jour non ouvré ».
+// ---------------------------------------------------------------------------
+await p.goto(BASE + '/#/');
+await p.waitForTimeout(700);
+const carte = await p.evaluate(async () => {
+  const { isoWeek, mondayOf, dateDuJour, SEMAINES_AFFICHEES } = await import('/js/dates.js');
+  const colonnes = [...document.querySelectorAll('#main .hm-col .hm-week')].map((e) => e.textContent.trim());
+  return {
+    attendu: SEMAINES_AFFICHEES,
+    colonnes,
+    semaineCourante: String(isoWeek(mondayOf(dateDuJour()))),
+    sousTitre: document.querySelector('#main .page-header .sub')?.textContent.trim() || '',
+  };
+});
+check(`la carte d’occupation compte exactement ${carte.attendu} semaines`,
+  carte.colonnes.length === carte.attendu, `${carte.colonnes.length} : ${carte.colonnes.join(' ')}`);
+check('elle commence à la semaine en cours',
+  carte.colonnes[0] === carte.semaineCourante,
+  `commence à S${carte.colonnes[0]}, semaine en cours S${carte.semaineCourante}`);
+check('le sous-titre annonce la fenêtre, non des dates réglées à la main',
+  carte.sousTitre.includes(`${carte.attendu} semaines`), carte.sousTitre);
+
+// Une séance de la semaine dernière : affichée ou non, elle n'est pas fautive.
+const passe = await p.evaluate(async () => {
+  const { dateDuJour, addDays, dayOfWeek } = await import('/js/dates.js');
+  // Trois semaines en arrière, ramené sur un jour de semaine.
+  let jour = addDays(dateDuJour(), -21);
+  while (dayOfWeek(jour) > 5) jour = addDays(jour, -1);
+
+  const st = JSON.parse(localStorage.getItem('efi-planning-v1'));
+  st.team = [{ id: 'p1', name: 'MEDAN Dominique', quals: { 'HAB-ELEC': { F: true, T: true } } }];
+  st.openDays = [jour];
+  st.dayPresence = {};
+  st.inscriptions = [{
+    id: 1, stagiaire: 'ANCIEN Revolu', formation: 'HAB-ELEC', type: 'Initial',
+    statut: 'confirmee', modeTheorie: 'distance',
+    datePratique: jour, debutPratique: 480, formateurId: 'p1',
+  }];
+  st.nextId = 2;
+  localStorage.setItem('efi-planning-v1', JSON.stringify(st));
+  return jour;
+});
+await p.goto(BASE + '/#/inscriptions');
+await p.reload();
+await p.waitForTimeout(900);
+const anomalies = await p.evaluate(() => {
+  const ligne = [...document.querySelectorAll('#main table.data tbody tr')]
+    .find((tr) => tr.textContent.includes('ANCIEN Revolu'));
+  return {
+    trouvee: !!ligne,
+    erreurs: [...(ligne?.querySelectorAll('.status-errors li') || [])].map((li) => li.textContent.trim()),
+    badge: document.querySelector('#nav .nav-badge')?.textContent.trim() || null,
+  };
+});
+check('une séance de trois semaines en arrière reste listée', anomalies.trouvee, passe);
+check('…et ne porte AUCUNE anomalie', anomalies.erreurs.length === 0,
+  anomalies.erreurs.join(' | ') || 'aucune');
+check('le compteur d’anomalies de la barre latérale reste muet',
+  anomalies.badge === null, anomalies.badge);
+
+// Les dates de période ont disparu des paramètres : il n'y a plus de réglage
+// par lequel reproduire le défaut.
+await p.goto(BASE + '/#/parametres');
+await p.waitForTimeout(700);
+const params = await p.evaluate(() => ({
+  champsDate: [...document.querySelectorAll('#main [data-p-date]')].map((e) => e.dataset.pDate),
+  texte: document.querySelector('#main').textContent.replace(/\s+/g, ' '),
+}));
+check('aucun champ de début/fin de période dans les paramètres',
+  params.champsDate.length === 0, params.champsDate.join(', '));
+check('la page explique la fenêtre glissante',
+  /semaines à partir de la semaine en cours/.test(params.texte));
+
 await p.goto(BASE + '/#/');
 await p.waitForTimeout(600);
 await p.screenshot({ path: artefact('tableau-de-bord.png'), fullPage: true });

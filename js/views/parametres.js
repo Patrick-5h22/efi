@@ -2,7 +2,7 @@
 // (équivalent de l'onglet « Paramètres »).
 
 import { app, esc, toast } from '../app.js';
-import { fmtTime, parseTime, fmtDateShort } from '../dates.js';
+import { fmtTime, parseTime, fmtDateShort, fenetreAffichage, SEMAINES_AFFICHEES } from '../dates.js';
 import { defaultState, seedExamples, saveState } from '../store.js';
 import { chevauchePause } from '../config.js';
 
@@ -40,6 +40,7 @@ function pauseAlerte(state, p) {
 export function renderParametres(main) {
   const state = app.state;
   const p = state.params;
+  const fenetre = fenetreAffichage();
 
   main.innerHTML = `
     <div class="page-header">
@@ -132,11 +133,12 @@ export function renderParametres(main) {
     </div>
 
     <div class="card">
-      <h2>3. Période et jours fériés</h2>
-      <div class="form-row">
-        <label class="field">Début de période <input type="date" value="${esc(p.periodStart)}" data-p-date="periodStart"></label>
-        <label class="field">Fin de période <input type="date" value="${esc(p.periodEnd)}" data-p-date="periodEnd"></label>
-      </div>
+      <h2>3. Jours fériés</h2>
+      <p class="muted" style="margin-bottom:8px">Les grilles et le tableau de bord affichent
+      <b>${SEMAINES_AFFICHEES} semaines à partir de la semaine en cours</b> (${fmtDateShort(fenetre.debut)}
+      → ${fmtDateShort(fenetre.fin)}) : la fenêtre glisse d'elle-même, il n'y a pas de dates à régler.
+      Les dates de début et de fin de période ont été retirées — réglées à la main, elles faisaient
+      basculer en anomalie toute séance planifiée avant le début, alors qu'elle était seulement passée.</p>
       <p style="margin-bottom:6px">Jours fériés exclus :</p>
       <div class="form-row">
         ${(p.holidays || []).map((h, i) => `<span class="badge badge-info">${fmtDateShort(h.date || h)}${h.label ? ' — ' + esc(h.label) : ''} <button class="btn btn-sm btn-secondary" data-del-holiday="${i}" title="Retirer" style="padding:0 6px">✕</button></span>`).join(' ')}
@@ -235,18 +237,6 @@ export function renderParametres(main) {
       }
       app.commit();
       toast('Paramètre enregistré.', 'ok');
-    });
-  });
-
-  main.querySelectorAll('[data-p-date]').forEach((input) => {
-    input.addEventListener('change', () => {
-      const key = input.dataset.pDate;
-      if (!input.value) return;
-      const next = { ...state.params, [key]: input.value };
-      if (next.periodStart >= next.periodEnd) { toast('La fin de période doit suivre le début.', 'error'); input.value = state.params[key]; return; }
-      state.params[key] = input.value;
-      app.commit();
-      toast('Période mise à jour.', 'ok');
     });
   });
 

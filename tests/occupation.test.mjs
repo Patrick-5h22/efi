@@ -46,13 +46,40 @@ test('occupation : mois en cours (septembre = 2 jours, 4 h)', () => {
   assert.equal(occ.pct, Math.round((8 / 36) * 100)); // 22 %
 });
 
-test('occupation : date hors période ramenée au début (semaine S36)', () => {
+// La référence est le jour même, jamais ramenée ailleurs.
+//
+// Régression : elle était bornée à une période réglée à la main — avant le
+// début, la carte « semaine en cours » affichait la première semaine de la
+// période. Elle mentait donc sur son propre titre, et c'est la même
+// confusion entre « ce qu'on affiche » et « ce qui est tenable » qui faisait
+// basculer en anomalie les séances antérieures au début de période.
+test('occupation : la référence est le jour même, sans bornage', () => {
   const state = fixture();
-  // « Aujourd'hui » avant la période → référence = 01/09 → semaine S36
   const occ = occupationSummary(state, computeSchedule(state), 'semaine', '2026-07-11');
-  assert.equal(occ.ref, '2026-09-01');
-  assert.equal(occ.days, 1);
-  assert.equal(occ.hours, 2);
+  assert.equal(occ.ref, '2026-07-11', 'aucun report sur une autre semaine');
+  assert.equal(occ.days, 0, 'cette semaine-là ne porte aucun jour ouvert');
+  assert.equal(occ.hours, 0);
+  assert.equal(occ.pct, 0);
+});
+
+// « Le mois en cours » est le mois ENTIER, et non sa seule partie à venir.
+//
+// Régression : la portée était intersectée avec la fenêtre d'affichage, qui
+// commence au lundi de la semaine en cours. Le 15 septembre, la carte du mois
+// ne comptait donc plus que la seconde quinzaine et tombait à zéro.
+test('portée « mois » : le mois entier, pas sa partie restante', () => {
+  const state = fixture();
+  const win = scopeWindow(state, 'mois', '2026-09-15');
+  assert.equal(win.debut, '2026-09-01');
+  assert.equal(win.fin, '2026-09-30');
+  assert.deepEqual(win.openDays, ['2026-09-01', '2026-09-08'],
+    'des jours ouverts antérieurs au 15 comptent toujours');
+  assert.equal(win.workingCount, 22, 'les 22 jours ouvrables de septembre 2026');
+
+  const wSem = scopeWindow(state, 'semaine', '2026-09-03');
+  assert.equal(wSem.debut, '2026-08-31');
+  assert.equal(wSem.fin, '2026-09-06');
+  assert.equal(wSem.workingCount, 5);
 });
 
 test('occupation : ligne annulée libère la portée', () => {

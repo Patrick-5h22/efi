@@ -88,14 +88,58 @@ export function fmtDateDay(iso) {
   return `${DAY_NAMES[dayOfWeek(iso)].slice(0, 3)} ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-// Liste des jours ouvrés de la période (hors week-ends et fériés)
-export function workingDays(params) {
-  const holidays = new Set((params.holidays || []).map((h) => h.date || h));
+// ---------------------------------------------------------------------------
+// Jours ouvrables et fenêtre d'affichage — deux notions distinctes
+//
+// Elles n'en faisaient qu'une, et c'était un défaut : une période bornée par
+// deux dates réglées à la main servait à la fois à décider CE QU'ON AFFICHE et
+// à décider QU'UNE DATE EST TENABLE. Avancer le début de période au lundi de
+// la semaine en cours faisait donc basculer en anomalie — « hors période ou
+// jour non ouvré » — toutes les séances déjà planifiées avant ce lundi. Elles
+// n'avaient pourtant rien d'anormal : elles étaient seulement passées.
+//
+// Désormais : un jour est ouvrable s'il n'est ni week-end ni férié, point ;
+// et la fenêtre d'affichage glisse d'elle-même avec le calendrier.
+// ---------------------------------------------------------------------------
+
+// Nombre de semaines montrées, à partir de la semaine en cours.
+export const SEMAINES_AFFICHEES = 16;
+
+// Ni week-end, ni férié. C'est la seule question que se pose un contrôle de
+// cohérence sur une date : rien à voir avec ce qu'on affiche aujourd'hui.
+export function estJourOuvrable(params, iso) {
+  const feries = new Set((params.holidays || []).map((h) => h.date || h));
+  return !isWeekend(iso) && !feries.has(iso);
+}
+
+// Seize semaines à partir du lundi de la semaine en cours. Bornes incluses.
+export function fenetreAffichage(aujourdHui = dateDuJour()) {
+  const debut = mondayOf(aujourdHui);
+  return { debut, fin: addDays(debut, SEMAINES_AFFICHEES * 7 - 1) };
+}
+
+// Jours ouvrables d'un intervalle, bornes incluses.
+export function joursOuvrables(params, debut, fin) {
+  const feries = new Set((params.holidays || []).map((h) => h.date || h));
   const out = [];
-  for (let d = params.periodStart; d <= params.periodEnd; d = addDays(d, 1)) {
-    if (!isWeekend(d) && !holidays.has(d)) out.push(d);
+  for (let d = debut; d <= fin; d = addDays(d, 1)) {
+    if (!isWeekend(d) && !feries.has(d)) out.push(d);
   }
   return out;
+}
+
+// Jours ouvrables de la fenêtre d'affichage.
+export function workingDays(params, aujourdHui = dateDuJour()) {
+  const { debut, fin } = fenetreAffichage(aujourdHui);
+  return joursOuvrables(params, debut, fin);
+}
+
+// Premier et dernier jour du mois d'une date.
+export function bornesDuMois(iso) {
+  const d = parseISO(iso);
+  const debut = `${iso.slice(0, 7)}-01`;
+  const fin = toISO(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)));
+  return { debut, fin };
 }
 
 // Créneaux de 30 min de la journée : [480, 510, …, 990]
@@ -105,32 +149,31 @@ export function daySlots(params) {
   return out;
 }
 
-// Numéros de semaines couvertes par la période
-export function periodWeeks(params) {
-  const seen = new Map(); // week -> monday
-  for (const d of workingDays(params)) {
-    const w = isoWeek(d);
-    if (!seen.has(w)) seen.set(w, mondayOf(d));
-  }
-  return [...seen.entries()].map(([week, monday]) => ({ week, monday }));
+// Les seize semaines de la fenêtre, de la semaine en cours à la seizième.
+//
+// Comptées sur les lundis et non sur les jours ouvrables : une semaine
+// entièrement fériée compte quand même, et la liste fait toujours exactement
+// SEMAINES_AFFICHEES entrées.
+export function semainesAffichees(aujourdHui = dateDuJour()) {
+  const { debut } = fenetreAffichage(aujourdHui);
+  return Array.from({ length: SEMAINES_AFFICHEES }, (_, i) => {
+    const monday = addDays(debut, i * 7);
+    return { week: isoWeek(monday), monday };
+  });
 }
 
-// Semaine à afficher quand aucune n'est demandée : celle d'aujourd'hui,
-// bornée à la période.
+// Semaine à afficher quand aucune n'est demandée : celle d'aujourd'hui.
 //
 // Le défaut était « la première semaine qui porte une inscription », donc la
 // plus ancienne : les vues s'ouvraient figées sur un passé révolu, et il
 // fallait cliquer autant de fois que de semaines écoulées pour revenir au
 // présent. Un tableau de bord parle d'abord d'aujourd'hui.
 //
-// Hors période : avant, la première semaine ; après, la dernière. Si la
-// semaine du jour ne figure pas dans la liste (vacances, jours fermés), on
-// prend la suivante qui y figure — jamais une précédente.
-export function semaineParDefaut(params, weeks, aujourdHui = dateDuJour()) {
+// Si la semaine du jour ne figure pas dans la liste reçue, on prend la
+// suivante qui y figure — jamais une précédente.
+export function semaineParDefaut(weeks, aujourdHui = dateDuJour()) {
   if (!weeks?.length) return null;
-  const ref = aujourdHui < params.periodStart ? params.periodStart
-    : aujourdHui > params.periodEnd ? params.periodEnd : aujourdHui;
-  const lundi = mondayOf(ref);
+  const lundi = mondayOf(aujourdHui);
   const exacte = weeks.find((w) => w.monday === lundi);
   const suivante = weeks.find((w) => w.monday >= lundi);
   return (exacte || suivante || weeks[weeks.length - 1]).week;

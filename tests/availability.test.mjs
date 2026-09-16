@@ -4,7 +4,7 @@ import { defaultState, seedExamples } from '../js/store.js';
 import { memberAvailability } from '../js/engine.js';
 
 test('disponibilités : formateur occupé signalé, habilitation vérifiée', () => {
-  const state = seedExamples(defaultState());
+  const state = seedExamples(defaultState(), { jours: ['2026-09-01', '2026-09-02'] });
   state.team.push({ id: 'p3', name: 'AUTRE A', quals: {} });
   // Créneau chevauchant la pratique de DUPONT (garcia p2 occupé 08:00-09:30 le 01/09)
   const avail = memberAvailability(state, {
@@ -23,7 +23,7 @@ test('disponibilités : formateur occupé signalé, habilitation vérifiée', ()
 });
 
 test('disponibilités : capacité 2 en R489-3 laisse le formateur libre', () => {
-  const state = seedExamples(defaultState());
+  const state = seedExamples(defaultState(), { jours: ['2026-09-01', '2026-09-02'] });
   // 01/09 13:00-14:30 : garcia (p2) forme DUPONT + MARTIN en Cat 3 (2/2) → saturé
   const availCat3 = memberAvailability(state, {
     formation: 'R489-3', type: 'Initial',

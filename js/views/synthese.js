@@ -3,15 +3,16 @@
 
 import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
-import { periodWeeks, weekDays, fmtTime, fmtDateLong, fmtDateShort, semaineParDefaut } from '../dates.js';
+import { weekDays, fmtTime, fmtDateLong, fmtDateShort, semaineParDefaut } from '../dates.js';
+import { semainesConsultables } from '../engine.js';
 import { buildICS, downloadICS } from '../ics.js';
 
 export function renderSynthese(main, args) {
   const state = app.state;
-  const weeks = periodWeeks(state.params);
+  const weeks = semainesConsultables(state);
   // La semaine en cours, comme les grilles — et non la plus ancienne qui
   // porte une inscription.
-  const defaultWeek = semaineParDefaut(state.params, weeks) || weeks[0].week;
+  const defaultWeek = semaineParDefaut(weeks) || weeks[0].week;
   const weekNum = Number(args[0]) || defaultWeek;
   const week = weeks.find((w) => w.week === weekNum) || weeks[0];
   const days = weekDays(week.monday);

@@ -2,6 +2,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCSV, importInscriptionsCSV } from '../js/csv.js';
 import { DEFAULT_FORMATIONS } from '../js/config.js';
+import { defaultState } from '../js/store.js';
+
+// Jours ouverts figés au 01 et 02/09/2026.
+//
+// La donnée de démonstration suit désormais la fenêtre glissante (seize
+// semaines depuis la semaine en cours) : sans ce figeage, les dates écrites en
+// clair dans ces scénarios ne tomberaient plus sur des jours ouverts, et la
+// suite dériverait avec le calendrier réel.
+function etatFige(jours = ['2026-09-01', '2026-09-02']) {
+  const s = defaultState();
+  s.openDays = [...jours];
+  return s;
+}
+
 
 test('parseCSV : guillemets, séparateur auto, BOM', () => {
   const rows = parseCSV('﻿"a;x";b\n"l1 ""quote""";2\n');
@@ -39,10 +53,10 @@ test('import CSV : lignes invalides ignorées avec raison', () => {
 
 test('import du CSV réel exporté du classeur Excel : 4 lignes ✓ OK', async () => {
   const { readFileSync } = await import('node:fs');
-  const { defaultState, addInscription } = await import('../js/store.js');
+  const { addInscription } = await import('../js/store.js');
   const { computeSchedule } = await import('../js/engine.js');
   const text = readFileSync(new URL('./fixtures/inscriptions-classeur.csv', import.meta.url), 'utf8');
-  const state = defaultState();
+  const state = etatFige();
   const { inscriptions, skipped } = importInscriptionsCSV(text, state.formations, state.team);
   assert.equal(skipped.length, 0);
   assert.equal(inscriptions.length, 4);

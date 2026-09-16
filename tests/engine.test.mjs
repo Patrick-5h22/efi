@@ -3,8 +3,15 @@ import assert from 'node:assert/strict';
 import { defaultState, seedExamples, addInscription } from '../js/store.js';
 import { computeSchedule, unionDuration } from '../js/engine.js';
 
-function freshState() {
+// Jours ouverts figés au 01 et 02/09/2026.
+//
+// La donnée de démonstration suit désormais la fenêtre glissante (seize
+// semaines depuis la semaine en cours) : sans ce figeage, ces scénarios
+// dériveraient avec le calendrier réel et leurs dates écrites en clair ne
+// tomberaient plus sur des jours ouverts.
+function freshState(jours = ['2026-09-01', '2026-09-02']) {
   const s = defaultState();
+  s.openDays = [...jours];
   return s;
 }
 
@@ -271,15 +278,15 @@ test('théorie renseignée en double signalée', () => {
 });
 
 test('comptage théorie par stagiaire unique', () => {
-  const state = seedExamples(defaultState());
+  const state = seedExamples(freshState());
   const sched = computeSchedule(state);
   assert.equal(sched.theoryCandidates('2026-09-01'), 2); // DUPONT + MARTIN
 });
 
 test('suggestion automatique de créneaux sans conflit', async () => {
   const { suggestSlots } = await import('../js/engine.js');
-  const state = seedExamples(defaultState());
-  const found = suggestSlots(state, { stagiaire: 'NOUVEAU Paul', formation: 'R489-1A', type: 'Initial' });
+  const state = seedExamples(freshState());
+  const found = suggestSlots(state, { stagiaire: 'NOUVEAU Paul', formation: 'R489-1A', type: 'Initial', aujourdHui: '2026-09-01' });
   assert.ok(found, 'aucune proposition');
   // Vérifie que la proposition est réellement sans anomalie
   addInscription(state, found);
@@ -289,8 +296,8 @@ test('suggestion automatique de créneaux sans conflit', async () => {
 
 test('suggestion : théorie omise si déjà planifiée pour la recommandation', async () => {
   const { suggestSlots } = await import('../js/engine.js');
-  const state = seedExamples(defaultState());
-  const found = suggestSlots(state, { stagiaire: 'EXEMPLE - DUPONT Jean', formation: 'R489-5', type: 'Initial' });
+  const state = seedExamples(freshState());
+  const found = suggestSlots(state, { stagiaire: 'EXEMPLE - DUPONT Jean', formation: 'R489-5', type: 'Initial', aujourdHui: '2026-09-01' });
   assert.ok(found);
   assert.equal(found.dateTheorie, null); // théorie R489 déjà posée le 01/09
 });
@@ -311,8 +318,8 @@ test('testeur théorie non habilité signalé (affectation manuelle du jour)', (
 
 test('suggestion : le test pratique proposé suit la formation pratique', async () => {
   const { suggestSlots } = await import('../js/engine.js');
-  const state = seedExamples(defaultState());
-  const found = suggestSlots(state, { stagiaire: 'NOUVEAU Paul', formation: 'R489-1A', type: 'Initial' });
+  const state = seedExamples(freshState());
+  const found = suggestSlots(state, { stagiaire: 'NOUVEAU Paul', formation: 'R489-1A', type: 'Initial', aujourdHui: '2026-09-01' });
   assert.ok(found);
   if (found.dateTestPratique === found.datePratique) {
     assert.ok(found.debutTestPratique >= found.debutPratique + 90,
@@ -321,7 +328,7 @@ test('suggestion : le test pratique proposé suit la formation pratique', async 
 });
 
 test('affectation auto : le testeur évite le formateur du candidat', () => {
-  const state = defaultState();
+  const state = freshState();
   // Tout en automatique : p1 formera (1er de la liste), le testeur doit être p2
   addInscription(state, {
     stagiaire: 'A Un', formation: 'R489-1A', type: 'Initial',
@@ -337,7 +344,7 @@ test('affectation auto : le testeur évite le formateur du candidat', () => {
 });
 
 test('intervenant en formation et en test en même temps détecté (choix manuels)', () => {
-  const state = defaultState();
+  const state = freshState();
   addInscription(state, {
     stagiaire: 'A Un', formation: 'R489-1A', type: 'Initial',
     datePratique: '2026-09-01', debutPratique: 480, formateurId: 'p1',
@@ -355,7 +362,7 @@ test('intervenant en formation et en test en même temps détecté (choix manuel
 });
 
 test('dossier annulé : libère le créneau et sort des contrôles', () => {
-  const state = defaultState();
+  const state = freshState();
   // Deux pratiques identiques avec le même formateur : conflit…
   for (const [nom, statut] of [['A Un', 'confirmee'], ['B Deux', 'confirmee']]) {
     addInscription(state, {
@@ -378,7 +385,7 @@ test('dossier annulé : libère le créneau et sort des contrôles', () => {
 
 test('occupation par jour : calcul de la heatmap', async () => {
   const { occupancyByDay } = await import('../js/engine.js');
-  const state = seedExamples(defaultState());
+  const state = seedExamples(freshState());
   const schedule = computeSchedule(state);
   const occ = occupancyByDay(state, schedule);
   // 01/09 : pratiques 1h30+1h30+1h30 (9 créneaux) + tests 1h×3 (6) + théorie 1h (2) = 17 / 36

@@ -2,8 +2,10 @@
 
 Application web de gestion des réservations du plateau technique EFI :
 formations pratiques et tests CACES (R489, R486) et Habilitation électrique,
-sur la période du **01/09/2026 au 31/12/2026** (86 jours ouvrés, période
-modifiable).
+L'affichage porte sur une **fenêtre glissante de seize semaines à partir de la
+semaine en cours** : il n'y a pas de dates de début et de fin à régler, et une
+séance déjà passée reste consultable et n'est jamais comptée comme une
+anomalie.
 
 Transposition fidèle du classeur Excel « Planification EFI v4.2 » :
 même principe (1 ligne = 1 stagiaire × 1 catégorie), mêmes contrôles

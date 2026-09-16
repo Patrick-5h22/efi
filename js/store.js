@@ -1,7 +1,8 @@
 // Magasin d'état : état applicatif + persistance localStorage + import/export JSON.
 // Aucune dépendance au DOM pour rester testable côté Node.
 
-import { DEFAULT_PARAMS, DEFAULT_FORMATIONS, DEFAULT_TEAM, DEFAULT_OPEN_DAYS } from './config.js';
+import { DEFAULT_PARAMS, DEFAULT_FORMATIONS, DEFAULT_TEAM, joursOuvertsParDefaut } from './config.js';
+import { dateDuJour } from './dates.js';
 
 export const STORAGE_KEY = 'efi-planning-v1';
 
@@ -11,7 +12,7 @@ export function defaultState() {
     params: structuredClone(DEFAULT_PARAMS),
     formations: structuredClone(DEFAULT_FORMATIONS),
     team: structuredClone(DEFAULT_TEAM),
-    openDays: [...DEFAULT_OPEN_DAYS],
+    openDays: joursOuvertsParDefaut(),
     // Affectations jour par jour : { '2026-09-01': { formateur: 'p1', testeur: 'p2' } }
     dayAssignments: {},
     // Présence des intervenants : { '2026-09-01': ['p1'] } — clé absente = tous présents
@@ -21,33 +22,44 @@ export function defaultState() {
   };
 }
 
-export function seedExamples(state) {
+// Données de démonstration d'une installation neuve.
+//
+// Les exemples se posent sur les jours OUVERTS de l'état, quels qu'ils soient.
+// Datés en dur (01 et 02/09/2026), ils sortaient de la fenêtre affichée dès
+// qu'elle avait glissé : l'application s'ouvrait sur une grille vide et les
+// quatre inscriptions restaient invisibles.
+//
+// « jours » impose des dates : les tests s'en servent pour rester lisibles et
+// stables, sans dériver avec le calendrier réel.
+export function seedExamples(state, { jours = null } = {}) {
+  if (jours) state.openDays = [...jours];
+  const [j1, j2 = j1] = state.openDays.length ? state.openDays : [dateDuJour()];
   // Les 4 lignes d'exemple du classeur (dont un cas multi-catégories)
   const rows = [
     {
       stagiaire: 'EXEMPLE - DUPONT Jean', formation: 'R489-1A', type: 'Initial',
-      datePratique: '2026-09-01', debutPratique: 480,
-      dateTheorie: '2026-09-01',
-      dateTestPratique: '2026-09-01', debutTestPratique: 570,
+      datePratique: j1, debutPratique: 480,
+      dateTheorie: j1,
+      dateTestPratique: j1, debutTestPratique: 570,
       formateurId: 'p2', testeurId: 'p1',
     },
     {
       stagiaire: 'EXEMPLE - DUPONT Jean', formation: 'R489-3', type: 'Initial',
-      datePratique: '2026-09-01', debutPratique: 780,
+      datePratique: j1, debutPratique: 780,
       dateTheorie: null,
-      dateTestPratique: '2026-09-01', debutTestPratique: 870,
+      dateTestPratique: j1, debutTestPratique: 870,
       formateurId: 'p2', testeurId: 'p1',
     },
     {
       stagiaire: 'EXEMPLE - MARTIN Claire', formation: 'R489-3', type: 'Initial',
-      datePratique: '2026-09-01', debutPratique: 780,
-      dateTheorie: '2026-09-01',
-      dateTestPratique: '2026-09-01', debutTestPratique: 930,
+      datePratique: j1, debutPratique: 780,
+      dateTheorie: j1,
+      dateTestPratique: j1, debutTestPratique: 930,
       formateurId: 'p2', testeurId: 'p1',
     },
     {
       stagiaire: 'EXEMPLE - BERNARD Luc', formation: 'HAB-ELEC', type: 'Initial',
-      datePratique: '2026-09-02', debutPratique: 480,
+      datePratique: j2, debutPratique: 480,
       dateTheorie: null,
       dateTestPratique: null, debutTestPratique: null,
       formateurId: 'p1', testeurId: null,
@@ -142,6 +154,12 @@ export function migrate(state) {
   const base = defaultState();
   // Complète les champs manquants sans écraser les données existantes
   state.params = { ...base.params, ...(state.params || {}) };
+  // periodStart / periodEnd ont disparu : la fenêtre affichée glisse avec le
+  // calendrier. Les laisser traîner dans l'état enregistré ferait croire à un
+  // réglage encore actif — c'est justement en avançant periodStart au lundi de
+  // la semaine en cours qu'on faisait basculer en anomalie tout le passé.
+  delete state.params.periodStart;
+  delete state.params.periodEnd;
   state.formations = state.formations?.length ? state.formations : base.formations;
   // Formations ajoutées au catalogue par défaut (ex. AIPR) : injectées dans
   // les états existants sans toucher aux formations personnalisées

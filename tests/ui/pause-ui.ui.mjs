@@ -6,23 +6,26 @@ page.on('dialog', (d) => d.accept());
 let pass = 0, fail = 0;
 const check = (l, ok, x = '') => { ok ? pass++ : fail++; console.log(`${ok ? '✓' : '✗'} ${l}${x ? ' — ' + x : ''}`); };
 
-// Semaine de la séance semée plus bas (02/09/2026). Les grilles s'ouvrent
-// désormais sur la semaine EN COURS — un défaut qui ne dépend plus des
-// données — donc une suite qui vise une semaine précise doit la nommer.
-const SEMAINE = 36;
-
 await page.goto(BASE + '/');
 await page.evaluate(() => localStorage.clear());
 await page.reload(); await page.waitForTimeout(800);
 
 // 0. On sème une séance qui mord sur 12:00–13:00, pour que l'avertissement
 // d'activation ait quelque chose à compter.
-await page.evaluate(() => {
+//
+// Le jour et la semaine sont LUS dans l'état, jamais écrits en clair : les
+// jours ouverts d'une installation neuve suivent la fenêtre glissante (seize
+// semaines depuis la semaine en cours). Datés en dur, ils sortaient de la
+// fenêtre et la grille visée n'avait plus un seul jour ouvert.
+const { jour: JOUR, semaine: SEMAINE } = await page.evaluate(async () => {
+  const { isoWeek } = await import('/js/dates.js');
   const st = JSON.parse(localStorage.getItem('efi-planning-v1'));
+  const jour = st.openDays[st.openDays.length - 1];
   st.inscriptions.push({ id: st.nextId++, stagiaire: 'MORD Surlapause', formation: 'HAB-ELEC',
     type: 'Initial', statut: 'confirmee', modeTheorie: 'distance',
-    datePratique: '2026-09-02', debutPratique: 660 }); // 11:00 → 13:00
+    datePratique: jour, debutPratique: 660 }); // 11:00 → 13:00
   localStorage.setItem('efi-planning-v1', JSON.stringify(st));
+  return { jour, semaine: isoWeek(jour) };
 });
 await page.reload(); await page.waitForTimeout(600);
 
@@ -72,7 +75,7 @@ await page.goto(BASE + '/#/inscriptions'); await page.waitForTimeout(500);
 await page.click('#btn-add'); await page.waitForTimeout(400);
 await page.fill('input[name=stagiaire]', 'TEST Pause');
 await page.selectOption('select[name=formation]', 'HAB-ELEC'); await page.waitForTimeout(300);
-await page.selectOption('select[name=datePratique]', '2026-09-02'); await page.waitForTimeout(500);
+await page.selectOption('select[name=datePratique]', JOUR); await page.waitForTimeout(500);
 const heures = await page.locator('select[name=debutPratique] option').evaluateAll(
   (o) => o.map((x) => x.value).filter(Boolean));
 check('aucun départ proposé ne mord sur la pause',
