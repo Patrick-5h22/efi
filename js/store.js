@@ -124,6 +124,23 @@ export function removeInscription(state, id) {
   if (idx >= 0) state.inscriptions.splice(idx, 1);
 }
 
+// Vide les inscriptions, et RIEN d'autre. Rend le nombre de lignes retirées.
+//
+// « Réinitialiser toutes les données » emporte l'équipe, les jours EFI, la
+// présence des intervenants, le catalogue et les paramètres, puis resème les
+// quatre exemples : pour repartir d'un planning vide sans reperdre une
+// configuration qu'on a mis du temps à saisir — la présence des intervenants
+// se coche jour par jour — il faut une action qui ne retire que les lignes.
+//
+// nextId n'est PAS remis à 1 : une sauvegarde réimportée plus tard porterait
+// alors des identifiants entre-temps réattribués, et deux lignes différentes
+// se retrouveraient avec le même numéro.
+export function viderInscriptions(state) {
+  const n = state.inscriptions.length;
+  state.inscriptions = [];
+  return n;
+}
+
 export function memberById(state, id) {
   return state.team.find((m) => m.id === id) || null;
 }
