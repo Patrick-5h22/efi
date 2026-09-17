@@ -1,9 +1,9 @@
 // Paramètres : formations/durées/capacités, horaires, tests, charge
 // (équivalent de l'onglet « Paramètres »).
 
-import { app, esc, toast } from '../app.js';
+import { app, esc, toast, telechargerSauvegarde } from '../app.js';
 import { fmtTime, parseTime, fmtDateShort, fenetreAffichage, SEMAINES_AFFICHEES } from '../dates.js';
-import { defaultState, seedExamples, saveState } from '../store.js';
+import { defaultState, seedExamples, saveState, viderInscriptions } from '../store.js';
 import { chevauchePause } from '../config.js';
 
 // Activer la pause fait basculer en anomalie les séances déjà posées qui la
@@ -154,10 +154,17 @@ export function renderParametres(main) {
       <h2>Données</h2>
       <div class="form-row">
         <button class="btn btn-secondary" id="btn-seed">Recharger les 4 exemples du classeur</button>
+        <button class="btn btn-danger" id="btn-vider-inscriptions"
+          title="Retire toutes les lignes d’inscription. L’équipe, les jours EFI, la présence des intervenants, le catalogue et les paramètres sont conservés.">🗑 Vider les inscriptions${state.inscriptions.length ? ` (${state.inscriptions.length})` : ''}</button>
         <button class="btn btn-danger" id="btn-reset">Réinitialiser toutes les données</button>
       </div>
       <p class="muted">⚠ Les lignes d'exemple sont à supprimer avant utilisation réelle (comme dans le classeur).
       L'export JSON (barre latérale) permet de sauvegarder avant toute manipulation.</p>
+      <p class="muted"><b>Vider les inscriptions</b> ne touche qu'aux lignes : l'équipe, les jours EFI ouverts,
+      la présence des intervenants, le catalogue et les paramètres restent en place — de quoi repartir d'un
+      planning vide pour une campagne de tests sans reperdre une configuration saisie jour par jour.
+      Une sauvegarde JSON est téléchargée <b>avant</b> la suppression, et <kbd>Ctrl</kbd>+<kbd>Z</kbd> l'annule.
+      <b>Réinitialiser toutes les données</b>, elle, emporte tout et resème les quatre exemples.</p>
     </div>
   `;
 
@@ -263,6 +270,26 @@ export function renderParametres(main) {
     seedExamples(state);
     app.commit();
     toast('Exemples du classeur ajoutés.', 'ok');
+  });
+
+  // Suppression en masse : la sauvegarde part AVANT, pas après. Un
+  // téléchargement refusé par le navigateur annule la suppression — mieux
+  // vaut ne rien faire que détruire sans filet.
+  main.querySelector('#btn-vider-inscriptions').addEventListener('click', () => {
+    const n = state.inscriptions.length;
+    if (!n) return toast('Aucune inscription à supprimer.');
+    if (!confirm(`Supprimer les ${n} inscription(s) de tous les stagiaires ?\n\n`
+      + 'Conservés : équipe, jours EFI ouverts, présence des intervenants, catalogue, paramètres.\n'
+      + 'Une sauvegarde JSON est téléchargée avant la suppression, et Ctrl+Z l’annule.')) return;
+    let fichier;
+    try {
+      fichier = telechargerSauvegarde(state, 'avant-vidage');
+    } catch (e) {
+      return toast('Sauvegarde impossible (' + e.message + ') — rien n’a été supprimé.', 'error');
+    }
+    viderInscriptions(state);
+    app.commit();
+    toast(`${n} inscription(s) supprimée(s). Sauvegarde : ${fichier}`, 'ok');
   });
 
   main.querySelector('#btn-reset').addEventListener('click', () => {

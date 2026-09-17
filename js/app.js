@@ -8,6 +8,7 @@ import { showLoginOverlay } from './views/login.js';
 import { applyTheme, watchSystemTheme, setupThemeMenu, setTheme, THEME_PRESETS } from './theme.js';
 import { setupCommandPalette, openCommandPalette } from './views/command.js';
 import { computeSchedule } from './engine.js';
+import { dateDuJour } from './dates.js';
 
 import { renderDashboard } from './views/dashboard.js';
 import { renderInscriptions } from './views/inscriptions.js';
@@ -357,14 +358,25 @@ export function render() {
 // ---------------------------------------------------------------------------
 // Export / import
 // ---------------------------------------------------------------------------
+// Télécharge une sauvegarde JSON de l'état.
+//
+// Exporté : toute action destructive doit pouvoir en déclencher une AVANT de
+// détruire, sans recopier ce bloc. La date vient de dateDuJour (heure locale
+// du centre) et non de toISOString : passé minuit à Paris, le fichier
+// porterait la date de la veille.
+export function telechargerSauvegarde(state, suffixe = '') {
+  const blob = new Blob([exportJSON(state)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `efi-planning-${dateDuJour()}${suffixe ? '-' + suffixe : ''}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  return a.download;
+}
+
 function setupImportExport() {
   document.getElementById('btn-export').addEventListener('click', () => {
-    const blob = new Blob([exportJSON(app.state)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `efi-planning-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    telechargerSauvegarde(app.state);
     toast('Données exportées.', 'ok');
   });
   const fileInput = document.getElementById('file-import');
