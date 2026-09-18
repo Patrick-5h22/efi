@@ -200,6 +200,13 @@ export function migrate(state) {
     if (f.testOnly === undefined) f.testOnly = false;
   }
   state.team = state.team || [];
+  // Fenêtre de disponibilité ajoutée après coup : absente = sans limite, ce
+  // qui reproduit exactement le comportement d'avant pour les équipes déjà
+  // saisies. Normalisée en null pour que la base reçoive un NULL et non ''.
+  for (const m of state.team) {
+    if (!m.dispoDebut) m.dispoDebut = null;
+    if (!m.dispoFin) m.dispoFin = null;
+  }
   state.openDays = state.openDays || [];
   state.dayAssignments = state.dayAssignments || {};
   state.dayPresence = state.dayPresence || {};

@@ -97,6 +97,30 @@ export function dureeTheorieFor(insc) {
   return 0;
 }
 
+// --- Disponibilité d'un intervenant ---------------------------------------
+// Fenêtre de disponibilité : bornes optionnelles, incluses. Vide = aucune
+// borne de ce côté.
+//
+// Jusqu'ici un intervenant déclaré dans l'outil était réputé disponible sur
+// toute la période dès qu'il était habilité : l'absence se saisissait jour par
+// jour (page Jours EFI) et la présence était implicite. Une ressource recrutée
+// en novembre apparaissait donc libre en septembre, et rien ne le signalait.
+// La fenêtre donne le DÉFAUT ; la présence quotidienne garde le dernier mot.
+export function dansLaFenetre(membre, date) {
+  if (!membre || !date) return false;
+  if (membre.dispoDebut && date < membre.dispoDebut) return false;
+  if (membre.dispoFin && date > membre.dispoFin) return false;
+  return true;
+}
+
+// Libellé de la fenêtre, pour les messages d'anomalie et l'écran Équipe.
+export function libelleFenetre(membre) {
+  const { dispoDebut: d, dispoFin: f } = membre || {};
+  if (!d && !f) return 'sans limite';
+  if (d && f) return `du ${d} au ${f}`;
+  return d ? `à partir du ${d}` : `jusqu’au ${f}`;
+}
+
 export const MAX_TEAM = 12;
 
 // Équipe d'exemple (identique au classeur)

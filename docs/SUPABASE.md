@@ -47,6 +47,24 @@ lequel le moteur choisit les intervenants.
 d'écriture du serveur MCP y voyait un conflit permanent. La 003 rend
 l'horodatage de la dernière écriture.
 
+**La leçon a resservi, et le garde-fou était trop étroit.** `tests/colonnes-base.test.mjs`
+ne surveillait que `planning.inscriptions`. Deux champs de **formation** —
+`testOnly` et `chargeComptee` — n'étaient donc écrits ni relus par les RPC de
+la 003, sans que rien ne le signale. Une formation du catalogue s'en sortait
+par accident : `migrate()` réinjecte le drapeau pour l'AIPR qu'il connaît. Mais
+une formation créée à la main dans l'écran Paramètres perdait le sien au
+premier aller-retour — une épreuve surveillée redevenait une formation
+ordinaire, avec un formateur mobilisé et un test à programmer.
+
+`docs/migrations/004-disponibilite-et-drapeaux-formations.sql` ajoute ces deux
+colonnes, plus `dispo_debut` / `dispo_fin` sur `planning.team_members` (fenêtre
+de disponibilité des intervenants). Mesuré sur une réplique du schéma : avec
+les RPC de la 003 seule, les quatre champs revenaient **perdus** ; avec la 004,
+tous reviennent, et la réappliquer ne casse rien.
+
+Le contrôle couvre désormais les **trois** tables que les RPC reconstruisent :
+inscriptions, formations et intervenants.
+
 **Avant d'ajouter un champ à `js/persisted.js` ou à une inscription**, vérifier
 ce que la base rend réellement — en lecture seule, sans rien écrire :
 
