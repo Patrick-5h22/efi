@@ -31,7 +31,8 @@ export function renderAide(main) {
         <li>Choisir <b>date + heure de début</b> de la pratique → fin calculée automatiquement.</li>
         <li><b>Tests obligatoires pour R489 / R486</b> :
           <ul>
-            <li>Test pratique (1h00) : par catégorie, donc sur chaque ligne (date + heure de début).</li>
+            <li>Test pratique (${fmtTime(p.practicalTestDuration).replace(':', 'h')} par défaut) : par catégorie, donc sur chaque ligne (date + heure de début).
+              Une formation peut porter sa propre durée de test dans <b>Paramètres</b> (colonne « Durée test ») — le QCM AIPR tient 2h00 là où un test R489 tient 1h00.</li>
             <li>Test théorique (1h00) : créneau unique et identique pour tous les candidats du jour (${fmtTime(p.theoryTime)} par défaut).
               La théorie d'une recommandation est <b>commune</b> à toutes ses catégories : un seul créneau par stagiaire et par recommandation —
               le renseigner sur une seule de ses lignes ; le contrôle le reconnaît automatiquement sur les autres.</li>
@@ -58,10 +59,18 @@ export function renderAide(main) {
         <li><b>Présence du jour</b> : sur la page Jours EFI, cocher les intervenants présents chaque jour
           (« Tous » par défaut) — l'affectation automatique ne choisit que parmi eux, et un intervenant
           positionné un jour où il n'est pas présent est signalé.</li>
-        <li><b>AIPR</b> : la formation se fait à distance (e-learning) — seule l'épreuve sur site (2h00) se planifie
-          ici, sans formateur ni autre test. Elle est tenue <b>en surveillance</b> par un testeur habilité AIPR :
-          celui-ci reste identifié sur le créneau mais n'y est pas bloqué, et l'épreuve n'entre ni dans sa charge
-          du jour ni dans le taux d'occupation.</li>
+        <li><b>AIPR — deux modalités au catalogue</b>, selon ce qui est vendu :
+          <ul>
+            <li><b>AIPR (épreuve sur site)</b> : la formation se fait à distance (e-learning) — seule l'épreuve
+              sur site (2h00) se planifie ici, sans formateur ni autre test.</li>
+            <li><b>AIPR (formation + épreuve)</b> : la formation se tient sur site avec un formateur, puis
+              l'épreuve au créneau de test. La formation entre dans la charge du jour ; l'épreuve, non.
+              <i>La durée de la partie formation reste à confirmer — 3h30 en attendant, réglable dans Paramètres.</i></li>
+          </ul>
+          Dans les deux cas l'épreuve est tenue <b>en surveillance</b> par un testeur habilité AIPR : celui-ci
+          reste identifié sur le créneau mais n'y est pas bloqué, et l'épreuve n'entre ni dans sa charge du jour
+          ni dans le taux d'occupation. Une épreuve surveillée EST l'examen du dispositif : aucun test théorique
+          n'est réclamé à côté.</li>
         <li><b>Pause déjeuner</b> (Paramètres, <b>désactivée par défaut</b>) : une fois active, aucune pratique,
           aucun test et aucune théorie en centre ne peut la chevaucher — les créneaux concernés ne sont plus
           proposés et les séances déjà posées dessus sont signalées. Seule la <b>théorie présentielle</b>

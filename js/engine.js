@@ -2,7 +2,7 @@
 // les intervenants effectifs (affectation automatique) et les contrôles (STATUT).
 // Reproduit les règles du classeur "Planification EFI v4.2".
 
-import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee, pauseCreneau, chevauchePause, dansLaFenetre, libelleFenetre } from './config.js';
+import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee, dureeTestFor, testSurveille, pauseCreneau, chevauchePause, dansLaFenetre, libelleFenetre } from './config.js';
 import { isoWeek, overlaps, workingDays, joursOuvrables, bornesDuMois, fenetreAffichage, addDays, fmtTime, mondayOf, dateDuJour, isWeekend, semainesAffichees } from './dates.js';
 
 // ---------------------------------------------------------------------------
@@ -22,14 +22,16 @@ export function computeSchedule(state) {
   const rows = inscriptions.map((insc) => {
     const formation = formationByCode(formations, insc.formation);
     const duree = dureeFor(formation, insc.type);
+    const dureeT = dureeTestFor(formation, params);
     const dureeTheorieF = dureeTheorieFor(insc);
     return {
       insc,
       formation,
       duree,
+      dureeTest: dureeT,
       cancelled: insc.statut === 'annulee',
       finPratique: insc.debutPratique != null ? insc.debutPratique + duree : null,
-      finTestPratique: insc.debutTestPratique != null ? insc.debutTestPratique + params.practicalTestDuration : null,
+      finTestPratique: insc.debutTestPratique != null ? insc.debutTestPratique + dureeT : null,
       heureTheorie: insc.dateTheorie ? params.theoryTime : null,
       // Théorie de la formation (modes centre / présentiel)
       dureeTheorieFormation: dureeTheorieF,
@@ -293,11 +295,17 @@ function validateRows(rows, ctx) {
     // Tests obligatoires (R489 / R486)
     if (formation.tests) {
       if (!insc.dateTestPratique || insc.debutTestPratique == null) {
-        row.errors.push('Test pratique manquant');
+        row.errors.push(testSurveille(formation) ? 'Épreuve manquante' : 'Test pratique manquant');
       }
-      const key = `${insc.stagiaire.toLowerCase()}|${formation.reco}`;
-      if (!theoryByStagiaireReco.has(key)) {
-        row.errors.push(`Test théorique ${formation.reco} manquant`);
+      // Une épreuve surveillée EST l'examen du dispositif : l'AIPR se sanctionne
+      // par son seul QCM, il n'y a pas de test théorique à côté. Le réclamer
+      // posait une anomalie sur toute ligne « formation + épreuve », et
+      // envoyait chercher un créneau de testeur qui n'a pas lieu d'exister.
+      if (!testSurveille(formation)) {
+        const key = `${insc.stagiaire.toLowerCase()}|${formation.reco}`;
+        if (!theoryByStagiaireReco.has(key)) {
+          row.errors.push(`Test théorique ${formation.reco} manquant`);
+        }
       }
     }
 
@@ -695,8 +703,11 @@ export function occupancyByDay(state, schedule) {
     if (i.datePratique && i.debutPratique != null && chargeComptee(r.formation)) {
       ensure(i.datePratique).busy += r.duree / params.slotMinutes;
     }
-    if (i.dateTestPratique && i.debutTestPratique != null && r.formation?.tests) {
-      ensure(i.dateTestPratique).busy += params.practicalTestDuration / params.slotMinutes;
+    // Un test surveillé (QCM AIPR) est de la surveillance, pas un test que
+    // l'on fait passer : il ne mobilise pas de temps d'intervenant non plus.
+    if (i.dateTestPratique && i.debutTestPratique != null && r.formation?.tests
+        && !testSurveille(r.formation)) {
+      ensure(i.dateTestPratique).busy += r.dureeTest / params.slotMinutes;
     }
     if (r.errors.length && i.datePratique) ensure(i.datePratique).errors += 1;
   }
@@ -832,8 +843,9 @@ export function occupationSummary(state, schedule, scope = 'periode', todayISO =
     if (i.datePratique && i.debutPratique != null && scopeDays.has(i.datePratique) && chargeComptee(r.formation)) {
       busy += r.duree / params.slotMinutes;
     }
-    if (i.dateTestPratique && i.debutTestPratique != null && scopeDays.has(i.dateTestPratique)) {
-      busy += params.practicalTestDuration / params.slotMinutes;
+    if (i.dateTestPratique && i.debutTestPratique != null && scopeDays.has(i.dateTestPratique)
+        && !testSurveille(r.formation)) {
+      busy += r.dureeTest / params.slotMinutes;
     }
   }
   // Sessions de théorie présentielle (un formateur mobilisé par session)
@@ -924,6 +936,7 @@ export function suggestSlots(state, { stagiaire, formation: code, type, aPartirD
   const formation = formationByCode(state.formations, code);
   if (!formation || !stagiaire) return null;
   const duree = dureeFor(formation, type);
+  const dureeTest = dureeTestFor(formation, params);
   // La fenêtre d'affichage borne les propositions : on ne planifie pas dans le
   // passé, ni à plus de seize semaines. « aujourdHui » est un point d'entrée
   // pour les tests — sans lui ils dériveraient avec le calendrier réel.
@@ -964,7 +977,7 @@ export function suggestSlots(state, { stagiaire, formation: code, type, aPartirD
     return rows.every((r) => r === newRow || r.errors.length <= (baseline.get(r.insc.id) ?? 0));
   };
 
-  const IGNORE_MISSING_TESTS = /Test (pratique|théorique).*manquant/;
+  const IGNORE_MISSING_TESTS = /(Test (pratique|théorique)|Épreuve).*manquant/;
   const maxTrials = 2000;
   let trials = 0;
 
@@ -976,7 +989,7 @@ export function suggestSlots(state, { stagiaire, formation: code, type, aPartirD
     // À validité égale, on prolonge ce qui est déjà posé ce jour-là plutôt que
     // d'ouvrir un trou dans la journée de l'intervenant.
     const creneauxPratique = parEnchainement(slots, ancrages(state, day, genrePratique, excludeId), duree,
-      formation.tests ? { avant: { duree: params.practicalTestDuration, limite: params.dayEnd } } : {});
+      formation.tests ? { avant: { duree: dureeTest, limite: params.dayEnd } } : {});
     for (const start of creneauxPratique) {
       if (start + duree > params.dayEnd) continue;
       const base = { stagiaire, formation: code, type, datePratique: day, debutPratique: start };
@@ -999,9 +1012,9 @@ export function suggestSlots(state, { stagiaire, formation: code, type, aPartirD
         // après — d'où une formation à 15:30 et son test à 08:00.
         const possibles = testDay === day ? slots.filter((t) => t >= start + duree) : slots;
         const ordered = parEnchainement(possibles, ancrages(state, testDay, 'test', excludeId),
-          params.practicalTestDuration);
+          dureeTest);
         for (const testStart of ordered) {
-          if (testStart + params.practicalTestDuration > params.dayEnd) continue;
+          if (testStart + dureeTest > params.dayEnd) continue;
           const draft = { ...withTheory, dateTestPratique: testDay, debutTestPratique: testStart };
           if (++trials > maxTrials) return null;
           if (trial(draft)) return draft;
@@ -1026,14 +1039,15 @@ export function suggestTestPratique(state, inscId, { aPartirDu = null, aujourdHu
   const formation = formationByCode(state.formations, cible.formation);
   if (!formation?.tests) return null;
   const duree = dureeFor(formation, cible.type);
+  const dureeTest = dureeTestFor(formation, params);
 
   const depuis = [cible.datePratique, aPartirDu, aujourdHui].filter(Boolean).sort().at(-1);
   const openDays = workingDays(params, aujourdHui)
     .filter((d) => state.openDays.includes(d) && d >= depuis);
 
   const slots = [];
-  for (let t = params.dayStart; t + params.practicalTestDuration <= params.dayEnd; t += params.slotMinutes) {
-    if (chevauchePause(params, t, t + params.practicalTestDuration)) continue;
+  for (let t = params.dayStart; t + dureeTest <= params.dayEnd; t += params.slotMinutes) {
+    if (chevauchePause(params, t, t + dureeTest)) continue;
     slots.push(t);
   }
 
@@ -1067,7 +1081,7 @@ export function suggestTestPratique(state, inscId, { aPartirDu = null, aujourdHu
       ? slots.filter((t) => t >= cible.debutPratique + duree)
       : slots;
     const ordered = parEnchainement(possibles, ancrages(state, testDay, 'test', inscId),
-      params.practicalTestDuration);
+      dureeTest);
     for (const testStart of ordered) {
       if (essai(testDay, testStart)) return { dateTestPratique: testDay, debutTestPratique: testStart };
     }
@@ -1097,7 +1111,8 @@ function busyIndex(state, excludeId = null) {
     if (r.insc.datePratique && r.insc.debutPratique != null && !r.formation?.testOnly) {
       add(r.formateurEffectif, r.insc.datePratique, r.insc.debutPratique, r.finPratique, 'formation', r.formation?.code);
     }
-    if (r.insc.dateTestPratique && r.insc.debutTestPratique != null) {
+    // Test surveillé (QCM AIPR) : surveillance — n'occupe pas le testeur
+    if (r.insc.dateTestPratique && r.insc.debutTestPratique != null && !testSurveille(r.formation)) {
       add(r.testeurEffectif, r.insc.dateTestPratique, r.insc.debutTestPratique, r.finTestPratique, 'test', r.formation?.code);
     }
   }
@@ -1152,9 +1167,11 @@ export function memberAvailability(state, draft, excludeId = null) {
         } else out.F = status('F', true);
       }
       if (!formation.testOnly && draft.dateTestPratique && draft.debutTestPratique != null) {
-        const end = draft.debutTestPratique + params.practicalTestDuration;
+        const end = draft.debutTestPratique + dureeTestFor(formation, params);
         out.T = !m.quals?.[formation.code]?.T ? 'non-habilite'
           : !presentOn(m.id, draft.dateTestPratique) ? 'absent'
+          // Test surveillé (QCM AIPR) : habilité et présent suffit.
+          : testSurveille(formation) ? 'libre'
           : freeOn(m.id, draft.dateTestPratique, draft.debutTestPratique, end, false) ? 'libre' : 'occupe';
       }
     }
@@ -1174,14 +1191,15 @@ export function availableSlotsFor(state, { formation: code, type, date, role = '
   const formation = formationByCode(state.formations, code);
   if (!formation || !date) return [];
 
-  const duration = role === 'test' ? params.practicalTestDuration
+  const duration = role === 'test' ? dureeTestFor(formation, params)
     : role === 'theorie' ? dureeTheorieFor({ modeTheorie: 'presentiel', type })
     : dureeFor(formation, type);
   const kind = role === 'test' || (role === 'pratique' && formation.testOnly) ? 'T' : 'F';
   const allowSameCat = role === 'pratique' && kind === 'F';
-  // Épreuve « test seul » (AIPR) : surveillance — un superviseur habilité et
-  // présent suffit, peu importe ses autres occupations
-  const surveillance = role === 'pratique' && !!formation.testOnly;
+  // Épreuve surveillée (AIPR, dans ses deux modalités) : un superviseur
+  // habilité et présent suffit, peu importe ses autres occupations.
+  const surveillance = (role === 'pratique' && !!formation.testOnly)
+    || (role === 'test' && testSurveille(formation));
 
   const idx = busyIndex(state, excludeId);
   const freeOn = idx.freeOn(formation);
@@ -1399,7 +1417,12 @@ function seancesDuParcours(state, rows) {
     if (i.dateTestPratique && i.debutTestPratique != null) {
       out.push({
         date: i.dateTestPratique, debut: i.debutTestPratique, fin: r.finTestPratique,
-        genre: 'test', libelle: `Test pratique — ${cat}`,
+        // Un test surveillé (QCM AIPR) n'est pas un test pratique : on le
+        // nomme « Épreuve », et par sa recommandation — « Épreuve — AIPR
+        // (formation + épreuve) » dirait deux fois le même mot.
+        genre: testSurveille(r.formation) ? 'epreuve' : 'test',
+        libelle: testSurveille(r.formation)
+          ? `Épreuve — ${r.formation?.reco || cat}` : `Test pratique — ${cat}`,
         intervenant: nom(r.testeurEffectif),
       });
     }

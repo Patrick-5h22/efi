@@ -65,6 +65,13 @@ tous reviennent, et la réappliquer ne casse rien.
 Le contrôle couvre désormais les **trois** tables que les RPC reconstruisent :
 inscriptions, formations et intervenants.
 
+Il a resservi aussitôt : `dureeTest` et `testSurveille`, ajoutés pour les deux
+modalités AIPR, ont fait échouer le test à la seconde où ils sont apparus dans
+le catalogue — avant d'avoir pu être perdus une seule fois.
+`docs/migrations/005-duree-de-test-par-formation.sql` ajoute les deux colonnes
+et réécrit les deux RPC. Elle reprend les colonnes de la 004 : l'appliquer
+seule suffit.
+
 **Avant d'ajouter un champ à `js/persisted.js` ou à une inscription**, vérifier
 ce que la base rend réellement — en lecture seule, sans rien écrire :
 
