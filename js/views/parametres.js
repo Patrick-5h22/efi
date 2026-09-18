@@ -4,7 +4,7 @@
 import { app, esc, toast, telechargerSauvegarde } from '../app.js';
 import { fmtTime, parseTime, fmtDateShort, fenetreAffichage, SEMAINES_AFFICHEES } from '../dates.js';
 import { defaultState, seedExamples, saveState, viderInscriptions } from '../store.js';
-import { chevauchePause } from '../config.js';
+import { chevauchePause, MODALITES_SEANCE, modaliteDe, appliquerModalite } from '../config.js';
 
 // Activer la pause fait basculer en anomalie les séances déjà posées qui la
 // chevauchent. On le dit AVANT, avec le compte exact — et on le redit après,
@@ -55,7 +55,7 @@ export function renderParametres(main) {
           <thead><tr>
             <th>Code</th><th>Formation</th><th>Recommandation</th><th>Séance</th>
             <th>Durée Initial (h)</th><th>Durée Recyclage (h)</th><th>Tests obligatoires</th>
-            <th>Capacité simultanée</th><th>Charge comptée</th><th></th>
+            <th>Durée test (h)</th><th>Capacité simultanée</th><th>Charge comptée</th><th></th>
           </tr></thead>
           <tbody>
             ${state.formations.map((f, idx) => `
@@ -64,16 +64,22 @@ export function renderParametres(main) {
                 <td><input value="${esc(f.label)}" data-f="${idx}|label" style="min-width:170px"></td>
                 <td><input value="${esc(f.reco)}" data-f="${idx}|reco" style="width:90px"></td>
                 <td>
-                  <select data-f="${idx}|testOnly">
-                    <option value="" ${f.testOnly ? '' : 'selected'}>Formation</option>
-                    <option value="1" ${f.testOnly ? 'selected' : ''}>Épreuve surveillée</option>
+                  <select data-f="${idx}|modalite">
+                    ${MODALITES_SEANCE.map((m) => `<option value="${m.id}"
+                      ${modaliteDe(f) === m.id ? 'selected' : ''}>${m.label}</option>`).join('')}
                   </select>
                 </td>
                 <td><input type="number" step="0.5" min="0.5" max="8" value="${f.dureeInitial / 60}" data-f="${idx}|dureeInitial" style="width:70px"></td>
                 <td><input type="number" step="0.5" min="0.5" max="8" value="${f.dureeRecyclage / 60}" data-f="${idx}|dureeRecyclage" style="width:70px"></td>
                 <td style="text-align:center">${f.testOnly
                   ? '<span class="muted" title="Épreuve surveillée : la formation se fait à distance, seule l’épreuve est planifiée — pas de tests séparés">épreuve seule</span>'
+                  : f.testSurveille
+                  ? '<span class="muted" title="L’épreuve surveillée occupe le créneau de test : elle est obligatoire">épreuve</span>'
                   : `<input type="checkbox" ${f.tests ? 'checked' : ''} data-f="${idx}|tests">`}</td>
+                <td>${f.testOnly ? '<span class="muted">—</span>'
+                  : `<input type="number" step="0.5" min="0.5" max="4" value="${f.dureeTest ? f.dureeTest / 60 : ''}"
+                      placeholder="${p.practicalTestDuration / 60}" data-f="${idx}|dureeTest" style="width:80px"
+                      title="Vide : la durée générale ci-dessous s’applique">`}</td>
                 <td><input type="number" min="1" max="12" value="${f.capacite}" data-f="${idx}|capacite" style="width:60px"></td>
                 <td style="text-align:center"><input type="checkbox" ${f.chargeComptee !== false ? 'checked' : ''} data-f="${idx}|chargeComptee" title="Décoché : la séance mobilise un intervenant mais sort du plafond quotidien (surveillance)"></td>
                 <td><button class="btn btn-danger btn-sm" data-del-formation="${idx}" title="Retirer du catalogue">🗑</button></td>
@@ -87,13 +93,14 @@ export function renderParametres(main) {
         <label class="field">Formation <input id="nf-label" placeholder="Pratique R482 Cat B" style="min-width:190px"></label>
         <label class="field">Recommandation <input id="nf-reco" placeholder="R482" style="width:100px"></label>
         <label class="field">Séance
-          <select id="nf-testonly">
-            <option value="">Formation</option>
-            <option value="1">Épreuve surveillée</option>
+          <select id="nf-modalite">
+            ${MODALITES_SEANCE.map((m) => `<option value="${m.id}">${m.label}</option>`).join('')}
           </select>
         </label>
         <label class="field">Initial (h) <input type="number" id="nf-init" step="0.5" min="0.5" max="8" value="1.5" style="width:80px"></label>
         <label class="field">Recyclage (h) <input type="number" id="nf-recy" step="0.5" min="0.5" max="8" value="1" style="width:90px"></label>
+        <label class="field">Durée test (h) <input type="number" id="nf-dtest" step="0.5" min="0.5" max="4"
+          placeholder="${p.practicalTestDuration / 60}" style="width:100px" title="Vide : la durée générale s’applique"></label>
         <label class="field">Capacité <input type="number" id="nf-cap" min="1" max="12" value="1" style="width:80px"></label>
         <label class="expert-toggle"><input type="checkbox" id="nf-tests" checked> Tests obligatoires</label>
         <label class="expert-toggle"><input type="checkbox" id="nf-charge" checked> Charge comptée</label>
@@ -102,6 +109,8 @@ export function renderParametres(main) {
 
       <p class="muted">La capacité simultanée > 1 (ex. R489 Cat 3 : 2 chariots) autorise plusieurs candidats en même temps avec le même formateur, sur la même catégorie uniquement.
       « Épreuve surveillée » = la formation se fait à distance et seule l'épreuve est planifiée, tenue par un testeur (AIPR).
+      « Formation + épreuve surveillée » = la même AIPR vendue avec sa formation sur site : un formateur, puis l'épreuve au créneau de test.
+      « Durée test » laissée vide = la durée générale s'applique ; renseignée, elle l'emporte pour cette formation (le QCM AIPR tient 2h00 quand un test R489 tient 1h00).
       « Charge comptée » décochée = la séance n'entre pas dans le plafond quotidien ni dans le taux d'occupation.
       Le code n'est pas modifiable après création : il relie la formation aux inscriptions et aux habilitations.
       Toute formation ajoutée apparaît automatiquement dans l'onglet Équipe — pensez à y cocher les habilitations F/T.</p>
@@ -173,11 +182,13 @@ export function renderParametres(main) {
       const [idx, field] = input.dataset.f.split('|');
       const f = state.formations[Number(idx)];
       if (field === 'tests' || field === 'chargeComptee') f[field] = input.checked;
-      else if (field === 'testOnly') {
-        f.testOnly = !!input.value;
-        // Une épreuve surveillée n'a pas de tests séparés à programmer
-        if (f.testOnly) f.tests = false;
-        renderParametres(main); // la colonne Tests change de nature
+      else if (field === 'modalite') {
+        appliquerModalite(f, input.value);
+        renderParametres(main); // les colonnes Tests et Durée test changent de nature
+      } else if (field === 'dureeTest') {
+        // Vide = « prendre la durée générale » : on enregistre null, et non 0.
+        const v = Number(input.value);
+        f.dureeTest = input.value.trim() && v > 0 ? Math.round(v * 60) : null;
       } else if (field === 'capacite') f.capacite = Math.max(1, Number(input.value) || 1);
       else if (field === 'label' || field === 'reco') {
         const v = input.value.trim();
@@ -196,16 +207,16 @@ export function renderParametres(main) {
     if (!code || !label || !reco) { toast('Code, formation et recommandation sont obligatoires.', 'error'); return; }
     if (state.formations.some((f) => f.code.toUpperCase() === code)) { toast(`Le code « ${code} » existe déjà.`, 'error'); return; }
     const hours = (sel) => Math.round((Number(main.querySelector(sel).value) || 1) * 60);
-    const testOnly = !!main.querySelector('#nf-testonly').value;
-    state.formations.push({
+    const dtest = Number(main.querySelector('#nf-dtest').value);
+    state.formations.push(appliquerModalite({
       code, label, reco,
       dureeInitial: hours('#nf-init'),
       dureeRecyclage: hours('#nf-recy'),
-      tests: testOnly ? false : main.querySelector('#nf-tests').checked,
+      tests: main.querySelector('#nf-tests').checked,
+      dureeTest: dtest > 0 ? Math.round(dtest * 60) : null,
       capacite: Math.max(1, Number(main.querySelector('#nf-cap').value) || 1),
-      testOnly,
       chargeComptee: main.querySelector('#nf-charge').checked,
-    });
+    }, main.querySelector('#nf-modalite').value));
     app.commit();
     renderParametres(main);
     toast(`Formation « ${code} » ajoutée — cochez ses habilitations dans Équipe.`, 'ok');

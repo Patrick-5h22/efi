@@ -250,9 +250,12 @@ Deux conséquences techniques :
 
 - **La R482 n'existe pas au catalogue** aujourd'hui. Les cinq catégories sont à
   créer.
-- **La durée de test est aujourd'hui un paramètre global unique**
+- ~~**La durée de test est aujourd'hui un paramètre global unique**
   (`practicalTestDuration: 60`, utilisé à cinq endroits du moteur). Elle doit
-  passer dans le catalogue, par dispositif.
+  passer dans le catalogue, par dispositif.~~ **Fait** : chaque formation porte
+  sa `dureeTest` (colonne « Durée test » dans Paramètres) ; vide, le paramètre
+  global s'applique et reste le défaut. Les durées R482 ci-dessus se saisissent
+  donc sans toucher au code, dès que les catégories seront créées.
 
 ⚠️ **Les durées de PRATIQUE de la R482 (Initial / Recyclage, par catégorie) ne
 sont pas connues.** C'est le seul point qui bloque encore la mise en place de la
@@ -289,21 +292,37 @@ Aujourd'hui l'AIPR est modélisée en **épreuve seule** : la formation se fait 
 distance, seul le QCM surveillé est planifié, et sa surveillance ne consomme pas
 de temps d'intervenant (`testOnly`, `chargeComptee: false`).
 
-Il faut que **les deux modalités coexistent et soient sélectionnables** :
+**Fait.** Les deux modalités coexistent au catalogue et se choisissent dans une
+liste unique (colonne « Séance » de l'écran Paramètres) :
 
 | Modalité | Contenu planifié | Intervenant |
 |---|---|---|
-| Test seul | épreuve surveillée | testeur, charge non comptée |
-| **Formation + test** | formation sur site, **puis** épreuve | formateur (charge comptée) puis testeur |
+| `AIPR` — épreuve surveillée | l'épreuve seule | testeur, charge non comptée |
+| `AIPR-FORM` — formation + épreuve | formation sur site, **puis** épreuve | formateur (charge comptée), puis testeur (hors charge) |
 
-*Durée de la partie formation non précisée.*
+Trois drapeaux (`testOnly`, `tests`, `testSurveille`) décrivaient en réalité
+trois modalités, et seules trois combinaisons ont un sens. Elles sont exposées
+comme un choix unique — « Formation », « Épreuve surveillée », « Formation +
+épreuve surveillée » — ce qui rend inatteignable l'état incohérent d'une épreuve
+seule réclamant par ailleurs un test séparé.
+
+Deux conséquences qui découlent du modèle, et non de règles ajoutées :
+
+- l'épreuve occupe le **créneau de test** de la ligne, avec sa propre durée
+  (`dureeTest: 120`) — c'est ce qui exigeait la durée par dispositif du §6 ;
+- une épreuve surveillée **est** l'examen du dispositif : aucun test théorique
+  n'est réclamé à côté. L'AIPR se sanctionne par son seul QCM.
+
+⚠️ **La durée de la partie formation n'est pas arrêtée.** 3h30 tient lieu de
+valeur d'attente, alignée sur l'e-learning en centre ; elle se corrige dans
+Paramètres sans toucher au code. La durée de l'**épreuve** est connue : 2h00.
 
 ## 9. Ce qui reste ouvert
 
 | # | Question | Pour | Bloque |
 |---|---|---|---|
 | 1 | Durées de **pratique** R482 (Initial / Recyclage) par catégorie | Emmanuel | la R482 entière |
-| 2 | Durée de la partie **formation** de l'AIPR « formation + test » | Emmanuel | la modalité AIPR |
+| 2 | Durée de la partie **formation** de l'AIPR « formation + épreuve » | Emmanuel | rien (3h30 en attendant, réglable) |
 | 3 | B1, C1, G utilisent-elles le **porte-engin** ? | Emmanuel | la ressource partagée |
 | 4 | La liste `A, B1, C1, F, G` est-elle l'offre R482 **complète** ? | Emmanuel | le catalogue R482 |
 | 5 | La règle de **pôle** s'applique-t-elle aussi aux stagiaires ? | Emmanuel | rien (défaut : oui) |

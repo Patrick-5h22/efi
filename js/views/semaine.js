@@ -6,7 +6,7 @@ import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
 import { weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isWeekend, semaineParDefaut } from '../dates.js';
 import { unionDuration, semainesConsultables } from '../engine.js';
-import { chargeComptee, chevauchePause } from '../config.js';
+import { chargeComptee, chevauchePause, testSurveille } from '../config.js';
 import { openInscriptionForm } from './form.js';
 import { styleGrille, classeLigne } from './grille.js';
 
@@ -210,10 +210,14 @@ function gridHTML(state, days, kind) {
       });
 
       if (occupants.length) {
-        const tLabel = (r) => r.formation?.testOnly ? (r.formation?.label || '') : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || '');
+        // Une épreuve surveillée (QCM AIPR) se nomme par sa recommandation :
+        // « Épreuve AIPR (formation + épreuve) » dirait deux fois le même mot.
+        const tLabel = (r) => (r.formation?.testOnly ? (r.formation?.label || '')
+          : testSurveille(r.formation) ? `Épreuve ${r.formation?.reco || ''}`.trim()
+          : 'Test ' + (r.formation?.label?.replace('Pratique ', '') || ''));
         const qui = (r) => (kind === 'F'
           ? detailQui('Form. : ', r.formateurEffectif)
-          : detailQui(r.formation?.testOnly ? 'Surv. : ' : 'Testeur : ', r.testeurEffectif));
+          : detailQui(r.formation?.testOnly || testSurveille(r.formation) ? 'Surv. : ' : 'Testeur : ', r.testeurEffectif));
         // Chaque inscription porte son propre point d'entrée. Auparavant seule
         // la cellule était cliquable, et seulement quand elle ne contenait
         // qu'une inscription : une séance à deux stagiaires n'était donc pas

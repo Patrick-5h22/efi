@@ -194,10 +194,14 @@ export function migrate(state) {
     if (x && (!x.testOnly || x.tests)) { x.testOnly = true; x.tests = false; }
     if (x && f.chargeComptee === false && x.chargeComptee !== false) x.chargeComptee = false;
   }
-  // Champs de formation ajoutés au fil des versions
+  // Champs de formation ajoutés au fil des versions. dureeTest normalisée en
+  // null (et non 0 ni '') : vide signifie « prendre le paramètre global », ce
+  // qu'un 0 ne dirait pas — il dirait « test de durée nulle ».
   for (const f of state.formations) {
     if (f.chargeComptee === undefined) f.chargeComptee = true;
     if (f.testOnly === undefined) f.testOnly = false;
+    if (!Number.isFinite(f.dureeTest) || f.dureeTest <= 0) f.dureeTest = null;
+    if (f.testSurveille === undefined) f.testSurveille = false;
   }
   state.team = state.team || [];
   // Fenêtre de disponibilité ajoutée après coup : absente = sans limite, ce

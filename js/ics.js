@@ -52,7 +52,9 @@ export function buildICS(state, schedule, { onlyDates = null } = {}) {
     }
     if (keep(i.dateTestPratique) && i.debutTestPratique != null && row.formation?.tests) {
       lines.push(...event(`test-${i.id}`, i.dateTestPratique, i.debutTestPratique, row.finTestPratique,
-        `Test pratique ${cat} — ${i.stagiaire}`,
+        row.formation?.testSurveille
+          ? `Épreuve ${row.formation.reco} — ${i.stagiaire}`
+          : `Test pratique ${cat} — ${i.stagiaire}`,
         `Testeur : ${memberName(state, row.testeurEffectif) || 'à affecter'}`));
     }
   }

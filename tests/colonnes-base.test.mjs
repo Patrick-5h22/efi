@@ -87,6 +87,8 @@ const COLONNES_FORMATIONS = [
   'code', 'label', 'reco', 'duree_initial', 'duree_recyclage', 'tests', 'capacite', 'position',
   // Ajoutées par la migration 004
   'test_only', 'charge_comptee',
+  // Ajoutées par la migration 005
+  'duree_test', 'test_surveille',
 ];
 
 const COLONNES_TEAM = [

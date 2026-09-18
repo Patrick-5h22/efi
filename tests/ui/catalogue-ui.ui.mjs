@@ -88,7 +88,9 @@ const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('efi-pl
 check('paramètre « charge comptée » persisté', stored === false, String(stored));
 
 // 9. Bascule en « épreuve surveillée »
-await page.selectOption(`select[data-f="${habIdx}|testOnly"]`, '1'); await page.waitForTimeout(500);
+// La liste « Séance » porte désormais la MODALITÉ (trois choix) et non le seul
+// drapeau testOnly : trois drapeaux ne décrivaient en réalité que trois états.
+await page.selectOption(`select[data-f="${habIdx}|modalite"]`, 'epreuve'); await page.waitForTimeout(500);
 const afterType = await page.evaluate(() => JSON.parse(localStorage.getItem('efi-planning-v1')).formations.find((f) => f.code === 'HAB-ELEC'));
 check('séance passée en épreuve surveillée', afterType.testOnly === true);
 check('tests séparés désactivés automatiquement', afterType.tests === false);
