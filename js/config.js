@@ -189,6 +189,110 @@ export function libelleFenetre(membre) {
   return d ? `à partir du ${d}` : `jusqu’au ${f}`;
 }
 
+// --- Sites, zones d'évolution et ressources partagées ---------------------
+//
+// Trois sites, et le choix du site précède toute programmation : il détermine
+// les formations proposables et les zones disponibles
+// (docs/SITES-ZONES-PARCOURS.md, § 2 à 4).
+//
+// Les sites sont regroupés en PÔLES. Périgny et Périgny II sont proches, on
+// peut enchaîner les deux dans une journée ; Saintes non. Un pôle se vérifie
+// par une comparaison — un temps de trajet demanderait une matrice de
+// distances et un paramétrage que personne ne tiendrait à jour.
+export const DEFAULT_SITES = [
+  { id: 'perigny', label: 'Périgny', pole: 'perigny' },
+  { id: 'perigny2', label: 'Périgny II', pole: 'perigny' },
+  { id: 'saintes', label: 'Saintes', pole: 'saintes' },
+];
+
+// Une zone porte la liste des dispositifs qu'elle admet et son nombre de
+// sessions simultanées. Les deux « règles » du premier courriel d'Emmanuel
+// n'ont alors pas besoin d'exister : la mutualisation R485 / R489 1A-1B est
+// une seule zone qui admet les quatre dispositifs, et le « 2 en parallèle sur
+// 3 et/ou 5 » est deux zones à une session. Les deux DÉCOULENT du modèle.
+//
+// Deux façons d'admettre un dispositif, et la seconde n'est pas un raccourci :
+//   « dispositifs » — des codes du catalogue, nommés un par un ;
+//   « recos »       — une recommandation entière.
+// Les zones de Périgny II admettent la R482 par recommandation : elles
+// fonctionneront le jour où les catégories R482 seront créées, sans qu'il
+// faille y revenir. Une zone qui nomme un code inconnu est signalée dans
+// l'écran Paramètres — sans quoi elle n'admettrait rien, en silence.
+export const DEFAULT_ZONES = [
+  { id: 'z-mutu', siteId: 'perigny', label: 'R485 / R489 1A-1B (mutualisée)', dispositifs: ['R485-1', 'R485-2', 'R489-1A', 'R489-1B'], recos: [], sessions: 1 },
+  { id: 'z-35-1', siteId: 'perigny', label: 'R489 Cat 3/5 #1', dispositifs: ['R489-3', 'R489-5'], recos: [], sessions: 1 },
+  { id: 'z-35-2', siteId: 'perigny', label: 'R489 Cat 3/5 #2', dispositifs: ['R489-3', 'R489-5'], recos: [], sessions: 1 },
+  { id: 'z-r486', siteId: 'perigny', label: 'R486', dispositifs: ['R486-A', 'R486-B'], recos: [], sessions: 1 },
+  { id: 'z-aipr-p', siteId: 'perigny', label: 'AIPR', dispositifs: [], recos: ['AIPR'], sessions: 1 },
+  { id: 'z-elec-p', siteId: 'perigny', label: 'Habilitation électrique', dispositifs: ['HAB-ELEC'], recos: [], sessions: 1 },
+  // Périgny II : site dédié exclusivement à la R482, aucune autre formation.
+  { id: 'z-r482-1', siteId: 'perigny2', label: 'R482 #1', dispositifs: [], recos: ['R482'], sessions: 1 },
+  { id: 'z-r482-2', siteId: 'perigny2', label: 'R482 #2', dispositifs: [], recos: ['R482'], sessions: 1 },
+  { id: 'z-aipr-s', siteId: 'saintes', label: 'AIPR', dispositifs: [], recos: ['AIPR'], sessions: 1 },
+  { id: 'z-elec-s', siteId: 'saintes', label: 'Habilitation électrique', dispositifs: ['HAB-ELEC'], recos: [], sessions: 1 },
+];
+
+// Une ressource est un MATÉRIEL partagé entre zones, et non une liste
+// d'exclusions. Le premier courriel présentait « Cat A et Cat F jamais en même
+// temps » comme une contrainte de site ; c'en est la conséquence, pas la
+// cause : « un seul porte-engin accessible des 2 côtés, mais seulement une
+// catégorie possible en formation ou en test » (Emmanuel, 18/09/2026).
+//
+// Une liste d'exclusions aurait marché pour ce cas précis, puis il aurait fallu
+// en ajouter une par matériel partagé découvert ensuite. Une ressource se
+// déclare, se nomme, et s'étend sans règle nouvelle. Elle dit aussi que la
+// contrainte vaut en formation COMME en test : c'est l'occupation du matériel
+// qui compte, pas la nature de la séance.
+//
+// ⚠ Les catégories R482 n'existent pas encore au catalogue : cette ressource
+// n'a donc encore aucun effet. L'écran Paramètres le signale plutôt que de
+// laisser croire à une contrainte active. Reste à confirmer si B1, C1 et G
+// utilisent aussi le porte-engin — le courriel ne nommait que A et F.
+export const DEFAULT_RESSOURCES = [
+  {
+    id: 'porte-engin', siteId: 'perigny2', label: 'Porte-engin', capacite: 1,
+    dispositifs: ['R482-A', 'R482-F'], recos: [],
+  },
+];
+
+// Le dispositif d'une formation est-il admis ici ? Vaut pour une zone comme
+// pour une ressource : les deux portent les mêmes deux listes.
+export function admetDispositif(porteur, formation) {
+  if (!porteur || !formation) return false;
+  return (porteur.dispositifs || []).includes(formation.code)
+    || (porteur.recos || []).includes(formation.reco);
+}
+
+export function zonesPour(zones, formation, siteId = null) {
+  return (zones || []).filter((z) => admetDispositif(z, formation)
+    && (!siteId || z.siteId === siteId));
+}
+
+export function sitesPour(sites, zones, formation) {
+  const ids = new Set(zonesPour(zones, formation).map((z) => z.siteId));
+  return (sites || []).filter((s) => ids.has(s.id));
+}
+
+export function siteById(sites, id) {
+  return (sites || []).find((s) => s.id === id) || null;
+}
+
+export function poleDuSite(sites, id) {
+  return siteById(sites, id)?.pole ?? null;
+}
+
+// Codes et recommandations nommés par une zone ou une ressource sans exister
+// au catalogue. Une zone qui nomme un code inconnu n'admet rien — et le dirait
+// nulle part. L'écran Paramètres s'en sert pour le montrer.
+export function referencesInconnues(porteur, formations) {
+  const codes = new Set((formations || []).map((f) => f.code));
+  const recos = new Set((formations || []).map((f) => f.reco));
+  return [
+    ...(porteur?.dispositifs || []).filter((c) => !codes.has(c)),
+    ...(porteur?.recos || []).filter((r) => !recos.has(r)),
+  ];
+}
+
 export const MAX_TEAM = 12;
 
 // Équipe d'exemple (identique au classeur)

@@ -105,6 +105,32 @@ test('base : aucun champ de formation ne perd sa colonne sans qu’on le sache',
     + '  Il faut une colonne ET une mise à jour des deux RPC (docs/SUPABASE.md).');
 });
 
+// Sites, zones et matériels partagés — trois collections nouvelles, trois
+// tables (migration 006). Le même filet s'étend : un champ ajouté à une zone
+// sans colonne serait accepté sans erreur et perdu au premier aller-retour.
+const COLONNES_SITES = ['id', 'label', 'pole', 'position'];
+const COLONNES_ZONES = ['id', 'site_id', 'label', 'dispositifs', 'recos', 'sessions', 'position'];
+const COLONNES_RESSOURCES = ['id', 'site_id', 'label', 'capacite', 'dispositifs', 'recos', 'position'];
+
+test('base : sites, zones et matériels gardent leurs colonnes', () => {
+  const s = defaultState();
+  const controle = (collection, colonnes, quoi) => {
+    const champs = new Set(collection.flatMap((x) => Object.keys(x)));
+    const sansColonne = [...champs].filter((c) => !colonnes.includes(snake(c)));
+    assert.deepEqual(sansColonne, [],
+      `Champs de ${quoi} sans colonne : ${sansColonne.join(', ')}\n`
+      + '  Il faut une colonne ET une mise à jour des deux RPC (docs/SUPABASE.md).');
+  };
+  controle(s.sites, COLONNES_SITES, 'site');
+  controle(s.zones, COLONNES_ZONES, 'zone');
+  controle(s.ressources, COLONNES_RESSOURCES, 'matériel partagé');
+
+  // Filet inverse : une liste de colonnes vidée ferait passer le contrôle.
+  for (const champ of ['siteId', 'dispositifs', 'sessions']) {
+    assert.ok(COLONNES_ZONES.includes(snake(champ)), `colonne manquante pour ${champ}`);
+  }
+});
+
 test('base : aucun champ d’intervenant ne perd sa colonne sans qu’on le sache', () => {
   const state = defaultState();
   // La fenêtre de disponibilité n'est posée qu'à la saisie : on la force ici

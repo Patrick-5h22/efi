@@ -72,6 +72,22 @@ le catalogue — avant d'avoir pu être perdus une seule fois.
 et réécrit les deux RPC. Elle reprend les colonnes de la 004 : l'appliquer
 seule suffit.
 
+Le contrôle couvre à présent **six** collections : inscriptions, formations,
+intervenants, et — depuis `docs/migrations/006-sites-zones-ressources.sql` —
+sites, zones et matériels partagés.
+
+`planning.zones` et `planning.ressources` portent `dispositifs` et `recos` en
+**jsonb**, et non en tables de liaison. Ce sont des listes de codes que la base
+n'interroge jamais par leur contenu : c'est le moteur, dans le navigateur, qui
+décide quelle zone admet quel dispositif. Deux tables de liaison coûteraient
+quatre jointures aux RPC pour reconstruire exactement les tableaux que
+l'application manipule. `sites.pole` est une colonne pour la même raison : un
+pôle n'a aujourd'hui aucun attribut propre.
+
+Chaque migration reprend les colonnes des précédentes (`add column if not
+exists`) et réécrit les deux RPC au complet : **appliquer la plus récente
+suffit**, quel que soit l'état de la base.
+
 **Avant d'ajouter un champ à `js/persisted.js` ou à une inscription**, vérifier
 ce que la base rend réellement — en lecture seule, sans rien écrire :
 
