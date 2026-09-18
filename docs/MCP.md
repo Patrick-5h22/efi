@@ -133,6 +133,30 @@ déjeuner, et mutualisation de la théorie par recommandation.
 **Ne propose qu'un déroulé sans aucune anomalie.** S'il ne trouve rien de
 tenable, il le dit plutôt que de proposer un créneau bancal.
 
+#### Les séances s'enchaînent
+
+Sur un parcours à plusieurs catégories, **toutes les formations sont posées
+d'abord, puis tous les tests pratiques** : le formateur enchaîne ses formations,
+le testeur enchaîne ses tests, chacun tient un bloc continu. Une nouvelle
+séance isolée se colle de même à ce qui est déjà au planning ce jour-là, en
+prolongeant une séance du même genre plutôt qu'en ouvrant un trou.
+
+> L'outil posait auparavant formation, test, formation, test, catégorie par
+> catégorie. Sur R489 1A + 3 + 5, le formateur travaillait de 08:00 à 09:30,
+> attendait deux heures et demie, reprenait à 12:00 ; le testeur alternait de
+> même. **420 minutes d'attente** sur la journée, qui s'étirait jusqu'à 17:00.
+> Le regroupement les ramène à 150, et la journée s'achève à 16:30.
+
+Deux creux ne se suppriment pas : le **test théorique** occupe le stagiaire sur
+un créneau fixe (11:00 par défaut), et le testeur attend que le stagiaire ait
+fini sa dernière formation avant de pouvoir l'évaluer.
+
+Le groupement est une **préférence, jamais une condition** : il cède devant la
+validité. Si l'enchaînement ne tient pas — un intervenant absent, une journée
+trop pleine — l'outil retombe sur un créneau non contigu, puis sur l'ancienne
+alternance, plutôt que de ne rien proposer. Un test pratique n'est en revanche
+**jamais** placé avant sa propre formation.
+
 La liste des catégories exposée dans le schéma est construite depuis le
 catalogue : un produit ajouté dans Paramètres devient proposable sans
 retoucher le code.
