@@ -157,6 +157,17 @@ trop pleine — l'outil retombe sur un créneau non contigu, puis sur l'ancienne
 alternance, plutôt que de ne rien proposer. Un test pratique n'est en revanche
 **jamais** placé avant sa propre formation.
 
+**L'ordre demandé des catégories ne fixe pas l'ordre des séances dans la
+journée**, et c'est voulu (arbitré avec le centre le 18/09/2026). Une demande
+« R489 3 et 5 » peut très bien faire passer la Cat 5 à 08:00 et la Cat 3 à
+09:30 : l'outil place d'abord la catégorie qui porte le test théorique, puis
+comble autour. Ce n'est pas un défaut à corriger — imposer la chronologie
+demandée coûterait des créneaux sans rien apporter au client, qui repart de
+toute façon avec ses deux catégories le même jour.
+
+Les *lignes* du parcours, elles, restent dans l'ordre demandé (c'est ce que
+vérifie `tests/parcours.test.mjs`) : seule leur position dans la journée varie.
+
 La liste des catégories exposée dans le schéma est construite depuis le
 catalogue : un produit ajouté dans Paramètres devient proposable sans
 retoucher le code.
