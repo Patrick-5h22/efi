@@ -2,7 +2,7 @@
 // les intervenants effectifs (affectation automatique) et les contrôles (STATUT).
 // Reproduit les règles du classeur "Planification EFI v4.2".
 
-import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee, pauseCreneau, chevauchePause } from './config.js';
+import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee, pauseCreneau, chevauchePause, dansLaFenetre, libelleFenetre } from './config.js';
 import { isoWeek, overlaps, workingDays, joursOuvrables, bornesDuMois, fenetreAffichage, addDays, fmtTime, mondayOf, dateDuJour, isWeekend, semainesAffichees } from './dates.js';
 
 // ---------------------------------------------------------------------------
@@ -76,8 +76,14 @@ export function computeSchedule(state) {
     return !!m?.quals?.[code]?.[kind];
   };
 
-  // Présence du jour (page Jours EFI) : clé absente ou liste vide = tous présents
+  // Disponibilité d'un intervenant à une date. Deux filtres qui se cumulent :
+  // sa fenêtre de disponibilité (le défaut, réglé sur sa fiche), puis la
+  // présence du jour (page Jours EFI — clé absente ou liste vide = tous
+  // présents). La fenêtre passe d'abord : hors de celle-ci, cocher « présent »
+  // ne rend pas quelqu'un disponible.
+  const parId = new Map(team.map((m) => [m.id, m]));
   const presentOn = (personId, date) => {
+    if (!dansLaFenetre(parId.get(personId), date)) return false;
     const p = state.dayPresence?.[date];
     return !p || !p.length || p.includes(personId);
   };
@@ -318,8 +324,18 @@ function validateRows(rows, ctx) {
 
     // Présence du jour (page Jours EFI) : un intervenant positionné un jour
     // où il n'est pas coché présent est signalé
+    // Deux causes, deux messages : « corrige la case du jour » et « cette
+    // personne n'est pas encore (ou plus) dans l'équipe sur cette période »
+    // n'appellent pas la même correction.
     const checkPresence = (id, date, label) => {
-      if (id && date && !presentOn(id, date)) {
+      if (!id || !date) return;
+      const membre = state.team.find((m) => m.id === id);
+      if (!dansLaFenetre(membre, date)) {
+        row.errors.push(`${memberNameOf(state, id)} hors de sa période de disponibilité `
+          + `(${libelleFenetre(membre)}) — ${label}`);
+        return;
+      }
+      if (!presentOn(id, date)) {
         row.errors.push(`${memberNameOf(state, id)} non présent ce jour (${label})`);
       }
     };
@@ -1102,7 +1118,9 @@ function busyIndex(state, excludeId = null) {
     return false;
   };
 
+  const parIdDispo = new Map(team.map((m) => [m.id, m]));
   const presentOn = (id, date) => {
+    if (!dansLaFenetre(parIdDispo.get(id), date)) return false;
     const p = state.dayPresence?.[date];
     return !p || !p.length || p.includes(id);
   };

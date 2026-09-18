@@ -2,7 +2,7 @@
 // (équivalent de l'onglet « Équipe »).
 
 import { app, esc, toast } from '../app.js';
-import { MAX_TEAM } from '../config.js';
+import { MAX_TEAM, libelleFenetre } from '../config.js';
 
 export function renderEquipe(main) {
   const state = app.state;
@@ -22,6 +22,7 @@ export function renderEquipe(main) {
           <thead>
             <tr>
               <th rowspan="2">Intervenant (NOM Prénom)</th>
+              <th rowspan="2" title="Bornes optionnelles. Vides = disponible sans limite.">Disponible</th>
               ${state.formations.map((f) => `<th colspan="2" style="text-align:center">${esc(f.code)}</th>`).join('')}
               <th rowspan="2"></th>
             </tr>
@@ -31,6 +32,12 @@ export function renderEquipe(main) {
             ${state.team.map((m) => `
               <tr>
                 <td><input data-name="${m.id}" value="${esc(m.name)}" style="min-width:180px"></td>
+                <td style="white-space:nowrap" title="Disponibilité : ${esc(libelleFenetre(m))}">
+                  <input type="date" data-dispo="${m.id}|dispoDebut" value="${esc(m.dispoDebut || '')}"
+                    style="width:132px" aria-label="Disponible à partir du, ${esc(m.name)}">
+                  <input type="date" data-dispo="${m.id}|dispoFin" value="${esc(m.dispoFin || '')}"
+                    style="width:132px;margin-top:2px" aria-label="Disponible jusqu’au, ${esc(m.name)}">
+                </td>
                 ${state.formations.map((f) => {
                   const q = m.quals?.[f.code] || {};
                   return `
@@ -39,18 +46,23 @@ export function renderEquipe(main) {
                 }).join('')}
                 <td><button class="btn btn-danger btn-sm" data-del="${m.id}" title="Supprimer">🗑</button></td>
               </tr>`).join('')}
-            ${!state.team.length ? `<tr><td colspan="${2 + state.formations.length * 2}" class="muted">Aucun intervenant — ajoutez-en pour permettre les affectations.</td></tr>` : ''}
+            ${!state.team.length ? `<tr><td colspan="${3 + state.formations.length * 2}" class="muted">Aucun intervenant — ajoutez-en pour permettre les affectations.</td></tr>` : ''}
           </tbody>
         </table>
       </div>
       <p class="muted">Un intervenant affecté à un candidat hors de ses habilitations est signalé dans le STATUT des inscriptions
       (« Formateur/Testeur non habilité »). Maximum ${MAX_TEAM} intervenants.</p>
+      <p class="muted"><b>Disponible</b> borne la période pendant laquelle l'intervenant peut être positionné — deux dates
+      optionnelles, incluses. Laissées vides, il est disponible sans limite. C'est le <b>défaut</b> : la présence jour par
+      jour (page <a href="#/jours">Jours EFI</a>) garde le dernier mot, et décocher une journée dans la fenêtre rend bien
+      l'intervenant indisponible ce jour-là. En revanche, cocher « présent » hors de sa fenêtre ne le rend pas disponible :
+      une personne recrutée en novembre n'est pas disponible en septembre parce qu'on a coché une case.</p>
     </div>
   `;
 
   main.querySelector('#btn-add')?.addEventListener('click', () => {
     const id = 'p' + (Math.max(0, ...state.team.map((m) => Number(m.id.replace(/\D/g, '')) || 0)) + 1);
-    state.team.push({ id, name: '', quals: {} });
+    state.team.push({ id, name: '', quals: {}, dispoDebut: null, dispoFin: null });
     app.commit();
   });
 
@@ -59,6 +71,27 @@ export function renderEquipe(main) {
       const m = state.team.find((t) => t.id === input.dataset.name);
       m.name = input.value.trim();
       app.commit();
+    });
+  });
+
+  // Fenêtre de disponibilité. Une borne vidée redevient « sans limite » de ce
+  // côté — d'où le null plutôt que la chaîne vide : c'est ce qui part en base.
+  main.querySelectorAll('[data-dispo]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const [id, champ] = input.dataset.dispo.split('|');
+      const m = state.team.find((t) => t.id === id);
+      const valeur = input.value || null;
+      const suivant = { ...m, [champ]: valeur };
+      // Une fenêtre inversée n'exclurait pas « rien », elle exclurait TOUT, et
+      // l'intervenant disparaîtrait du planning sans explication.
+      if (suivant.dispoDebut && suivant.dispoFin && suivant.dispoDebut > suivant.dispoFin) {
+        toast('La fin de disponibilité doit suivre le début.', 'error');
+        input.value = m[champ] || '';
+        return;
+      }
+      m[champ] = valeur;
+      app.commit();
+      toast(`${m.name || 'Intervenant'} — disponibilité ${libelleFenetre(m)}.`, 'ok');
     });
   });
 

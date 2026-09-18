@@ -67,3 +67,49 @@ test('base : les colonnes existantes couvrent bien les champs essentiels', () =>
     assert.ok(COLONNES.includes(snake(champ)), `colonne manquante pour ${champ}`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Les inscriptions n'étaient pas seules concernées
+//
+// Ce fichier ne surveillait que planning.inscriptions, et c'est ainsi qu'une
+// perte est passée : les RPC de la migration 003 n'écrivaient ni ne relisaient
+// « testOnly » et « chargeComptee » des formations. Une formation du catalogue
+// s'en sortait par accident — migrate() réinjecte le drapeau pour l'AIPR qu'il
+// connaît — mais une formation créée à la main dans l'écran Paramètres perdait
+// le sien au premier aller-retour : une épreuve surveillée redevenait une
+// formation ordinaire, avec un formateur mobilisé et un test à programmer.
+//
+// Mesuré sur une réplique du schéma : avec les RPC de la 003 seule, les quatre
+// champs revenaient PERDUS ; avec la 004, tous reviennent.
+// ---------------------------------------------------------------------------
+
+const COLONNES_FORMATIONS = [
+  'code', 'label', 'reco', 'duree_initial', 'duree_recyclage', 'tests', 'capacite', 'position',
+  // Ajoutées par la migration 004
+  'test_only', 'charge_comptee',
+];
+
+const COLONNES_TEAM = [
+  'id', 'name', 'quals', 'position',
+  // Ajoutées par la migration 004
+  'dispo_debut', 'dispo_fin',
+];
+
+test('base : aucun champ de formation ne perd sa colonne sans qu’on le sache', () => {
+  const champs = new Set(defaultState().formations.flatMap((f) => Object.keys(f)));
+  const sansColonne = [...champs].filter((c) => !COLONNES_FORMATIONS.includes(snake(c)));
+  assert.deepEqual(sansColonne, [],
+    `Champs de formation sans colonne : ${sansColonne.join(', ')}\n`
+    + '  Il faut une colonne ET une mise à jour des deux RPC (docs/SUPABASE.md).');
+});
+
+test('base : aucun champ d’intervenant ne perd sa colonne sans qu’on le sache', () => {
+  const state = defaultState();
+  // La fenêtre de disponibilité n'est posée qu'à la saisie : on la force ici
+  // pour que le champ existe même sur une équipe d'exemple.
+  const champs = new Set(state.team.flatMap((m) => Object.keys({ dispoDebut: null, dispoFin: null, ...m })));
+  const sansColonne = [...champs].filter((c) => !COLONNES_TEAM.includes(snake(c)));
+  assert.deepEqual(sansColonne, [],
+    `Champs d’intervenant sans colonne : ${sansColonne.join(', ')}\n`
+    + '  Il faut une colonne ET une mise à jour des deux RPC (docs/SUPABASE.md).');
+});
