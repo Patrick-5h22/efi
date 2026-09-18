@@ -835,10 +835,75 @@ export function occupationSummary(state, schedule, scope = 'periode', todayISO =
 }
 
 // ---------------------------------------------------------------------------
+// Enchaînement des séances
+//
+// Une proposition qui ne regarde que « le premier créneau libre » hache la
+// journée des intervenants. Sur un parcours R489 1A + 3 + 5, l'outil posait
+// formation, test, formation, test, formation, test : le formateur travaillait
+// de 08:00 à 09:30, attendait deux heures et demie, reprenait à 12:00 — et le
+// testeur de même, en alternance. Personne ne tenait un bloc continu.
+//
+// On préfère donc, à validité égale, un créneau qui COLLE à une séance du même
+// genre déjà posée ce jour-là : les formations s'enchaînent entre elles, les
+// tests pratiques entre eux. Ce n'est qu'une préférence d'ordre d'essai : la
+// validité reste tranchée par le moteur, et l'indisponibilité d'un intervenant
+// fait retomber sur un créneau non contigu plutôt que d'échouer.
+//
+// Genre 'formation' = ce qui mobilise un FORMATEUR ; genre 'test' = ce qui
+// mobilise un TESTEUR, épreuves surveillées (AIPR) comprises : c'est la
+// journée de l'intervenant qu'on cherche à rendre continue, pas l'étiquette.
+// ---------------------------------------------------------------------------
+function ancrages(state, jour, genre, excludeId = null) {
+  const fins = new Set();
+  const debuts = new Set();
+  for (const r of computeSchedule(state).rows) {
+    if (r.cancelled) continue;
+    const i = r.insc;
+    if (excludeId != null && i.id === excludeId) continue;
+    const epreuve = !!r.formation?.testOnly;
+    // Le créneau « pratique » d'une épreuve seule est tenu par un testeur.
+    if (i.datePratique === jour && i.debutPratique != null && (epreuve ? genre === 'test' : genre === 'formation')) {
+      debuts.add(i.debutPratique);
+      fins.add(r.finPratique);
+    }
+    if (genre === 'test' && i.dateTestPratique === jour && i.debutTestPratique != null) {
+      debuts.add(i.debutTestPratique);
+      fins.add(r.finTestPratique);
+    }
+  }
+  return { fins, debuts };
+}
+
+// Créneaux réordonnés : ce qui prolonge une séance du même genre d'abord, ce
+// qui la précède ensuite, le reste après.
+//
+// « apres » garde la préférence qui existait déjà pour le test pratique — le
+// placer après la formation du même stagiaire plutôt qu'avant. Elle est
+// exprimée ici comme un critère de tri, et non par l'ordre du tableau reçu :
+// un tri stable sur un tableau préordonné perdait cette intention dès qu'un
+// autre critère s'y ajoutait.
+// « avant » passe en tête les créneaux qui laissent encore la place d'une
+// séance de cette durée derrière eux, le même jour. Sans ce critère, coller la
+// formation à la dernière séance de la journée la poussait en fin d'après-midi
+// et son test pratique n'avait plus où tenir : l'outil proposait alors une
+// formation à 15:30 et son test à 08:00, soit avant. L'enchaînement ne vaut
+// qu'à l'intérieur de ce qui reste tenable.
+function parEnchainement(creneaux, { fins, debuts }, duree, { apres = null, avant = null } = {}) {
+  const rang = (t) => (fins.has(t) ? 0 : debuts.has(t + duree) ? 1 : 2);
+  const tot = (t) => (apres == null || t >= apres ? 0 : 1);
+  const place = (t) => (avant == null || t + duree + avant.duree <= avant.limite ? 0 : 1);
+  return [...creneaux].sort((a, b) => place(a) - place(b) || rang(a) - rang(b) || tot(a) - tot(b) || a - b);
+}
+
+// ---------------------------------------------------------------------------
 // Proposition automatique de créneaux : première combinaison
 // pratique (+ test pratique + théorie si obligatoires) sans anomalie.
+//
+// « sansTest » ne pose que la pratique (et la théorie) en tolérant l'anomalie
+// « test pratique manquant » : c'est la première passe d'un parcours, qui
+// regroupe toutes les formations avant de placer les tests.
 // ---------------------------------------------------------------------------
-export function suggestSlots(state, { stagiaire, formation: code, type, aPartirDu = null, aujourdHui = dateDuJour() }, excludeId = null) {
+export function suggestSlots(state, { stagiaire, formation: code, type, aPartirDu = null, aujourdHui = dateDuJour(), sansTest = false }, excludeId = null) {
   const { params } = state;
   const formation = formationByCode(state.formations, code);
   if (!formation || !stagiaire) return null;
@@ -887,8 +952,16 @@ export function suggestSlots(state, { stagiaire, formation: code, type, aPartirD
   const maxTrials = 2000;
   let trials = 0;
 
+  // Le genre de la séance « pratique » : une épreuve seule (AIPR) mobilise un
+  // testeur, pas un formateur — elle s'enchaîne donc avec les tests.
+  const genrePratique = formation.testOnly ? 'test' : 'formation';
+
   for (const day of openDays) {
-    for (const start of slots) {
+    // À validité égale, on prolonge ce qui est déjà posé ce jour-là plutôt que
+    // d'ouvrir un trou dans la journée de l'intervenant.
+    const creneauxPratique = parEnchainement(slots, ancrages(state, day, genrePratique, excludeId), duree,
+      formation.tests ? { avant: { duree: params.practicalTestDuration, limite: params.dayEnd } } : {});
+    for (const start of creneauxPratique) {
       if (start + duree > params.dayEnd) continue;
       const base = { stagiaire, formation: code, type, datePratique: day, debutPratique: start };
       if (++trials > maxTrials) return null;
@@ -896,23 +969,91 @@ export function suggestSlots(state, { stagiaire, formation: code, type, aPartirD
         if (trial(base)) return base;
         continue;
       }
-      // Pré-vérification : la pratique seule doit passer (seuls les tests manquants sont tolérés)
       const withTheory = { ...base, dateTheorie: hasTheory ? null : day };
+      // Pré-vérification : la pratique seule doit passer (seuls les tests manquants sont tolérés)
       if (!trial(withTheory, IGNORE_MISSING_TESTS)) continue;
-      // Test pratique : même jour de préférence, sinon jours suivants.
-      // Le même jour, on privilégie un créneau APRÈS la formation pratique.
+      if (sansTest) return withTheory;
+      // Test pratique : même jour de préférence, sinon jours suivants. On
+      // privilégie un créneau qui prolonge un autre test, puis — à défaut —
+      // l'après-formation.
       for (const testDay of openDays.filter((d) => d >= day)) {
-        const ordered = testDay === day
-          ? [...slots.filter((t) => t >= start + duree), ...slots.filter((t) => t < start + duree)]
-          : slots;
+        // Le même jour, le test ne peut être QUE derrière la formation : on
+        // n'évalue pas une pratique avant de l'avoir enseignée. Ce n'était
+        // qu'une préférence, et elle cédait dès qu'aucun créneau ne restait
+        // après — d'où une formation à 15:30 et son test à 08:00.
+        const possibles = testDay === day ? slots.filter((t) => t >= start + duree) : slots;
+        const ordered = parEnchainement(possibles, ancrages(state, testDay, 'test', excludeId),
+          params.practicalTestDuration);
         for (const testStart of ordered) {
           if (testStart + params.practicalTestDuration > params.dayEnd) continue;
-          if (testDay === day && overlaps(start, start + duree, testStart, testStart + params.practicalTestDuration)) continue;
           const draft = { ...withTheory, dateTestPratique: testDay, debutTestPratique: testStart };
           if (++trials > maxTrials) return null;
           if (trial(draft)) return draft;
         }
       }
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Test pratique d'une ligne DÉJÀ posée.
+//
+// Seconde passe d'un parcours : les formations sont en place, on vient
+// accrocher les tests les uns aux autres. suggestSlots ne sait pas faire —
+// il pose une ligne neuve, pas un champ manquant sur une ligne existante.
+// ---------------------------------------------------------------------------
+export function suggestTestPratique(state, inscId, { aPartirDu = null, aujourdHui = dateDuJour() } = {}) {
+  const { params } = state;
+  const cible = state.inscriptions.find((i) => i.id === inscId);
+  if (!cible) return null;
+  const formation = formationByCode(state.formations, cible.formation);
+  if (!formation?.tests) return null;
+  const duree = dureeFor(formation, cible.type);
+
+  const depuis = [cible.datePratique, aPartirDu, aujourdHui].filter(Boolean).sort().at(-1);
+  const openDays = workingDays(params, aujourdHui)
+    .filter((d) => state.openDays.includes(d) && d >= depuis);
+
+  const slots = [];
+  for (let t = params.dayStart; t + params.practicalTestDuration <= params.dayEnd; t += params.slotMinutes) {
+    if (chevauchePause(params, t, t + params.practicalTestDuration)) continue;
+    slots.push(t);
+  }
+
+  // Anomalies préexistantes : poser ce test ne doit rien dégrader, mais il n'a
+  // pas à corriger ce qui était déjà cassé.
+  //
+  // Exiger zéro anomalie sur la ligne visée était trop fort : une ligne dont
+  // la théorie n'est pas encore posée en porte une, et le test se voyait alors
+  // refusé pour un défaut qui ne le concerne pas. On compare donc aux
+  // anomalies de départ, une par une — la seule chose interdite est d'en
+  // ajouter une nouvelle.
+  const baseline = new Map();
+  for (const r of computeSchedule(state).rows) baseline.set(r.insc.id, r.errors);
+
+  const essai = (testDay, testStart) => {
+    const sim = structuredClone(state);
+    const ligne = sim.inscriptions.find((i) => i.id === inscId);
+    ligne.dateTestPratique = testDay;
+    ligne.debutTestPratique = testStart;
+    const { rows } = computeSchedule(sim);
+    const row = rows.find((r) => r.insc.id === inscId);
+    if (!row) return false;
+    const avant = baseline.get(inscId) || [];
+    if (row.errors.some((e) => !avant.includes(e))) return false;
+    return rows.every((r) => r === row || r.errors.length <= (baseline.get(r.insc.id) || []).length);
+  };
+
+  for (const testDay of openDays) {
+    // Le même jour, jamais avant la formation du stagiaire.
+    const possibles = testDay === cible.datePratique
+      ? slots.filter((t) => t >= cible.debutPratique + duree)
+      : slots;
+    const ordered = parEnchainement(possibles, ancrages(state, testDay, 'test', inscId),
+      params.practicalTestDuration);
+    for (const testStart of ordered) {
+      if (essai(testDay, testStart)) return { dateTestPratique: testDay, debutTestPratique: testStart };
     }
   }
   return null;
@@ -1135,6 +1276,52 @@ export function suggestParcours(state, { stagiaire, formations: codes, type = 'I
 }
 
 function composerParcours(state, { stagiaire, codes, type, aPartirDu }) {
+  // Deux passes d'abord : toutes les formations, puis tous les tests. C'est ce
+  // qui rend les journées continues — le formateur enchaîne ses formations, le
+  // testeur enchaîne ses tests.
+  //
+  // À défaut, une passe : chaque catégorie pose sa formation et son test dans
+  // la foulée. Ce repli n'est pas décoratif — le regroupement peut ne pas
+  // tenir dans la journée alors que l'alternance y tenait, et une proposition
+  // moins jolie vaut mieux que pas de proposition. « Dans la mesure du
+  // possible » : le groupement est une préférence, jamais une condition.
+  return enDeuxPasses(state, { stagiaire, codes, type, aPartirDu })
+    || enUnePasse(state, { stagiaire, codes, type, aPartirDu });
+}
+
+function enDeuxPasses(state, { stagiaire, codes, type, aPartirDu }) {
+  const sim = structuredClone(state);
+  const lignes = [];
+
+  // Passe 1 — les formations, enchaînées entre elles.
+  //
+  // Le plancher glisse sur le jour de la PREMIÈRE catégorie posée : sans lui,
+  // une catégorie repoussée au lendemain par une contrainte — le test
+  // théorique exige un testeur qui ne soit pas le formateur — laissait les
+  // suivantes revenir la veille. Le stagiaire venait deux jours pour un
+  // parcours qui tenait en un.
+  let plancher = aPartirDu;
+  for (const code of codes) {
+    const draft = suggestSlots(sim, { stagiaire, formation: code, type, aPartirDu: plancher, sansTest: true });
+    if (!draft) return null;
+    plancher = draft.datePratique;
+    const insc = { id: sim.nextId++, statut: 'pre', modeTheorie: 'distance', ...draft };
+    sim.inscriptions.push(insc);
+    lignes.push(insc);
+  }
+
+  // Passe 2 — les tests pratiques, enchaînés entre eux, après leur formation.
+  for (const ligne of lignes) {
+    if (!formationByCode(sim.formations, ligne.formation)?.tests) continue;
+    const test = suggestTestPratique(sim, ligne.id, { aPartirDu: ligne.datePratique });
+    if (!test) return null;
+    Object.assign(ligne, test);
+  }
+
+  return finaliserParcours(state, sim, lignes);
+}
+
+function enUnePasse(state, { stagiaire, codes, type, aPartirDu }) {
   const sim = structuredClone(state);
   const lignes = [];
 
@@ -1146,6 +1333,10 @@ function composerParcours(state, { stagiaire, codes, type, aPartirDu }) {
     lignes.push(insc);
   }
 
+  return finaliserParcours(state, sim, lignes);
+}
+
+function finaliserParcours(state, sim, lignes) {
   const { rows } = computeSchedule(sim);
   const retenues = rows.filter((r) => lignes.some((l) => l.id === r.insc.id));
   // Un parcours proposé ne doit comporter aucune anomalie : le commercial
