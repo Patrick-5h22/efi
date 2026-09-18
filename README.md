@@ -137,5 +137,14 @@ quand `MCP_OAUTH` est activé — un flux OAuth 2.1 adossé aux comptes Microsof
 de l'application, administrable depuis une organisation Claude Team. Voir
 [docs/MCP.md](docs/MCP.md), qui donne l'ordre d'activation à respecter.
 
+## Ce qui vient
+
+[docs/SITES-ZONES-PARCOURS.md](docs/SITES-ZONES-PARCOURS.md) consolide la
+spécification à venir : trois sites et leurs zones d'évolution, les matériels
+partagés entre zones, le parcours multi-catégories (une recommandation, N
+dispositifs) et les durées combinées. **Rien n'en est implémenté** — le document
+sert de référence unique à la place des courriels successifs, tranche leurs
+contradictions et liste ce qui reste à décider.
+
 Voir [EVALUATION.md](EVALUATION.md) pour la grille d'évaluation et
 l'historique des itérations.
