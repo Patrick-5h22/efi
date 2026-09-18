@@ -13,6 +13,9 @@
 export const PERSISTED_FIELDS = [
   'params',         // paramètres généraux (horaires, durées, pause, capacités)
   'formations',     // catalogue des produits
+  'sites',          // lieux (Périgny, Périgny II, Saintes) et leurs pôles
+  'zones',          // emplacements d'évolution : dispositifs admis, sessions
+  'ressources',     // matériels partagés entre zones (porte-engin)
   'team',           // intervenants et habilitations
   'openDays',       // jours ouverts EFI
   'dayAssignments', // intervenant du jour

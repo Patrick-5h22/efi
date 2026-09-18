@@ -1,7 +1,10 @@
 // Magasin d'état : état applicatif + persistance localStorage + import/export JSON.
 // Aucune dépendance au DOM pour rester testable côté Node.
 
-import { DEFAULT_PARAMS, DEFAULT_FORMATIONS, DEFAULT_TEAM, joursOuvertsParDefaut } from './config.js';
+import {
+  DEFAULT_PARAMS, DEFAULT_FORMATIONS, DEFAULT_TEAM, DEFAULT_SITES, DEFAULT_ZONES,
+  DEFAULT_RESSOURCES, joursOuvertsParDefaut,
+} from './config.js';
 import { dateDuJour } from './dates.js';
 
 export const STORAGE_KEY = 'efi-planning-v1';
@@ -11,6 +14,11 @@ export function defaultState() {
     version: 1,
     params: structuredClone(DEFAULT_PARAMS),
     formations: structuredClone(DEFAULT_FORMATIONS),
+    // Sites, zones d'évolution et matériels partagés — le choix du site
+    // précède la programmation (docs/SITES-ZONES-PARCOURS.md).
+    sites: structuredClone(DEFAULT_SITES),
+    zones: structuredClone(DEFAULT_ZONES),
+    ressources: structuredClone(DEFAULT_RESSOURCES),
     team: structuredClone(DEFAULT_TEAM),
     openDays: joursOuvertsParDefaut(),
     // Affectations jour par jour : { '2026-09-01': { formateur: 'p1', testeur: 'p2' } }
@@ -203,6 +211,25 @@ export function migrate(state) {
     if (!Number.isFinite(f.dureeTest) || f.dureeTest <= 0) f.dureeTest = null;
     if (f.testSurveille === undefined) f.testSurveille = false;
   }
+  // Sites, zones et ressources : un état enregistré avant leur existence n'en
+  // a aucun. Les injecter vides laisserait une application sans plateau ; on
+  // reprend donc le paramétrage livré, que l'écran Paramètres corrige ensuite.
+  // Un paramétrage DÉJÀ saisi, lui, n'est pas touché — même réduit à une seule
+  // zone, c'est un choix.
+  state.sites = state.sites?.length ? state.sites : base.sites;
+  state.zones = state.zones?.length ? state.zones : base.zones;
+  state.ressources = state.ressources || base.ressources;
+  for (const z of [...state.zones, ...state.ressources]) {
+    z.dispositifs = z.dispositifs || [];
+    z.recos = z.recos || [];
+  }
+  for (const z of state.zones) if (!Number.isFinite(z.sessions) || z.sessions < 1) z.sessions = 1;
+  for (const r of state.ressources) if (!Number.isFinite(r.capacite) || r.capacite < 1) r.capacite = 1;
+  // Un pôle absent vaut le site lui-même : isolé, donc jamais enchaînable avec
+  // un autre — l'hypothèse prudente, celle qui ne fait pas rouler quelqu'un
+  // entre deux villes sans le dire.
+  for (const s of state.sites) if (!s.pole) s.pole = s.id;
+
   state.team = state.team || [];
   // Fenêtre de disponibilité ajoutée après coup : absente = sans limite, ce
   // qui reproduit exactement le comportement d'avant pour les équipes déjà

@@ -4,7 +4,10 @@
 import { app, esc, toast, telechargerSauvegarde } from '../app.js';
 import { fmtTime, parseTime, fmtDateShort, fenetreAffichage, SEMAINES_AFFICHEES } from '../dates.js';
 import { defaultState, seedExamples, saveState, viderInscriptions } from '../store.js';
-import { chevauchePause, MODALITES_SEANCE, modaliteDe, appliquerModalite } from '../config.js';
+import {
+  chevauchePause, MODALITES_SEANCE, modaliteDe, appliquerModalite,
+  referencesInconnues, siteById, formationByCode,
+} from '../config.js';
 
 // Activer la pause fait basculer en anomalie les séances déjà posées qui la
 // chevauchent. On le dit AVANT, avec le compte exact — et on le redit après,
@@ -35,6 +38,18 @@ function pauseAlerte(state, p) {
   return `<div class="callout" style="border-left:3px solid var(--warn);padding-left:10px;margin-top:10px">
     <ul class="plain-list">${items.map((t) => `<li>${t}</li>`).join('')}</ul>
   </div>`;
+}
+
+// Dispositifs admis par une zone ou requis par un matériel, dits en clair.
+// Une recommandation entière vaut mieux que ses catégories énumérées : les
+// zones de Périgny II admettent « toute la R482 », y compris les catégories
+// qui n'existent pas encore au catalogue.
+function admisEnClair(state, porteur) {
+  const parts = [
+    ...(porteur.recos || []).map((r) => `<b>toute la ${esc(r)}</b>`),
+    ...(porteur.dispositifs || []).map((c) => esc(formationByCode(state.formations, c)?.label || c)),
+  ];
+  return parts.length ? parts.join(', ') : '<span class="muted">aucun</span>';
 }
 
 export function renderParametres(main) {
@@ -117,6 +132,82 @@ export function renderParametres(main) {
     </div>
 
     <div class="card">
+      <h2>1 bis. Sites, zones d'évolution et matériels partagés</h2>
+      <p class="callout" style="border-left:3px solid var(--warn);padding-left:10px">
+      <b>Paramétrage seul pour l'instant.</b> Ces zones et ce matériel sont enregistrés et modifiables, mais le planning
+      ne s'en sert pas encore : aucune séance n'est refusée pour cause de zone occupée, et la règle de pôle
+      (Saintes ↔ Périgny dans la même journée) n'est pas encore appliquée. Ce sera le lot suivant.</p>
+      <p class="muted">Le choix du site précède la programmation : il déterminera les formations proposables et les zones disponibles.
+      Une zone porte les dispositifs qu'elle admet et son nombre de <b>sessions simultanées</b> — c'est de là que découlent
+      la mutualisation R485 / R489 1A-1B (une zone, quatre dispositifs, une session) et les deux zones Cat 3/5 en parallèle,
+      sans qu'aucune règle particulière n'ait à exister.</p>
+
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Site</th><th>Pôle</th><th>Zones</th></tr></thead>
+          <tbody>
+            ${state.sites.map((site) => `
+              <tr>
+                <td><b>${esc(site.label)}</b></td>
+                <td>${esc(site.pole)}</td>
+                <td>${state.zones.filter((z) => z.siteId === site.id).length}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Deux sites d'un même <b>pôle</b> s'enchaînent dans une journée, deux pôles différents non :
+      Périgny ↔ Périgny II oui, Saintes non. Une comparaison de pôles remplace une matrice de temps de trajet
+      que personne ne tiendrait à jour.</p>
+
+      <div class="table-wrap" style="margin-top:14px">
+        <table class="data">
+          <thead><tr>
+            <th>Zone</th><th>Site</th><th>Dispositifs admis</th><th>Sessions simultanées</th>
+          </tr></thead>
+          <tbody>
+            ${state.zones.map((z, idx) => {
+    const inconnues = referencesInconnues(z, state.formations);
+    return `
+              <tr>
+                <td><input value="${esc(z.label)}" data-z="${idx}|label" style="min-width:210px"></td>
+                <td>${esc(siteById(state.sites, z.siteId)?.label || z.siteId)}</td>
+                <td>${admisEnClair(state, z)}
+                  ${inconnues.length ? `<span class="badge badge-warn" title="Absent du catalogue : la zone n’admet rien de ce nom, tant que la formation n’est pas créée">sans effet : ${esc(inconnues.join(', '))}</span>` : ''}</td>
+                <td><input type="number" min="1" max="6" value="${z.sessions}" data-z="${idx}|sessions" style="width:70px"></td>
+              </tr>`;
+  }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-wrap" style="margin-top:14px">
+        <table class="data">
+          <thead><tr>
+            <th>Matériel partagé</th><th>Site</th><th>Requis par</th><th>Exemplaires</th>
+          </tr></thead>
+          <tbody>
+            ${state.ressources.length ? state.ressources.map((r, idx) => {
+    const inconnues = referencesInconnues(r, state.formations);
+    return `
+              <tr>
+                <td><input value="${esc(r.label)}" data-r="${idx}|label" style="min-width:180px"></td>
+                <td>${esc(siteById(state.sites, r.siteId)?.label || r.siteId)}</td>
+                <td>${admisEnClair(state, r)}
+                  ${inconnues.length ? `<span class="badge badge-warn" title="Absent du catalogue : la contrainte ne s’applique à rien, tant que la formation n’est pas créée">sans effet : ${esc(inconnues.join(', '))}</span>` : ''}</td>
+                <td><input type="number" min="1" max="6" value="${r.capacite}" data-r="${idx}|capacite" style="width:70px"></td>
+              </tr>`;
+  }).join('') : '<tr><td colspan="4" class="muted">Aucun matériel partagé déclaré.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Un matériel partagé est un <b>exemplaire unique utilisé par plusieurs zones</b> — le porte-engin de Périgny II,
+      accessible des deux côtés mais tenant une seule catégorie à la fois, en formation comme en test. Le déclarer ainsi, plutôt
+      qu'en liste d'exclusions, permet d'en ajouter d'autres sans règle nouvelle.
+      <b>« Sans effet »</b> signale un nom absent du catalogue : les deux zones de Périgny II et le porte-engin
+      visent la <b>R482</b>, qui reste à créer — d'ici là, ils n'admettent et ne contraignent rien.</p>
+    </div>
+
+    <div class="card">
       <h2>2. Horaires, tests et charge</h2>
       <div class="form-grid">
         <label class="field">Heure de début de journée <input value="${fmtTime(p.dayStart)}" data-p="dayStart" data-time></label>
@@ -195,6 +286,40 @@ export function renderParametres(main) {
         if (!v) { toast('Ce champ ne peut pas être vide.', 'error'); input.value = f[field]; return; }
         f[field] = v;
       } else f[field] = Math.round((Number(input.value) || 1) * 60);
+      app.commit();
+      toast('Paramètre enregistré.', 'ok');
+    });
+  });
+
+  // Zones et matériels partagés : libellé et nombre de sessions / exemplaires.
+  // La liste des dispositifs admis n'est pas encore modifiable ici — elle est
+  // livrée d'après la spécification et vaudra un écran à elle.
+  const champNombre = (input, mini) => {
+    const v = Math.round(Number(input.value));
+    return Number.isFinite(v) && v >= mini ? v : null;
+  };
+  main.querySelectorAll('[data-z], [data-r]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const zone = 'z' in input.dataset;
+      const [idx, field] = (zone ? input.dataset.z : input.dataset.r).split('|');
+      const cible = (zone ? state.zones : state.ressources)[Number(idx)];
+      if (!cible) return;
+      if (field === 'label') {
+        const v = input.value.trim();
+        if (!v) { toast('Le libellé ne peut pas être vide.', 'error'); input.value = cible.label; return; }
+        cible.label = v;
+      } else {
+        // Zéro session ne veut pas dire « illimité » mais « zone inutilisable » :
+        // on refuse plutôt que d'enregistrer une zone qui n'admet plus rien
+        // sans que personne ne l'ait voulu.
+        const v = champNombre(input, 1);
+        if (v === null) {
+          toast(zone ? 'Une zone tient au moins une session.' : 'Un matériel compte au moins un exemplaire.', 'error');
+          input.value = cible[field];
+          return;
+        }
+        cible[field] = v;
+      }
       app.commit();
       toast('Paramètre enregistré.', 'ok');
     });

@@ -6,7 +6,12 @@
 > trois sources dont on ne sait plus laquelle fait foi. Les contradictions sont
 > **tranchées** ci-dessous, avec la décision retenue et sa date.
 >
-> Rien de ce qui suit n'est implémenté. C'est la cible.
+> **État d'avancement.** Ce document reste la cible. Ce qui en est fait est
+> marqué au fil des sections : la fenêtre de disponibilité (§ 7), les deux
+> modalités AIPR et la durée de test par dispositif (§ 6 et § 8), et le
+> **paramétrage** des sites, zones et matériels partagés (§ 2 à 4). Ce qui
+> n'est pas fait est dit aussi — et notamment : **les zones ne contraignent
+> encore rien**, le moteur les ignore.
 
 **Sources** — courriel « contraintes de sites et de zones à intégrer »
 (16/09/2026), courriel « complément suite à réunion » (18/09/2026), réponses
@@ -38,6 +43,15 @@ heure ni zone ; ses séances, oui. Ne pas les fusionner.
 
 Trois sites. Le choix du site précède toute programmation : il détermine les
 formations proposables et les zones disponibles.
+
+> **Fait : le paramétrage.** `sites`, `zones` et `ressources` existent dans
+> l'état, sont persistés (migration 006) et se règlent dans l'écran Paramètres
+> (§ 1 bis) — libellé, sessions simultanées, exemplaires.
+>
+> **Pas fait : la contrainte.** Le moteur ne lit pas encore les zones. Aucune
+> séance n'est refusée pour zone occupée, aucune zone n'est affectée
+> automatiquement, et la règle de pôle du § 3 n'est pas appliquée. L'écran
+> Paramètres le dit en clair plutôt que de laisser croire le contraire.
 
 ### Périgny
 
@@ -135,6 +149,13 @@ qui compte, pas la nature de la séance.
 
 *À confirmer : les catégories B1, C1 et G utilisent-elles aussi le
 porte-engin ?* Le premier courriel ne nommait que A et F.
+
+> **Fait : la déclaration.** La ressource existe, avec son site, sa capacité de
+> 1 et les deux dispositifs qui la requièrent. **Elle ne contraint rien**, pour
+> deux raisons qui se cumulent : le moteur ne lit pas encore les ressources, et
+> les catégories R482 ne sont pas au catalogue. L'écran Paramètres marque la
+> ligne « sans effet : R482-A, R482-F » — une contrainte qui ne s'applique à
+> rien et ne le dirait pas serait pire que pas de contrainte du tout.
 
 ## 5. Parcours
 
