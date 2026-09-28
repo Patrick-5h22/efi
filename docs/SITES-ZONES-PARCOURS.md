@@ -7,11 +7,11 @@
 > **tranchées** ci-dessous, avec la décision retenue et sa date.
 >
 > **État d'avancement.** Ce document reste la cible. Ce qui en est fait est
-> marqué au fil des sections : la fenêtre de disponibilité (§ 7), les deux
-> modalités AIPR et la durée de test par dispositif (§ 6 et § 8), les sites,
-> zones et matériels partagés (§ 2 à 4) — **paramétrage et contraintes du
-> moteur**. Restent en chantier : les jours d'ouverture par site (§ 7), le
-> choix du site à la saisie, et les parcours (§ 5).
+> marqué au fil des sections : la fenêtre de disponibilité et les **jours
+> d'ouverture par site** (§ 7), les deux modalités AIPR et la durée de test par
+> dispositif (§ 6 et § 8), les sites, zones et matériels partagés (§ 2 à 4) —
+> paramétrage et contraintes du moteur. Reste en chantier : les **parcours**
+> (§ 5).
 
 **Sources** — courriel « contraintes de sites et de zones à intégrer »
 (16/09/2026), courriel « complément suite à réunion » (18/09/2026), réponses
@@ -330,10 +330,29 @@ Emmanuel évoque aussi « voire des créneaux spécifiques » (temps partiel, de
 journées récurrentes). *À préciser si le besoin est réel : une fenêtre de dates
 est simple, un motif hebdomadaire est un autre chantier.*
 
-**Jours d'ouverture : par site** (confirmé le 18/09). `openDays` est aujourd'hui
-une liste plate ; elle devient une liste par site. *À préciser : la présence
+**Jours d'ouverture : par site** (confirmé le 18/09). *À préciser : la présence
 d'un intervenant devient-elle elle aussi « présent à tel site », ou la règle de
 pôle suffit-elle ?* La seconde option est plus simple et paraît suffisante.
+
+> **Fait.** `openDays` est passé d'une liste plate à `{ site: [jours] }`
+> (migration 008 : `planning.open_days` devient une table de couples
+> `(jour, site)`). L'écran **Jours EFI** porte un onglet par site, et le
+> tableau du dessous nomme, pour chaque journée, les sites qui ouvrent.
+>
+> Le contrôle général « jour non ouvert (EFI) » ne voit que **l'union** des
+> sites — c'est la bonne mesure pour le tableau de bord, une journée où Saintes
+> seul ouvre étant bien une journée d'activité. C'est précisément ce qui rend
+> le contrôle par site nécessaire : sans lui, une R482 passait un mercredi où
+> Périgny ouvre et Périgny II non. L'anomalie nomme les lieux qui auraient pu
+> l'accueillir.
+>
+> L'affectation automatique en tient compte : une habilitation électrique se
+> tenant à Périgny **ou** à Saintes bascule sur celui qui ouvre, au lieu
+> d'échouer. Et la saisie guidée ne propose plus, pour une séance de plateau,
+> les journées où aucun site du dispositif n'ouvre.
+>
+> La **présence** des intervenants reste par journée, pas par site : la règle
+> de pôle suffit, comme pressenti ci-dessus.
 
 ## 8. AIPR — deux modalités
 

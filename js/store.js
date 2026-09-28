@@ -3,7 +3,7 @@
 
 import {
   DEFAULT_PARAMS, DEFAULT_FORMATIONS, DEFAULT_TEAM, DEFAULT_SITES, DEFAULT_ZONES,
-  DEFAULT_RESSOURCES, joursOuvertsParDefaut,
+  DEFAULT_RESSOURCES, joursOuvertsParDefaut, joursOuverts,
 } from './config.js';
 import { dateDuJour } from './dates.js';
 
@@ -40,8 +40,11 @@ export function defaultState() {
 // « jours » impose des dates : les tests s'en servent pour rester lisibles et
 // stables, sans dériver avec le calendrier réel.
 export function seedExamples(state, { jours = null } = {}) {
-  if (jours) state.openDays = [...jours];
-  const [j1, j2 = j1] = state.openDays.length ? state.openDays : [dateDuJour()];
+  if (jours) {
+    state.openDays = Object.fromEntries((state.sites || []).map((s) => [s.id, [...jours]]));
+  }
+  const ouverts = joursOuverts(state.openDays);
+  const [j1, j2 = j1] = ouverts.length ? ouverts : [dateDuJour()];
   // Les 4 lignes d'exemple du classeur (dont un cas multi-catégories)
   const rows = [
     {
@@ -244,7 +247,17 @@ export function migrate(state) {
     if (!m.dispoDebut) m.dispoDebut = null;
     if (!m.dispoFin) m.dispoFin = null;
   }
-  state.openDays = state.openDays || [];
+  // Jours d'ouverture : la liste plate devient une carte par site. Ce qui
+  // était ouvert « tout court » l'était pour tout le monde — c'est la seule
+  // lecture fidèle d'un état enregistré avant les sites.
+  if (Array.isArray(state.openDays)) {
+    const plats = [...state.openDays].sort();
+    state.openDays = Object.fromEntries(state.sites.map((s) => [s.id, [...plats]]));
+  }
+  state.openDays = state.openDays && typeof state.openDays === 'object' ? state.openDays : {};
+  for (const [id, liste] of Object.entries(state.openDays)) {
+    state.openDays[id] = [...new Set(Array.isArray(liste) ? liste : [])].sort();
+  }
   state.dayAssignments = state.dayAssignments || {};
   state.dayPresence = state.dayPresence || {};
   state.inscriptions = state.inscriptions || [];

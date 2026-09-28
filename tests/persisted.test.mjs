@@ -86,7 +86,7 @@ test('empreinte : insensible à l’ordre des clés et aux champs non persistés
 test('empreinte : une modification du contenu, même minuscule, se voit', () => {
   const a = defaultState();
   const b = structuredClone(a);
-  b.openDays = [...a.openDays, '2026-12-25'];
+  b.openDays = { ...a.openDays, perigny: [...a.openDays.perigny, '2026-12-25'] };
   assert.notEqual(empreintePersistee(a), empreintePersistee(b));
 
   const c = structuredClone(a);

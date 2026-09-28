@@ -95,12 +95,31 @@ référentielle ferait échouer la sauvegarde entière sur une zone supprimée
 entre-temps — au lieu de quoi le moteur signale « zone inconnue » sur la seule
 ligne concernée.
 
+`docs/migrations/008-jours-ouverture-par-site.sql` transforme enfin
+`planning.open_days` en table de **couples** `(jour, site)` — ce qu'elle voulait
+dire dès l'instant où il y a plus d'un lieu. Sa clé primaire passe de `day` à
+`(day, site_id)`, et chaque jour déjà enregistré devient ouvert sur chacun des
+sites connus : ce qui était ouvert « tout court » l'était pour tout le monde.
+
+Si `planning.sites` est encore vide — 006 posée mais aucune sauvegarde depuis —
+la reprise ne peut désigner aucun site : les lignes sont alors **conservées**
+telles quelles et la clé primaire n'est pas resserrée. La première sauvegarde
+de l'application réécrira la table de toute façon, et détruire des journées
+d'ouverture pour faire propre serait un mauvais échange.
+
+Une différence avec `day_presence`, et elle est voulue : un site dont la liste
+est vide et un site absent de l'objet disent **la même chose** — jamais ouvert.
+Il n'y a ici aucune nuance à préserver, là où une journée présente dans
+`dayPresence` avec une liste vide signifie « personne ce jour-là ». La RPC rend
+donc l'un ou l'autre indifféremment.
+
 Chaque migration reprend les colonnes des précédentes (`add column if not
 exists`) et réécrit les deux RPC au complet : **appliquer la plus récente
 suffit**, quel que soit l'état de la base. Vérifié pour la 007 : appliquée
 seule sur un schéma qui n'avait reçu aucune des trois précédentes, elle pose
-tout, et l'aller-retour rend la zone imposée comme la zone laissée en
-automatique.
+tout. Vérifié pour la 008 : deux jours plats et trois sites donnent six couples
+après reprise, et l'aller-retour préserve un site fermé quand les autres
+ouvrent.
 
 **Avant d'ajouter un champ à `js/persisted.js` ou à une inscription**, vérifier
 ce que la base rend réellement — en lecture seule, sans rien écrire :

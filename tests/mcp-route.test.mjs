@@ -53,7 +53,8 @@ function etatInitial() {
     { id: 'p1', name: 'MEDAN Dominique', quals: structuredClone(QUALS) },
     { id: 'p2', name: 'GARCIA Thierry', quals: structuredClone(QUALS) },
   ];
-  s.openDays = [...J];
+  // Jours d'ouverture par site : les trois sites ouvrent les mêmes journées.
+  s.openDays = Object.fromEntries(s.sites.map((x) => [x.id, [...J]]));
   s.inscriptions = [];
   return s;
 }
@@ -446,13 +447,15 @@ test('route : un planning inchangé n’est jamais pris pour un conflit', async 
 test('route : une modification concurrente est préservée, pas écrasée', async () => {
   // Une assistante enregistre entre notre lecture et notre écriture.
   avantChaqueLecture = (n) => {
-    if (n === 2) base.openDays = [...base.openDays, LOINTAIN];
+    // Les jours d'ouverture sont désormais par SITE : l'assistante ouvre
+    // une journée à Périgny.
+    if (n === 2) base.openDays.perigny = [...(base.openDays.perigny || []), LOINTAIN];
   };
 
   const r = await rpc(preReservation());
   assert.ok(!r.json.result?.isError, texteOutil(r));
   assert.equal(sauvegardes, 1);
-  assert.ok(base.openDays.includes(LOINTAIN),
+  assert.ok(base.openDays.perigny.includes(LOINTAIN),
     'recalculer sur l’état frais, sinon la modification de l’assistante disparaît');
   assert.ok(base.inscriptions.some((i) => i.stagiaire === 'DURAND Thomas' && i.statut === 'pre'),
     'la pré-réservation doit tout de même être posée');
@@ -460,7 +463,9 @@ test('route : une modification concurrente est préservée, pas écrasée', asyn
 
 test('route : un planning qui bouge sans arrêt fait refuser l’écriture', async () => {
   let n = 0;
-  avantChaqueLecture = () => { base.openDays = [...base.openDays, addDays(LOINTAIN, n += 1)]; };
+  avantChaqueLecture = () => {
+    base.openDays.perigny = [...(base.openDays.perigny || []), addDays(LOINTAIN, n += 1)];
+  };
 
   const r = await rpc(preReservation());
   assert.equal(r.json.result.isError, true);

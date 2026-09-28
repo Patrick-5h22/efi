@@ -5,6 +5,7 @@ import { memberName } from '../store.js';
 import { semainesAffichees, fenetreAffichage, SEMAINES_AFFICHEES, fmtDateShort, fmtTime, isoWeek, weekDays, fmtDateDay, dateDuJour, mondayOf } from '../dates.js';
 import { occupancyByDay, occupationSummary, scopeWindow, rowInScope, prochainesActivites, OCCUPATION_SCOPES } from '../engine.js';
 import { getKpiScope, setKpiScope } from '../prefs.js';
+import { joursOuverts } from '../config.js';
 import { openInscriptionForm } from './form.js';
 
 export function renderDashboard(main) {
@@ -149,7 +150,7 @@ function heatmapHTML(state, weeks) {
   // mieux que de compter les colonnes.
   const aujourdHui = dateDuJour();
   const lundiCourant = mondayOf(aujourdHui);
-  const openSet = new Set(state.openDays);
+  const openSet = new Set(joursOuverts(state.openDays));
   const holidays = new Set((state.params.holidays || []).map((h) => h.date || h));
   const level = (ratio) => ratio <= 0 ? 0 : ratio <= 0.25 ? 1 : ratio <= 0.5 ? 2 : ratio <= 0.75 ? 3 : 4;
 

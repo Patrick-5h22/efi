@@ -5,7 +5,7 @@ import { app, esc, toast } from '../app.js';
 import { addInscription, updateInscription, montantOuNull } from '../store.js';
 import {
   formationByCode, dureeFor, TYPES, MODES_THEORIE, THEORIE_CENTRE_DUREE_DEFAUT,
-  zonesPour, siteById,
+  zonesPour, siteById, joursOuverts, siteOuvertLe,
 } from '../config.js';
 import { daySlots, fmtTime, workingDays, fmtDateDay } from '../dates.js';
 import { computeSchedule, memberAvailability, suggestSlots, availableSlotsFor, availableTheorieSlots, roomFreeSlots } from '../engine.js';
@@ -46,16 +46,31 @@ export function openInscriptionForm(options = {}) {
   dialog = document.createElement('dialog');
 
   const slots = daySlots(state.params);
-  const openSet = new Set(state.openDays);
+  const openSet = new Set(joursOuverts(state.openDays));
   const days = workingDays(state.params);
   // Mode guidé (défaut) : seuls les jours ouverts et les créneaux avec une
   // ressource disponible sont proposés. « Saisie libre » réaffiche tout.
   let expert = false;
 
-  const dayOptions = (selected) => days
-    .filter((d) => expert || openSet.has(d) || d === selected)
+  // Un jour « ouvert » dépend maintenant du SITE. Pour une séance de plateau,
+  // la question n'est pas « le centre ouvre-t-il ? » mais « un plateau qui
+  // accueille ce dispositif ouvre-t-il ? » — sans quoi le mode guidé propose
+  // un mercredi pour une R482 alors que Périgny II est fermé, et l'anomalie
+  // arrive après coup. La théorie, elle, n'a pas de plateau : elle garde
+  // l'union des sites.
+  const ouvertPour = (code, d) => {
+    if (!code) return openSet.has(d);
+    const formation = formationByCode(state.formations, code);
+    if (!formation) return openSet.has(d);
+    const zones = zonesPour(state.zones || [], formation);
+    if (!zones.length) return openSet.has(d);
+    return zones.some((z) => siteOuvertLe(state.openDays, z.siteId, d));
+  };
+
+  const dayOptions = (selected, code = null) => days
+    .filter((d) => expert || ouvertPour(code, d) || d === selected)
     .map((d) =>
-      `<option value="${d}" ${d === selected ? 'selected' : ''}>${fmtDateDay(d)}${openSet.has(d) ? '' : ' (fermé)'}</option>`
+      `<option value="${d}" ${d === selected ? 'selected' : ''}>${fmtDateDay(d)}${ouvertPour(code, d) ? '' : ' (fermé)'}</option>`
     ).join('');
 
   const timeOptions = (selected) => slots.map((t) =>
@@ -136,7 +151,7 @@ export function openInscriptionForm(options = {}) {
 
         <h2 style="font-size:14px; margin: 14px 0 8px;" id="pratique-title">Formation pratique</h2>
         <div class="form-grid">
-          <label class="field">Date <select name="datePratique" required><option value="">—</option>${dayOptions(init.datePratique)}</select></label>
+          <label class="field">Date <select name="datePratique" required><option value="">—</option>${dayOptions(init.datePratique, init.formation)}</select></label>
           <label class="field">Heure de début <select name="debutPratique" required><option value="">—</option>${timeOptions(init.debutPratique)}</select></label>
           <label class="field">Fin (auto) <input name="finPratique" disabled></label>
         </div>
@@ -144,7 +159,7 @@ export function openInscriptionForm(options = {}) {
         <div id="tests-section">
           <h2 style="font-size:14px; margin: 14px 0 8px;">Tests (obligatoires R489 / R486)</h2>
           <div class="form-grid">
-            <label class="field">Date test pratique <select name="dateTestPratique"><option value="">—</option>${dayOptions(init.dateTestPratique)}</select></label>
+            <label class="field">Date test pratique <select name="dateTestPratique"><option value="">—</option>${dayOptions(init.dateTestPratique, init.formation)}</select></label>
             <label class="field">Début test pratique <select name="debutTestPratique"><option value="">—</option>${timeOptions(init.debutTestPratique)}</select></label>
             <label class="field">Date test théorique <select name="dateTheorie"><option value="">—</option>${dayOptions(init.dateTheorie)}</select></label>
           </div>
@@ -253,12 +268,12 @@ export function openInscriptionForm(options = {}) {
     // avec le reste, la clé la couvre déjà.
     if (key === guidedKey) return;
     guidedKey = key;
-    const rebuildDay = (name, sel) => {
-      $(name).innerHTML = '<option value="">—</option>' + dayOptions(sel);
+    const rebuildDay = (name, sel, code = null) => {
+      $(name).innerHTML = '<option value="">—</option>' + dayOptions(sel, code);
       $(name).value = sel ?? '';
     };
-    rebuildDay('datePratique', draft.datePratique);
-    rebuildDay('dateTestPratique', draft.dateTestPratique);
+    rebuildDay('datePratique', draft.datePratique, draft.formation);
+    rebuildDay('dateTestPratique', draft.dateTestPratique, draft.formation);
     rebuildDay('dateTheorie', draft.dateTheorie);
     rebuildDay('dateTheorieFormation', draft.dateTheorieFormation);
     const setOptions = (name, avail, sel) => {
