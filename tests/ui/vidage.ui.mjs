@@ -43,10 +43,13 @@ const semé = await p.evaluate(async () => {
   st.dayPresence = { [j1]: ['p1'], [j2]: ['p1', 'p2'] };
   st.dayAssignments = { [j1]: { formateur: 'p1', testeur: 'p2' } };
   st.params.maxDailyLoad = 420;
+  // Une vente par stagiaire : le montant est porté par le PARCOURS.
+  st.parcours = [1, 2, 3].map((id) => ({ id, chiffreAffaires: 1250, dossierYpareo: '0123456789' }));
+  st.nextParcoursId = 4;
   st.inscriptions = ['UN Premier', 'DEUX Second', 'TROIS Troisieme'].map((stagiaire, k) => ({
     id: k + 1, stagiaire, formation: 'R489-1A', type: 'Initial', statut: 'confirmee',
     modeTheorie: 'distance', datePratique: j1, debutPratique: 480 + k * 120,
-    formateurId: 'p1', chiffreAffaires: 1250, dossierYpareo: '0123456789',
+    formateurId: 'p1', parcoursId: k + 1,
   }));
   st.nextId = 4;
   localStorage.setItem('efi-planning-v1', JSON.stringify(st));
@@ -91,8 +94,9 @@ if (telechargement) {
   const sauvegarde = JSON.parse(readFileSync(chemin, 'utf8'));
   check('la sauvegarde contient bien les trois inscriptions',
     sauvegarde.inscriptions?.length === 3, String(sauvegarde.inscriptions?.length));
-  check('avec leur chiffre d’affaires', sauvegarde.inscriptions?.[0]?.chiffreAffaires === 1250,
-    String(sauvegarde.inscriptions?.[0]?.chiffreAffaires));
+  check('avec le chiffre d’affaires de leurs parcours',
+    sauvegarde.parcours?.length === 3 && sauvegarde.parcours[0].chiffreAffaires === 1250,
+    JSON.stringify(sauvegarde.parcours?.map((x) => x.chiffreAffaires)));
 }
 
 const apres = await p.evaluate(() => {

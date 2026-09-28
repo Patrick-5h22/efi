@@ -12,7 +12,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultState, addInscription } from '../js/store.js';
+import { defaultState, addInscription, addParcours } from '../js/store.js';
 
 // Colonnes de planning.inscriptions telles que les migrations du dépôt les
 // définissent — et telles que les deux RPC les écrivent et les relisent
@@ -29,12 +29,20 @@ const COLONNES = [
   'formateur_id', 'testeur_id', 'updated_at',
   'entreprise', 'siret', 'statut', 'motif_annulation',
   // Ajoutés par les migrations 002 et 003
-  'dossier_ypareo', 'chiffre_affaires', 'mode_theorie',
+  'mode_theorie',
   'date_theorie_formation', 'debut_theorie_formation', 'duree_theorie_centre',
   'formateur_theorie_id', 'reserve_par', 'reserve_le',
   // Ajoutées par la migration 007
   'zone_id', 'zone_test_id',
+  // Ajoutée par la migration 009. « dossier_ypareo » et « chiffre_affaires »
+  // ont quitté cette liste : ils appartiennent au PARCOURS. Les colonnes
+  // existent encore en base mais ne sont plus ni écrites ni relues.
+  'parcours_id',
 ];
+
+// Le parcours : ce qu'un stagiaire achète. Il ne porte que ce qui ne doit
+// exister qu'une fois — tout le reste se déduit de ses lignes.
+const COLONNES_PARCOURS = ['id', 'dossier_ypareo', 'chiffre_affaires', 'position'];
 
 // Champs posés par le serveur MCP (js/mcp.js) et non par addInscription :
 // la trace de l'origine d'une pré-réservation.
@@ -60,6 +68,25 @@ test('base : aucun champ d’inscription ne perd sa colonne sans qu’on le sach
     + '  Si vous venez d’ajouter un champ : il faut une colonne ET une mise à\n'
     + '  jour des deux RPC, sinon il sera perdu en silence (docs/SUPABASE.md).\n'
     + '  Si vous venez d’appliquer une migration : retirez-le de cette liste.');
+});
+
+test('base : aucun champ de parcours ne perd sa colonne sans qu’on le sache', () => {
+  const s = defaultState();
+  const p = addParcours(s, { dossierYpareo: '1234567890', chiffreAffaires: 900 });
+  const sansColonne = Object.keys(p).filter((c) => !COLONNES_PARCOURS.includes(snake(c)));
+  assert.deepEqual(sansColonne, [],
+    `Champs de parcours sans colonne : ${sansColonne.join(', ')}\n`
+    + '  Il faut une colonne ET une mise à jour des deux RPC (docs/SUPABASE.md).');
+});
+
+test('base : le montant n’est plus porté par la ligne', () => {
+  // Filet contre un retour en arrière discret : réintroduire le montant sur
+  // l'inscription ferait recompter le chiffre d'affaires une fois par
+  // catégorie, ce que le parcours vient précisément d'arrêter.
+  const insc = addInscription(defaultState(), {});
+  assert.ok(!('chiffreAffaires' in insc), 'le montant appartient au parcours');
+  assert.ok(!('dossierYpareo' in insc), 'le n° de dossier aussi');
+  assert.ok('parcoursId' in insc);
 });
 
 test('base : les colonnes existantes couvrent bien les champs essentiels', () => {

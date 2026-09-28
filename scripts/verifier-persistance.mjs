@@ -28,13 +28,17 @@ const SUPABASE_KEY = 'sb_publishable_6lJ88JCHt4n_lvxQ0UC3qg_c7zz-TV7';
 // qu'une colonne manquante ferait disparaître sans bruit.
 const CHAMPS_LIGNE = [
   'stagiaire', 'formation', 'type', 'statut',
-  'dossierYpareo', 'chiffreAffaires', 'entreprise', 'siret',
+  'parcoursId', 'entreprise', 'siret',
   'datePratique', 'debutPratique', 'dateTheorie', 'dateTestPratique',
-  'debutTestPratique', 'formateurId', 'testeurId',
+  'debutTestPratique', 'formateurId', 'testeurId', 'zoneId', 'zoneTestId',
   'modeTheorie', 'dateTheorieFormation', 'debutTheorieFormation',
   'dureeTheorieCentre', 'formateurTheorieId',
   'reservePar', 'reserveLe', 'motifAnnulation',
 ];
+
+// Le montant et le n° de dossier ont quitté la ligne : ils appartiennent au
+// parcours, et c'est là qu'il faut aller les vérifier.
+const CHAMPS_PARCOURS = ['dossierYpareo', 'chiffreAffaires'];
 
 const code = process.env.EFI_ACCESS_CODE;
 if (!code) {
@@ -91,6 +95,16 @@ for (const champ of CHAMPS_LIGNE) {
   const marque = renseignes ? '✓' : (cleAbsente ? '?' : '·');
   const note = renseignes ? '' : (cleAbsente ? '  (clé absente du JSON)' : '  (aucune valeur)');
   console.log(`  ${marque}  ${champ} : ${renseignes}/${inscriptions.length}${note}`);
+}
+
+const parcours = Array.isArray(etat?.parcours) ? etat.parcours : [];
+console.log(`\nChamps des parcours — ${parcours.length} parcours rendu(s)\n`);
+for (const champ of CHAMPS_PARCOURS) {
+  const cleAbsente = parcours.length > 0 && parcours.every((p) => !(champ in p));
+  const renseignes = parcours.filter((p) => p[champ] !== null && p[champ] !== undefined && p[champ] !== '').length;
+  const marque = renseignes ? '✓' : (cleAbsente ? '?' : '·');
+  const note = renseignes ? '' : (cleAbsente ? '  (clé absente du JSON)' : '  (aucune valeur)');
+  console.log(`  ${marque}  ${champ} : ${renseignes}/${parcours.length}${note}`);
 }
 
 console.log('\nComment lire ce rapport\n');

@@ -1,5 +1,5 @@
-// Volet gestion : n° de dossier YPAREO, chiffre d'affaires par inscription,
-// et écran de suivi du CA.
+// Volet gestion : n° de dossier YPAREO et chiffre d'affaires — portés par le
+// PARCOURS et non par la séance —, écran de suivi du CA, export YPAREO.
 import { lancerNavigateur, BASE, artefact } from './_harness.mjs';
 const browser = await lancerNavigateur();
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
@@ -34,10 +34,16 @@ await page.click('#btn-save'); await page.waitForTimeout(500);
 
 const stored = await page.evaluate(() => {
   const st = JSON.parse(localStorage.getItem('efi-planning-v1'));
-  return st.inscriptions.find((i) => i.stagiaire === 'NEAU Emmanuel');
+  const i = st.inscriptions.find((x) => x.stagiaire === 'NEAU Emmanuel');
+  return { ...i, parcours: st.parcours.find((p) => p.id === i?.parcoursId) };
 });
-check('n° de dossier enregistré', stored?.dossierYpareo === '0123456789', String(stored?.dossierYpareo));
-check('CA enregistré en nombre', stored?.chiffreAffaires === 1250, String(stored?.chiffreAffaires));
+check('un parcours est créé avec la ligne', !!stored?.parcours, String(stored?.parcoursId));
+check('n° de dossier enregistré sur le parcours',
+  stored?.parcours?.dossierYpareo === '0123456789', String(stored?.parcours?.dossierYpareo));
+check('CA enregistré en nombre sur le parcours',
+  stored?.parcours?.chiffreAffaires === 1250, String(stored?.parcours?.chiffreAffaires));
+check('la ligne ne porte plus le montant',
+  !('chiffreAffaires' in (stored || {})), JSON.stringify(Object.keys(stored || {}).slice(0, 4)));
 
 // 2. Colonnes visibles dans la liste
 const listText = await page.locator('table.data').innerText();
@@ -62,11 +68,13 @@ const ca = await page.locator('#main').innerText();
 check('écran CA accessible', ca.includes('Chiffre d’affaires'));
 check('bloc mensuel « Septembre 2026 »', ca.includes('Septembre 2026'));
 check('sous-total mensuel', ca.includes('Sous-total'));
-check('total par formation', ca.includes('Total par formation'));
+check('total par recommandation', ca.includes('Total par recommandation'));
 check('KPI dossier', ca.includes('dossier(s) YPAREO'));
 check('lien de navigation présent', (await page.locator('#nav').innerText()).includes('Chiffre d’affaires'));
 
-// 6. Détection du montant recopié sur un même dossier
+// 6. Une seconde catégorie rattachée au MÊME parcours ne double pas le CA.
+//    C'est tout l'objet du parcours : avant, ce cas donnait 2 500 € et un
+//    avertissement « montant répété » qu'aucun code ne savait corriger.
 await page.evaluate(() => {
   const st = JSON.parse(localStorage.getItem('efi-planning-v1'));
   const src = st.inscriptions.find((i) => i.stagiaire === 'NEAU Emmanuel');
@@ -76,8 +84,12 @@ await page.evaluate(() => {
 await page.reload(); await page.waitForTimeout(500);
 await page.goto(BASE + '/#/ca'); await page.waitForTimeout(600);
 const ca2 = await page.locator('#main').innerText();
-check('montant répété signalé', ca2.includes('Points de vigilance') && ca2.includes('répété'), '');
-check('total resté la somme brute (on signale, on ne corrige pas)', /2\s?500/.test(ca2), '');
+check('deux séances, un seul montant compté', /1\s?250/.test(ca2) && !/2\s?500/.test(ca2),
+  ca2.split('\n').filter((l) => /€/.test(l)).slice(0, 3).join(' / '));
+check('le compteur dit bien « parcours » et « séances »',
+  ca2.includes('parcours facturé(s)') && ca2.includes('séance(s) couverte(s)'), '');
+check('plus d’avertissement « montant répété » — la cause a disparu',
+  !ca2.includes('répété'), '');
 await page.locator('.card').first().screenshot({ path: artefact('ca-ecran.png') }).catch(() => {});
 await page.screenshot({ path: artefact('ca-page.png'), fullPage: true });
 
@@ -85,13 +97,25 @@ await page.screenshot({ path: artefact('ca-page.png'), fullPage: true });
 const annees = await page.locator('#ca-annee option').allInnerTexts();
 check('sélecteur d’année alimenté', annees.includes('2026'), annees.join(','));
 
-// 8. Export CSV des inscriptions : nouvelles colonnes
-await page.goto(BASE + '/#/inscriptions'); await page.waitForTimeout(400);
-const csvHeader = await page.evaluate(async () => {
-  const mod = await import('/js/csv.js').catch(() => null);
-  return mod ? 'ok' : 'ok';
+// 8. Export YPAREO : une ligne par parcours, catégories en champ texte
+await page.goto(BASE + '/#/inscriptions'); await page.waitForTimeout(500);
+check('le bouton YPAREO existe', await page.locator('#btn-ypareo').count() === 1);
+
+const ypareo = await page.evaluate(async () => {
+  const { lignesYpareo, ypareoCSV } = await import('/js/ypareo.js');
+  const { migrate } = await import('/js/store.js');
+  const st = migrate(JSON.parse(localStorage.getItem('efi-planning-v1')));
+  return { lignes: lignesYpareo(st), csv: ypareoCSV(st) };
 });
-check('module CSV toujours chargeable', csvHeader === 'ok');
+const vente = ypareo.lignes.find((l) => l.stagiaire === 'NEAU Emmanuel');
+check('une seule ligne pour les deux catégories', !!vente && vente.seances === 2,
+  JSON.stringify(ypareo.lignes.map((l) => [l.stagiaire, l.seances])));
+check('la colonne Formation porte les recommandations',
+  /HAB ELEC|R489/.test(vente?.formation || ''), vente?.formation);
+check('les catégories partent en commentaire',
+  /Cat\. 3/.test(vente?.commentaire || ''), vente?.commentaire);
+check('le CSV porte l’en-tête attendu',
+  ypareo.csv.includes('"Commentaire"') && ypareo.csv.includes('"N° dossier YPAREO"'), '');
 
 check('aucune erreur JS', errors.length === 0, errors.join(' ; '));
 console.log(`\n${pass}/${pass + fail} OK`);

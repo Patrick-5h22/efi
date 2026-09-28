@@ -2,8 +2,9 @@
 // avec filtres, statut détaillé et actions.
 
 import { app, esc, toast } from '../app.js';
-import { removeInscription, memberName } from '../store.js';
-import { fmtTime, fmtDateShort } from '../dates.js';
+import { removeInscription, memberName, parcoursById, lignesDuParcours } from '../store.js';
+import { fmtTime, fmtDateShort, dateDuJour } from '../dates.js';
+import { ypareoCSV, lignesYpareo } from '../ypareo.js';
 import { semainesConsultables } from '../engine.js';
 import { siteById } from '../config.js';
 import { openInscriptionForm } from './form.js';
@@ -23,8 +24,8 @@ const SORTERS = {
   date: (r) => `${r.insc.datePratique || '9999'}|${String(r.insc.debutPratique ?? 0).padStart(4, '0')}`,
   semaine: (r) => r.semaine ?? 99,
   statut: (r) => -r.errors.length,
-  dossier: (r) => r.insc.dossierYpareo || '￿',
-  ca: (r) => r.insc.chiffreAffaires ?? -1,
+  dossier: (r) => parcoursById(app.state, r.insc.parcoursId)?.dossierYpareo || '￿',
+  ca: (r) => parcoursById(app.state, r.insc.parcoursId)?.chiffreAffaires ?? -1,
 };
 
 export function renderInscriptions(main) {
@@ -40,7 +41,8 @@ export function renderInscriptions(main) {
     // les assistantes pour retrouver une inscription.
     if (filters.search) {
       const q = filters.search.toLowerCase();
-      const hay = `${row.insc.stagiaire} ${row.insc.dossierYpareo || ''}`.toLowerCase();
+      const dossier = parcoursById(state, row.insc.parcoursId)?.dossierYpareo || '';
+      const hay = `${row.insc.stagiaire} ${dossier}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     if (filters.formation && row.insc.formation !== filters.formation) return false;
@@ -63,6 +65,7 @@ export function renderInscriptions(main) {
       <div class="page-actions">
         <button class="btn" id="btn-add">➕ Inscrire un stagiaire</button>
         <button class="btn btn-secondary" id="btn-csv">⬇ CSV</button>
+        <button class="btn btn-secondary" id="btn-ypareo" title="Une ligne par parcours : la recommandation en Formation, les catégories en Commentaire">⬇ YPAREO</button>
         <button class="btn btn-secondary" id="btn-ics" title="Exporter toutes les réservations au format calendrier (.ics)">📅 .ics</button>
         <button class="btn btn-secondary" id="btn-import-csv" title="Importer des inscriptions depuis un fichier CSV (export du classeur)">⬆ CSV</button>
         <input type="file" id="csv-file" accept=".csv,text/csv" hidden>
@@ -127,6 +130,12 @@ export function renderInscriptions(main) {
   main.querySelector('#f-status').addEventListener('change', (e) => { filters.status = e.target.value; renderInscriptions(main); });
   main.querySelector('#f-dossier').addEventListener('change', (e) => { filters.dossier = e.target.value; renderInscriptions(main); });
   main.querySelector('#btn-csv').addEventListener('click', () => exportCSV(state, rows));
+  main.querySelector('#btn-ypareo').addEventListener('click', () => {
+    const lignes = lignesYpareo(state);
+    if (!lignes.length) { toast('Aucun parcours à exporter.', 'error'); return; }
+    telecharger(ypareoCSV(state), `efi-ypareo-${dateDuJour()}.csv`);
+    toast(`${lignes.length} parcours exporté(s).`, 'ok');
+  });
   main.querySelector('#btn-ics').addEventListener('click', () => downloadICS(buildICS(state, app.schedule), 'efi-planning.ics'));
   const csvInput = main.querySelector('#csv-file');
   main.querySelector('#btn-import-csv').addEventListener('click', () => csvInput.click());
@@ -203,6 +212,11 @@ function zoneCell(state, row) {
 
 function rowHTML(state, row) {
   const { insc, formation } = row;
+  // Le montant appartient au PARCOURS. Sur une vente à plusieurs catégories,
+  // il s'affiche donc sur chaque ligne, suivi d'une astérisque : sans elle on
+  // lirait trois fois 900 € et on croirait à 2700 € de chiffre d'affaires.
+  const parcours = parcoursById(state, insc.parcoursId);
+  const partage = parcours ? lignesDuParcours(state, parcours.id).length - 1 : 0;
   const manuel = ' <span title="Choix manuel">✎</span>';
   const fmtF = formation?.testOnly
     ? '<span class="muted" title="Épreuve tenue par un testeur — pas de formateur">n/a</span>'
@@ -222,10 +236,12 @@ function rowHTML(state, row) {
     <tr class="${statutRow} ${row.errors.length ? 'row-error' : ''}">
       <td>${insc.id}</td>
       <td><b>${esc(insc.stagiaire)}</b>${insc.entreprise ? `<br><span class="muted">${esc(insc.entreprise)}</span>` : ''}${statutBadge ? '<br>' + statutBadge : ''}</td>
-      <td>${insc.dossierYpareo
-        ? `<span class="mono"${ypareoValide(insc.dossierYpareo) ? '' : ' title="Un n° YPAREO compte 10 chiffres"'}>${esc(insc.dossierYpareo)}${ypareoValide(insc.dossierYpareo) ? '' : ' <span class="badge badge-warn">?</span>'}</span>`
+      <td>${parcours?.dossierYpareo
+        ? `<span class="mono"${ypareoValide(parcours.dossierYpareo) ? '' : ' title="Un n° YPAREO compte 10 chiffres"'}>${esc(parcours.dossierYpareo)}${ypareoValide(parcours.dossierYpareo) ? '' : ' <span class="badge badge-warn">?</span>'}</span>`
+        : '<span class="muted">—</span>'}${partage ? `<br><span class="muted" title="Ce parcours couvre ${partage + 1} séances">parcours n°${parcours.id}</span>` : ''}</td>
+      <td style="text-align:right">${parcours?.chiffreAffaires != null
+        ? `<span class="mono"${partage ? ' title="Montant du parcours entier, non de cette seule séance"' : ''}>${fmtEuros(parcours.chiffreAffaires)}${partage ? ' *' : ''}</span>`
         : '<span class="muted">—</span>'}</td>
-      <td style="text-align:right">${insc.chiffreAffaires != null ? `<span class="mono">${fmtEuros(insc.chiffreAffaires)}</span>` : '<span class="muted">—</span>'}</td>
       <td>${esc(formation?.label || insc.formation || '?')}</td>
       <td>${esc(insc.type)}</td>
       <td>${fmtTime(row.duree).replace(':', 'h')}</td>
@@ -273,7 +289,8 @@ function exportCSV(state, rows) {
   const lines = rows.map((row) => {
     const i = row.insc;
     return [
-      i.id, i.stagiaire, i.dossierYpareo || '', i.chiffreAffaires ?? '',
+      i.id, i.stagiaire, parcoursById(state, i.parcoursId)?.dossierYpareo || '',
+      parcoursById(state, i.parcoursId)?.chiffreAffaires ?? '',
       row.formation?.label || '', i.type, fmtTime(row.duree),
       fmtDateShort(i.datePratique), fmtTime(i.debutPratique), fmtTime(row.finPratique),
       fmtDateShort(i.dateTheorie), i.dateTheorie ? fmtTime(row.heureTheorie) : '',
@@ -286,11 +303,14 @@ function exportCSV(state, rows) {
       row.errors.length ? row.errors.join(' | ') : '✓ OK',
     ].map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(sep);
   });
-  const csv = '﻿' + [header.join(sep), ...lines].join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  telecharger('﻿' + [header.join(sep), ...lines].join('\r\n'), 'inscriptions-efi.csv');
+}
+
+function telecharger(contenu, nom) {
+  const blob = new Blob([contenu], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'inscriptions-efi.csv';
+  a.download = nom;
   a.click();
   URL.revokeObjectURL(a.href);
 }

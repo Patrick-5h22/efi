@@ -2,7 +2,10 @@
 // entre la vue Inscriptions et les grilles de semaine.
 
 import { app, esc, toast } from '../app.js';
-import { addInscription, updateInscription, montantOuNull } from '../store.js';
+import {
+  addInscription, updateInscription, montantOuNull,
+  addParcours, parcoursById, lignesDuParcours, purgerParcoursVides,
+} from '../store.js';
 import {
   formationByCode, dureeFor, TYPES, MODES_THEORIE, THEORIE_CENTRE_DUREE_DEFAUT,
   zonesPour, siteById, joursOuverts, siteOuvertLe,
@@ -18,8 +21,7 @@ export function openInscriptionForm(options = {}) {
   const editing = options.id != null ? state.inscriptions.find((i) => i.id === options.id) : null;
   const init = editing || {
     stagiaire: options.stagiaire || '',
-    dossierYpareo: options.dossierYpareo || '',
-    chiffreAffaires: options.chiffreAffaires ?? null,
+    parcoursId: options.parcoursId ?? null,
     formation: options.formation || '',
     type: options.type || 'Initial',
     datePratique: options.datePratique || null,
@@ -44,6 +46,14 @@ export function openInscriptionForm(options = {}) {
 
   if (dialog) dialog.remove();
   dialog = document.createElement('dialog');
+
+  // Parcours de la ligne éditée : c'est lui qui porte le montant et le n° de
+  // dossier, plus la ligne.
+  const parcoursInit = editing ? parcoursById(state, editing.parcoursId) : null;
+  // Dernier parcours vu par le formulaire. Sert à ne recharger le montant et
+  // le dossier QUE lorsqu'on change de parcours : les recharger à chaque
+  // rendu effacerait un montant en cours de frappe sur une vente neuve.
+  let parcoursVu = editing?.parcoursId != null ? String(editing.parcoursId) : '';
 
   const slots = daySlots(state.params);
   const openSet = new Set(joursOuverts(state.openDays));
@@ -109,14 +119,20 @@ export function openInscriptionForm(options = {}) {
               ${[...new Set(state.inscriptions.map((i) => i.stagiaire))].map((s) => `<option value="${esc(s)}">`).join('')}
             </datalist>
           </label>
+          <label class="field" style="grid-column: span 2;">Parcours
+            <select name="parcoursId" id="parcours-select">
+              ${init.parcoursId != null ? `<option value="${init.parcoursId}" selected></option>` : ''}
+            </select>
+          </label>
           <label class="field">N° de dossier YPAREO
-            <input name="dossierYpareo" value="${esc(init.dossierYpareo || '')}" placeholder="10 chiffres"
+            <input name="dossierYpareo" value="${esc(parcoursInit?.dossierYpareo || '')}" placeholder="10 chiffres"
               inputmode="numeric" maxlength="10" pattern="\\d{10}" title="10 chiffres">
           </label>
           <label class="field">Chiffre d’affaires (€)
-            <input name="chiffreAffaires" type="number" min="0" step="0.01" value="${init.chiffreAffaires ?? ''}"
-              placeholder="(facultatif)" title="Montant facturé pour cette ligne">
+            <input name="chiffreAffaires" type="number" min="0" step="0.01" value="${parcoursInit?.chiffreAffaires ?? ''}"
+              placeholder="(facultatif)" title="Montant facturé pour l’ensemble du parcours">
           </label>
+          <p class="muted" id="parcours-info" style="grid-column: span 2; margin:0"></p>
           <label class="field">Formation
             <select name="formation" required>
               <option value="">— choisir —</option>
@@ -214,8 +230,7 @@ export function openInscriptionForm(options = {}) {
 
   const readDraft = () => ({
     stagiaire: $('stagiaire').value.trim(),
-    dossierYpareo: $('dossierYpareo').value.trim() || null,
-    chiffreAffaires: montantOuNull($('chiffreAffaires').value),
+    parcoursId: $('parcoursId').value ? Number($('parcoursId').value) : null,
     entreprise: $('entreprise').value.trim() || null,
     siret: $('siret').value.trim() || null,
     statut: $('statut').value,
@@ -263,7 +278,10 @@ export function openInscriptionForm(options = {}) {
   let guidedKey = null;
   const syncGuided = (draft) => {
     const key = [draft.formation, draft.type, draft.datePratique, draft.dateTestPratique,
-      draft.modeTheorie, draft.dateTheorieFormation, draft.dureeTheorieCentre, expert].join('|');
+      draft.modeTheorie, draft.dateTheorieFormation, draft.dureeTheorieCentre, expert,
+      // Le stagiaire commande la liste des parcours proposés ; le parcours
+      // retenu commande le montant affiché.
+      draft.stagiaire.trim().toLowerCase(), draft.parcoursId].join('|');
     // La liste des zones ne dépend que de la formation : elle est reconstruite
     // avec le reste, la clé la couvre déjà.
     if (key === guidedKey) return;
@@ -307,6 +325,50 @@ export function openInscriptionForm(options = {}) {
           + list.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')
           + (kept ? `<option value="${kept.id}">${esc(kept.name)} (non habilité)</option>` : '');
         el.value = sel || '';
+      }
+    }
+    // Parcours : « Nouveau » par défaut, sinon les parcours DÉJÀ ouverts pour
+    // ce stagiaire. Rattacher une catégorie de plus à une vente existante est
+    // le geste courant — « R489 1A, puis finalement 3 et 5 aussi » — et c'est
+    // ce qui fait qu'un seul montant couvre les trois séances.
+    {
+      const el = $('parcoursId');
+      const nom = (id) => {
+        const lignes = lignesDuParcours(state, id).filter((i) => i.id !== (editing?.id ?? null));
+        const cats = lignes.map((i) => formationByCode(state.formations, i.formation)?.label || i.formation);
+        const p = parcoursById(state, id);
+        const montant = p?.chiffreAffaires != null ? ` — ${p.chiffreAffaires} €` : '';
+        return `Parcours n°${id}${cats.length ? ` : ${cats.join(', ')}` : ''}${montant}`;
+      };
+      const candidats = (state.parcours || []).filter((p) => {
+        const lignes = lignesDuParcours(state, p.id);
+        if (editing && p.id === editing.parcoursId) return true;
+        const nomStagiaire = (draft.stagiaire || '').trim().toLowerCase();
+        return nomStagiaire && lignes.some((i) => i.stagiaire.trim().toLowerCase() === nomStagiaire);
+      });
+      const sel = draft.parcoursId;
+      el.innerHTML = '<option value="">— nouveau parcours —</option>'
+        + candidats.map((p) => `<option value="${p.id}">${esc(nom(p.id))}</option>`).join('');
+      el.value = sel != null && candidats.some((p) => p.id === sel) ? String(sel) : '';
+
+      // Choisir un parcours existant, c'est reprendre SON montant et SON
+      // dossier. Sans cela, les champs restés vides étaient réenregistrés
+      // par-dessus à l'enregistrement : rattacher une seconde catégorie à une
+      // vente de 900 € la ramenait à zéro, en silence.
+      if (parcoursVu !== el.value) {
+        parcoursVu = el.value;
+        const choisi = el.value ? parcoursById(state, Number(el.value)) : null;
+        $('dossierYpareo').value = choisi?.dossierYpareo || '';
+        $('chiffreAffaires').value = choisi?.chiffreAffaires ?? '';
+      }
+
+      const info = dialog.querySelector('#parcours-info');
+      if (info) {
+        info.textContent = el.value
+          ? 'Le montant et le n° de dossier ci-dessous sont ceux du parcours : ils couvrent toutes ses séances.'
+          : candidats.length
+            ? 'Une vente, un montant. Rattachez cette catégorie à un parcours existant pour ne pas compter son chiffre d’affaires deux fois.'
+            : 'Une vente, un montant : le chiffre d’affaires se saisit une fois pour tout le parcours.';
       }
     }
     // Zones d'évolution : seules celles qui ACCUEILLENT le dispositif sont
@@ -434,8 +496,20 @@ export function openInscriptionForm(options = {}) {
       toast('Champs obligatoires : stagiaire, formation, date et heure de pratique.', 'error');
       return;
     }
+    // Le montant et le n° de dossier vont au PARCOURS, jamais à la ligne.
+    const gestion = {
+      dossierYpareo: $('dossierYpareo').value.trim() || null,
+      chiffreAffaires: montantOuNull($('chiffreAffaires').value),
+    };
+    let parcours = draft.parcoursId != null ? parcoursById(state, draft.parcoursId) : null;
+    if (!parcours) parcours = addParcours(state, gestion);
+    else Object.assign(parcours, gestion);
+    draft.parcoursId = parcours.id;
+
     if (editing) {
       updateInscription(state, editing.id, draft);
+      // Déplacer une ligne peut vider son ancien parcours.
+      purgerParcoursVides(state);
       toast(`Inscription n°${editing.id} mise à jour.`, 'ok');
     } else {
       const insc = addInscription(state, draft);

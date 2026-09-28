@@ -26,8 +26,13 @@ export function renderAide(main) {
       <ol>
         <li>Saisir le nom, choisir la <b>formation</b> et le <b>type</b> (Initial / Recyclage) → durée automatique
           (R489 : 1h30 / 1h00 ; R486 et Hab. élec : 2h00). Ces durées, comme le reste du catalogue, se règlent dans <b>Paramètres</b>.</li>
-        <li>Renseigner si besoin le <b>n° de dossier YPAREO</b> (10 chiffres) et le <b>chiffre d'affaires</b> de la ligne — les deux
-          sont facultatifs et n'entrent dans aucun contrôle de planification.</li>
+        <li>Choisir le <b>parcours</b> : « nouveau parcours », ou une vente déjà ouverte pour ce stagiaire.
+          Un parcours regroupe les catégories vendues ensemble — « R489 Cat 1A + 3 + 5 » est <b>une</b> vente
+          et <b>trois</b> séances.</li>
+        <li>Renseigner si besoin le <b>n° de dossier YPAREO</b> (10 chiffres) et le <b>chiffre d'affaires</b> :
+          ils appartiennent au <b>parcours</b>, pas à la séance. Un montant saisi une fois couvre donc toutes
+          ses catégories — dans la liste, il s'affiche sur chaque ligne suivi d'une astérisque pour rappeler
+          qu'il est partagé. Les deux sont facultatifs et n'entrent dans aucun contrôle de planification.</li>
         <li>Choisir <b>date + heure de début</b> de la pratique → fin calculée automatiquement.</li>
         <li><b>Tests obligatoires pour R489 / R486</b> :
           <ul>

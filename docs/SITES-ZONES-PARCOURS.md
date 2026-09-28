@@ -6,12 +6,12 @@
 > trois sources dont on ne sait plus laquelle fait foi. Les contradictions sont
 > **tranchées** ci-dessous, avec la décision retenue et sa date.
 >
-> **État d'avancement.** Ce document reste la cible. Ce qui en est fait est
-> marqué au fil des sections : la fenêtre de disponibilité et les **jours
-> d'ouverture par site** (§ 7), les deux modalités AIPR et la durée de test par
-> dispositif (§ 6 et § 8), les sites, zones et matériels partagés (§ 2 à 4) —
-> paramétrage et contraintes du moteur. Reste en chantier : les **parcours**
-> (§ 5).
+> **État d'avancement.** Ce document reste la cible. Tout ce qu'il décrit est
+> désormais en place, à l'exception de ce que les §§ marquent comme ouvert :
+> la fenêtre de disponibilité et les jours d'ouverture par site (§ 7), les deux
+> modalités AIPR et la durée de test par dispositif (§ 6 et § 8), les sites,
+> zones et matériels partagés (§ 2 à 4), et les **parcours** (§ 5). Ce qui
+> reste tient aux réponses attendues d'Emmanuel, listées au § 9.
 
 **Sources** — courriel « contraintes de sites et de zones à intégrer »
 (16/09/2026), courriel « complément suite à réunion » (18/09/2026), réponses
@@ -200,11 +200,26 @@ porte-engin ?* Le premier courriel ne nommait que A et F.
 
 | Porté par le **parcours** | Porté par la **séance** |
 |---|---|
-| stagiaire, entreprise, SIRET | date, heure de début, durée |
-| n° de dossier YPAREO | intervenant (formateur ou testeur) |
-| **chiffre d'affaires** | zone |
-| recommandation, liste des catégories | statut (pré-réservé / confirmé / annulé) |
-| régime (Initial / Recyclage) | |
+| n° de dossier YPAREO | stagiaire, entreprise, SIRET |
+| **chiffre d'affaires** | date, heure de début, durée |
+| | intervenant (formateur ou testeur), zone |
+| | régime, statut (pré-réservé / confirmé / annulé) |
+
+> **Fait — avec un écart assumé par rapport au tableau d'origine.** Le parcours
+> ne porte QUE le montant et le n° de dossier : ce qui ne doit exister qu'une
+> fois. Stagiaire, entreprise, recommandation, liste des catégories et régime
+> restent sur les séances et se **déduisent**.
+>
+> Les stocker aussi sur le parcours aurait créé une seconde source de vérité,
+> qui finit toujours par contredire la première — un parcours annoncé
+> « R489 1A, 3, 5 » alors qu'une des trois lignes a été supprimée depuis.
+> Déduire ne coûte rien et ne peut pas diverger. C'est d'ailleurs l'esprit du
+> paragraphe ci-dessous : les mêmes bénéfices pour une fraction du coût.
+>
+> Le parcours se choisit dans le formulaire d'inscription : « nouveau
+> parcours » par défaut, ou une vente déjà ouverte pour ce stagiaire. Retirer
+> la dernière séance d'un parcours le retire avec elle — un montant sans
+> séance ne serait visible nulle part tout en continuant de compter.
 
 Pourquoi ne pas faire du parcours la ligne unique : une grille affiche des
 séances, et un parcours n'a pas d'heure. Faire du parcours l'objet de base
@@ -225,13 +240,35 @@ Commentaire = Cat. 1A, 3, 5
 C'est une conséquence directe du regroupement : un `parcoursId` donne la
 recommandation et la liste des catégories sans calcul.
 
+> **Fait.** Bouton **⬇ YPAREO** sur l'écran Inscriptions : une ligne par
+> parcours, les séances annulées exclues, un parcours entièrement annulé omis.
+> Les catégories partent en texte (« Cat. 1A, Cat. 3, Cat. 5 ») ; un dispositif
+> sans catégorie — habilitation électrique, AIPR — garde son nom plutôt qu'un
+> « Cat. » vide. Un parcours mêlant deux recommandations ou deux régimes les
+> nomme tous les deux plutôt que d'en élire un.
+
 ### Chiffre d'affaires
 
-**Par parcours** (décidé le 18/09/2026). Conséquence technique à ne pas
-oublier : `chiffre_affaires` est aujourd'hui une **colonne de
-`planning.inscriptions`**, posée par la migration 002. La déplacer vers le
-parcours demandera une nouvelle migration SQL et une reprise des RPC
-`efi_save_state` / `efi_load_state`.
+**Par parcours** (décidé le 18/09/2026).
+
+> **Fait** — migration 009. Le montant se saisit une fois pour toute la vente.
+>
+> Ce que cela répare : le montant était porté par la LIGNE. Un dossier couvrant
+> trois catégories occupait trois lignes, et le même montant recopié sur
+> chacune comptait **trois fois**. Un contrôle signalait le cas sans pouvoir le
+> corriger — il ne savait pas laquelle des trois portait la vérité. Ce contrôle
+> a disparu avec sa cause.
+>
+> **Conséquence sur la ventilation, assumée.** Un parcours « R489 Cat 1A + 3
+> + 5 » vendu 900 € ne se répartit pas entre ses trois catégories : au prorata
+> des durées ? à parts égales ? Aucune règle n'a été donnée, et en inventer une
+> serait pire que de ne pas ventiler. L'écran CA ventile donc par
+> **recommandation**, qui est ce qui se vend.
+>
+> **Reprise** : chaque ligne existante reçoit son propre parcours, un pour un.
+> Regrouper d'office les lignes d'un même stagiaire aurait été une
+> interprétation — rien ne dit que deux lignes du même candidat ont été vendues
+> ensemble. Le total du chiffre d'affaires est inchangé à l'euro près.
 
 ## 6. Durées
 

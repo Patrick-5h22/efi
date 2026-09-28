@@ -235,9 +235,16 @@ test('mcp : les champs de gestion restent à compléter par l’assistante', () 
   const state = base();
   const jour = chercherCreneaux(state, { formations: CATS, a_partir_du: '2026-09-15' }, LE).options[0].jour;
   const r = preReserver(state, { stagiaire: 'DURAND Thomas', formations: CATS, jour }, LE);
+
+  // Le montant et le dossier appartiennent au PARCOURS, plus à la ligne.
+  const ids = [...new Set(r.lignes.map((l) => l.parcoursId))];
+  assert.equal(ids.length, 1, 'les trois catégories forment UNE vente, donc un seul parcours');
+  const parcours = r.state.parcours.find((p) => p.id === ids[0]);
+  assert.ok(parcours, 'le parcours est bien posé dans l’état rendu');
+  assert.equal(parcours.dossierYpareo, null, 'le commercial ne saisit pas le dossier YPAREO');
+  assert.equal(parcours.chiffreAffaires, null, 'ni le montant');
   for (const l of r.lignes) {
-    assert.equal(l.dossierYpareo, null, 'le commercial ne saisit pas le dossier YPAREO');
-    assert.equal(l.chiffreAffaires, null, 'ni le montant');
+    assert.ok(!('chiffreAffaires' in l), 'la ligne ne porte plus de montant');
   }
 });
 
