@@ -6,7 +6,7 @@ import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
 import { weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isWeekend, semaineParDefaut } from '../dates.js';
 import { unionDuration, semainesConsultables } from '../engine.js';
-import { chargeComptee, chevauchePause, testSurveille, siteById } from '../config.js';
+import { chargeComptee, chevauchePause, testSurveille, siteById, joursOuverts } from '../config.js';
 import { openInscriptionForm } from './form.js';
 import { styleGrille, classeLigne } from './grille.js';
 
@@ -111,7 +111,7 @@ function fusionner(cases) {
 function gridHTML(state, days, kind) {
   const slots = daySlots(state.params);
   const { rows, theoryTesters } = app.schedule;
-  const openSet = new Set(state.openDays);
+  const openSet = new Set(joursOuverts(state.openDays));
   const theoryEnd = state.params.theoryTime + state.params.theoryDuration;
 
   const head = `<tr><th class="day-col">Jour</th><th class="who-col">Intervenant</th>${slots.map((t) => `<th>${fmtTime(t)}</th>`).join('')}</tr>`;

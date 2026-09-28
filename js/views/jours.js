@@ -4,24 +4,42 @@
 import { app, esc } from '../app.js';
 import { memberName } from '../store.js';
 import { workingDays, parseISO, fmtDateShort, dayOfWeek, isoWeek } from '../dates.js';
+import { joursOuverts, siteOuvertLe, sitesOuvertsLe, basculerJour, siteById } from '../config.js';
+
+// Site dont on édite le calendrier. Un calendrier par site affiché d'un bloc
+// ferait douze grilles sur une fenêtre de seize semaines ; un onglet à la fois
+// se lit, et le tableau du dessous dit de toute façon qui ouvre quel jour.
+let siteCourant = null;
 
 export function renderJours(main) {
   const state = app.state;
   const days = workingDays(state.params);
-  const openSet = new Set(state.openDays);
-  const openCount = state.openDays.filter((d) => days.includes(d)).length;
+  const sites = state.sites || [];
+  if (!sites.some((x) => x.id === siteCourant)) siteCourant = sites[0]?.id || null;
+  // Le calendrier édite UN site ; l'union sert à tout le reste (activité,
+  // présence, affectations), qui reste par journée et non par lieu.
+  const openSet = new Set(joursOuverts(state.openDays));
+  const openCount = openSet.size ? [...openSet].filter((d) => days.includes(d)).length : 0;
 
   main.innerHTML = `
     <div class="page-header">
       <h1>Jours EFI</h1>
-      <span class="sub">${days.length} jours ouvrés sur la période — ${openCount} jour(s) d'ouverture du plateau technique</span>
+      <span class="sub">${days.length} jours ouvrés sur la période — ${openCount} jour(s) où au moins un site ouvre</span>
     </div>
 
     <div class="card">
       <h2>Calendrier d'ouverture</h2>
-      <p class="muted">Cliquer sur un jour pour ouvrir/fermer le plateau. Seuls les jours ouverts offrent des créneaux (vert)
-      sur les grilles de semaine ; une inscription sur un jour fermé est signalée en rouge dans le STATUT.</p>
-      <div class="months">${monthsHTML(state, days, openSet)}</div>
+      <div class="form-row" style="margin-bottom:10px">
+        ${sites.map((site) => {
+    const n = (state.openDays?.[site.id] || []).filter((d) => days.includes(d)).length;
+    return `<button class="btn ${site.id === siteCourant ? '' : 'btn-secondary'} btn-sm"
+              data-site="${site.id}">${esc(site.label)} <span class="badge badge-info">${n}</span></button>`;
+  }).join('')}
+      </div>
+      <p class="muted">Cliquer sur un jour pour ouvrir/fermer <b>${esc(siteById(sites, siteCourant)?.label || '—')}</b>.
+      Chaque site a son propre calendrier : Périgny II peut n'ouvrir que deux jours par semaine sans que Périgny ferme.
+      Une séance est refusée si le site de son plateau est fermé ce jour-là, même si un autre site ouvre.</p>
+      <div class="months">${monthsHTML(state, days, siteCourant)}</div>
     </div>
 
     <div class="card">
@@ -32,19 +50,22 @@ export function renderJours(main) {
       formateur ET testeur le même jour est signalée. « Testeur théorie (auto) » = testeur retenu pour le créneau théorie du jour.</p>
       <div class="table-wrap">
         <table class="data">
-          <thead><tr><th>Jour</th><th>Sem.</th><th>Ouvert EFI</th><th>Présents</th><th>Formateur affecté</th><th>Testeur affecté</th><th>Testeur théorie (auto)</th><th>Activité</th></tr></thead>
+          <thead><tr><th>Jour</th><th>Sem.</th><th>Sites ouverts</th><th>Présents</th><th>Formateur affecté</th><th>Testeur affecté</th><th>Testeur théorie (auto)</th><th>Activité</th></tr></thead>
           <tbody>${assignRowsHTML(state, days, openSet)}</tbody>
         </table>
       </div>
     </div>
   `;
 
+  main.querySelectorAll('[data-site]').forEach((b) => {
+    b.addEventListener('click', () => { siteCourant = b.dataset.site; renderJours(main); });
+  });
+
   main.querySelectorAll('[data-toggle]').forEach((td) => {
     const toggle = () => {
       const d = td.dataset.toggle;
-      if (openSet.has(d)) state.openDays = state.openDays.filter((x) => x !== d);
-      else state.openDays.push(d);
-      state.openDays.sort();
+      if (!siteCourant) return;
+      state.openDays = basculerJour(state.openDays, siteCourant, d);
       app.commit();
       // Rendre le focus au jour cliqué après re-rendu
       main.querySelector(`[data-toggle="${d}"]`)?.focus();
@@ -87,7 +108,7 @@ export function renderJours(main) {
 
 const MONTH_NAMES = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
-function monthsHTML(state, days, openSet) {
+function monthsHTML(state, days, siteCourant) {
   const holidays = new Set((state.params.holidays || []).map((h) => h.date || h));
   // Regrouper les jours ouvrés par mois
   const byMonth = new Map();
@@ -117,8 +138,12 @@ function monthsHTML(state, days, openSet) {
         if (!d) return '<td class="cal-empty"></td>';
         const num = parseISO(d).getUTCDate();
         if (holidays.has(d)) return `<td class="cal-holiday" title="Férié">${num}</td>`;
-        const open = openSet.has(d);
-        return `<td class="${open ? 'cal-open' : 'cal-closed'}" data-toggle="${d}" tabindex="0" role="button" aria-pressed="${open}" title="${fmtDateShort(d)} — cliquer pour ${open ? 'fermer' : 'ouvrir'}">${num}${open ? ' ✓' : ''}</td>`;
+        const open = siteOuvertLe(state.openDays, siteCourant, d);
+        const ailleurs = sitesOuvertsLe(state.openDays, d).filter((id) => id !== siteCourant);
+        const note = ailleurs.length
+          ? ` — ouvert aussi : ${ailleurs.map((id) => siteById(state.sites || [], id)?.label || id).join(', ')}`
+          : '';
+        return `<td class="${open ? 'cal-open' : 'cal-closed'}" data-toggle="${d}" tabindex="0" role="button" aria-pressed="${open}" title="${fmtDateShort(d)} — cliquer pour ${open ? 'fermer' : 'ouvrir'}${note}">${num}${open ? ' ✓' : ''}</td>`;
       }).join('') + '</tr>';
     }).join('');
 
@@ -167,7 +192,9 @@ function assignRowsHTML(state, days, openSet) {
     return `<tr ${sameBoth ? 'class="row-error" title="Même personne formateur ET testeur le même jour"' : ''} ${!open ? 'style="opacity:.55"' : ''}>
       <td>${fmtDateShort(date)}</td>
       <td>S${isoWeek(date)}</td>
-      <td>${open ? '<span class="badge badge-ok">OUI</span>' : '<span class="badge badge-warn">NON</span>'}</td>
+      <td>${sitesOuvertsLe(state.openDays, date).map((id) =>
+        `<span class="badge badge-ok">${esc(siteById(state.sites || [], id)?.label || id)}</span>`).join(' ')
+        || '<span class="badge badge-warn">aucun</span>'}</td>
       <td class="pres-cell">${presenceCell}</td>
       <td><select data-assign="${date}|formateur" ${!open ? 'disabled' : ''}>${memberOptions(a.formateur)}</select></td>
       <td><select data-assign="${date}|testeur" ${!open ? 'disabled' : ''}>${memberOptions(a.testeur)}</select>${sameBoth ? ' <span class="badge badge-error">⚠</span>' : ''}</td>

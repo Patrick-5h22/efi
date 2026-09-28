@@ -38,7 +38,8 @@ const semé = await p.evaluate(async () => {
     { id: 'p1', name: 'MEDAN Dominique', quals: { 'R489-1A': { F: true, T: true } } },
     { id: 'p2', name: 'GARCIA Thierry', quals: { 'R489-1A': { F: true, T: true } } },
   ];
-  st.openDays = [j1, j2];
+  // Jours d'ouverture par site : on ouvre les trois sites sur les deux jours.
+  st.openDays = Object.fromEntries(st.sites.map((x) => [x.id, [j1, j2]]));
   st.dayPresence = { [j1]: ['p1'], [j2]: ['p1', 'p2'] };
   st.dayAssignments = { [j1]: { formateur: 'p1', testeur: 'p2' } };
   st.params.maxDailyLoad = 420;
@@ -101,6 +102,7 @@ const apres = await p.evaluate(() => {
     nextId: st.nextId,
     equipe: st.team.map((m) => m.name),
     jours: st.openDays,
+    sites: st.sites.map((x) => x.id),
     presence: st.dayPresence,
     affectations: st.dayAssignments,
     charge: st.params.maxDailyLoad,
@@ -111,8 +113,9 @@ const apres = await p.evaluate(() => {
 check('plus aucune inscription', apres.inscriptions === 0, String(apres.inscriptions));
 check('l’équipe est intacte', apres.equipe.join(', ') === 'MEDAN Dominique, GARCIA Thierry',
   apres.equipe.join(', '));
-check('les jours EFI ouverts sont intacts', apres.jours.join(',') === `${semé.j1},${semé.j2}`,
-  apres.jours.join(','));
+check('les jours EFI ouverts sont intacts par site',
+  apres.sites.every((id) => (apres.jours[id] || []).join(',') === `${semé.j1},${semé.j2}`),
+  JSON.stringify(apres.jours));
 check('la présence des intervenants est intacte',
   JSON.stringify(apres.presence) === JSON.stringify({ [semé.j1]: ['p1'], [semé.j2]: ['p1', 'p2'] }),
   JSON.stringify(apres.presence));

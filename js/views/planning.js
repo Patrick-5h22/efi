@@ -4,7 +4,7 @@
 import { app, esc } from '../app.js';
 import { memberName } from '../store.js';
 import { workingDays, daySlots, fmtTime, fmtDateDay, isoWeek } from '../dates.js';
-import { chevauchePause } from '../config.js';
+import { chevauchePause, joursOuverts } from '../config.js';
 import { styleGrille, classeLigne, HAUTEUR_LIGNE_GLOBALE } from './grille.js';
 
 export function renderPlanning(main, args, kind) {
@@ -12,7 +12,7 @@ export function renderPlanning(main, args, kind) {
   const days = workingDays(state.params);
   const slots = daySlots(state.params);
   const { rows, theoryTesters } = app.schedule;
-  const openSet = new Set(state.openDays);
+  const openSet = new Set(joursOuverts(state.openDays));
   const theoryEnd = state.params.theoryTime + state.params.theoryDuration;
   const title = kind === 'F' ? 'Planning formateur' : 'Planning testeur';
 

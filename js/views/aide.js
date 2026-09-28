@@ -55,7 +55,11 @@ export function renderAide(main) {
         <li>Plage ${fmtTime(p.dayStart)}-${fmtTime(p.dayEnd)} respectée ; tests manquants signalés ; chevauchement des créneaux d'un même stagiaire.</li>
         <li><b>Formateur ≠ testeur du même candidat</b> : le formateur du jour de pratique ne peut être le testeur du candidat (théorie ou test pratique).</li>
         <li><b>Habilitations</b> : un intervenant affecté hors de ses habilitations F/T est signalé.</li>
-        <li><b>Jours EFI</b> : toute inscription sur un jour non ouvert est signalée.</li>
+        <li><b>Jours EFI, par site</b> : chaque site a son propre calendrier d'ouverture (onglets de l'écran
+          Jours EFI). Une inscription sur une journée où <b>aucun</b> site n'ouvre est signalée ; une séance dont
+          le plateau est sur un site fermé l'est aussi, en nommant les lieux qui auraient pu l'accueillir —
+          même si un autre site ouvre ce jour-là. L'affectation automatique bascule d'elle-même sur le site
+          ouvert quand la formation se tient à plusieurs endroits.</li>
         <li><b>Zone d'évolution</b> : chaque séance reçoit automatiquement un plateau parmi ceux qui accueillent
           son dispositif (Paramètres § 1 bis). Une zone tient le nombre de <b>sessions simultanées</b> qu'on lui a
           déclaré — d'où « toutes les zones … sont occupées à cette heure », qui nomme les plateaux pris.

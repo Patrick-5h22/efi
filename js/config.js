@@ -293,6 +293,44 @@ export function referencesInconnues(porteur, formations) {
   ];
 }
 
+// --- Jours d'ouverture, par site ------------------------------------------
+//
+// « openDays » était une liste plate de journées : le plateau technique était
+// ouvert, ou il ne l'était pas. Avec trois sites, cela ne suffit plus —
+// Périgny II peut n'ouvrir que deux jours par semaine sans que Périgny ferme.
+// L'état porte donc { siteId: [jours] }.
+//
+// Un site absent de l'objet, ou dont la liste est vide, n'ouvre jamais. Il n'y
+// a pas ici la nuance qui a valu à « dayPresence » son traitement particulier
+// (une journée présente avec une liste VIDE y signifie « personne ») : une
+// journée non listée est une journée fermée, point.
+export function joursOuverts(openDays) {
+  if (Array.isArray(openDays)) return [...new Set(openDays)].sort();
+  const tous = new Set();
+  for (const liste of Object.values(openDays || {})) for (const j of liste || []) tous.add(j);
+  return [...tous].sort();
+}
+
+export function siteOuvertLe(openDays, siteId, date) {
+  if (Array.isArray(openDays)) return openDays.includes(date);
+  return !!(openDays?.[siteId] || []).includes(date);
+}
+
+export function sitesOuvertsLe(openDays, date) {
+  if (Array.isArray(openDays)) return [];
+  return Object.keys(openDays || {}).filter((id) => (openDays[id] || []).includes(date));
+}
+
+// Bascule l'ouverture d'un site sur une journée. Rend le nouvel objet plutôt
+// que de modifier celui qu'on lui passe : l'appelant décide quand commettre.
+export function basculerJour(openDays, siteId, date) {
+  const base = Array.isArray(openDays) ? {} : { ...(openDays || {}) };
+  const liste = new Set(base[siteId] || []);
+  if (liste.has(date)) liste.delete(date); else liste.add(date);
+  base[siteId] = [...liste].sort();
+  return base;
+}
+
 export const MAX_TEAM = 12;
 
 // Équipe d'exemple (identique au classeur)
@@ -317,7 +355,10 @@ export const DEFAULT_TEAM = [
 // celle-ci avait glissé : une installation neuve s'ouvrait sur une grille
 // vide, et les quatre inscriptions d'exemple restaient invisibles.
 export function joursOuvertsParDefaut(aujourdHui = dateDuJour()) {
-  return joursOuvrables(DEFAULT_PARAMS, ...Object.values(fenetreAffichage(aujourdHui))).slice(0, 2);
+  const jours = joursOuvrables(DEFAULT_PARAMS, ...Object.values(fenetreAffichage(aujourdHui))).slice(0, 2);
+  // Une installation neuve ouvre ses trois sites sur les mêmes journées :
+  // n'en ouvrir qu'un obligerait à deviner lequel.
+  return Object.fromEntries(DEFAULT_SITES.map((s) => [s.id, [...jours]]));
 }
 
 export function formationByCode(formations, code) {

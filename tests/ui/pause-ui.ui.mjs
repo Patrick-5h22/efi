@@ -20,7 +20,10 @@ await page.reload(); await page.waitForTimeout(800);
 const { jour: JOUR, semaine: SEMAINE } = await page.evaluate(async () => {
   const { isoWeek } = await import('/js/dates.js');
   const st = JSON.parse(localStorage.getItem('efi-planning-v1'));
-  const jour = st.openDays[st.openDays.length - 1];
+  // Les jours d'ouverture sont par SITE : on prend le dernier jour où au
+  // moins un site ouvre.
+  const tous = [...new Set(Object.values(st.openDays).flat())].sort();
+  const jour = tous[tous.length - 1];
   st.inscriptions.push({ id: st.nextId++, stagiaire: 'MORD Surlapause', formation: 'HAB-ELEC',
     type: 'Initial', statut: 'confirmee', modeTheorie: 'distance',
     datePratique: jour, debutPratique: 660 }); // 11:00 → 13:00

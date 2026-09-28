@@ -5,7 +5,7 @@
 import {
   formationByCode, dureeFor, dureeTheorieFor, chargeComptee, dureeTestFor, testSurveille,
   pauseCreneau, chevauchePause, dansLaFenetre, libelleFenetre,
-  zonesPour, admetDispositif, siteById, poleDuSite,
+  zonesPour, admetDispositif, siteById, poleDuSite, joursOuverts, siteOuvertLe,
 } from './config.js';
 import { isoWeek, overlaps, workingDays, joursOuvrables, bornesDuMois, fenetreAffichage, addDays, fmtTime, mondayOf, dateDuJour, isWeekend, semainesAffichees } from './dates.js';
 
@@ -15,7 +15,10 @@ import { isoWeek, overlaps, workingDays, joursOuvrables, bornesDuMois, fenetreAf
 // ---------------------------------------------------------------------------
 export function computeSchedule(state) {
   const { params, formations, team, inscriptions } = state;
-  const openDays = new Set(state.openDays);
+  // Un jour « ouvert » tout court : au moins un site l'est. Le contrôle par
+  // SITE se fait plus bas, à l'affectation de la zone — c'est elle qui sait
+  // où la séance se tient.
+  const openDays = new Set(joursOuverts(state.openDays));
   // Un jour tenable est un jour OUVRABLE — ni week-end, ni férié. La fenêtre
   // d'affichage n'entre pas dans ce jugement : une séance de la semaine
   // dernière est passée, pas anormale.
@@ -316,8 +319,14 @@ function affecterZones(rows, state) {
   // jour-là — sans quoi l'affectation automatique créerait elle-même le
   // déplacement qu'elle est censée interdire.
   const choisirZone = (formation, date, start, end, cle, acteurs, consomme) => {
-    const admises = zonesPour(zones, formation);
-    if (!admises.length) return { zone: null, motif: 'aucune' };
+    const toutes = zonesPour(zones, formation);
+    if (!toutes.length) return { zone: null, motif: 'aucune' };
+
+    // Un site fermé ce jour-là n'offre aucun plateau. Le contrôle général
+    // « jour non ouvert » ne voit que l'union des sites : il laisse passer une
+    // R482 un mercredi où Périgny ouvre mais pas Périgny II.
+    const admises = toutes.filter((z) => siteOuvertLe(state.openDays, z.siteId, date));
+    if (!admises.length) return { zone: null, motif: 'ferme', admises: toutes };
 
     // Le pôle déjà engagé dans la journée n'est pas une préférence mais une
     // BORNE. Traité en simple préférence, le repli envoyait le second candidat
@@ -357,6 +366,8 @@ function affecterZones(rows, state) {
       } else if (!admetDispositif(zone, formation)) {
         row.errors.push(`${libelle} : la zone « ${zone.label} » n’accueille pas ${formation.label}`);
         zone = null;
+      } else if (!siteOuvertLe(state.openDays, zone.siteId, date)) {
+        row.errors.push(`${libelle} : ${nomSite(zone.siteId)} est fermé ce jour-là`);
       } else if (consomme && !placeLibre(zone.id, zone.sessions, date, start, end, cle)) {
         row.errors.push(`${libelle} : zone « ${zone.label} » déjà occupée à cette heure`);
       }
@@ -367,6 +378,10 @@ function affecterZones(rows, state) {
         // Un dispositif sans zone n'est pas planifiable : le dire vaut mieux
         // que de le poser sur un plateau qui n'existe pas.
         row.errors.push(`${libelle} : aucune zone n’accueille ${formation.label}`);
+      } else if (choix.motif === 'ferme') {
+        const lieux = [...new Set(choix.admises.map((z) => nomSite(z.siteId)))].sort();
+        row.errors.push(`${libelle} : aucun site ouvert ce jour pour ${formation.label} `
+          + `(${lieux.join(', ')})`);
       } else if (!zone) {
         row.errors.push(`${libelle} : toutes les zones de ${formation.label} `
           + `sont occupées à cette heure (${choix.admises.map((z) => z.label).join(', ')})`);
@@ -883,7 +898,7 @@ export function minutesOffertes(params) {
 export function occupancyByDay(state, schedule) {
   const { params } = state;
   const slotsPerDay = Math.floor(minutesOffertes(params) / params.slotMinutes);
-  const openSet = new Set(state.openDays);
+  const openSet = new Set(joursOuverts(state.openDays));
   const out = new Map(); // date -> { busy, total, ratio, errors }
 
   const ensure = (date) => {
@@ -893,7 +908,7 @@ export function occupancyByDay(state, schedule) {
     return out.get(date);
   };
 
-  for (const day of state.openDays) ensure(day);
+  for (const day of joursOuverts(state.openDays)) ensure(day);
 
   for (const r of schedule.rows) {
     if (r.cancelled) continue;
@@ -968,7 +983,7 @@ export function scopeWindow(state, scope = 'periode', todayISO = null) {
   const isIn = (d) => !!d && d >= debut && d <= fin;
 
   const working = joursOuvrables(params, debut, fin);
-  const openDays = state.openDays.filter((d) => working.includes(d));
+  const openDays = joursOuverts(state.openDays).filter((d) => working.includes(d));
   return { scope, ref, debut, fin, isIn, workingCount: working.length, openDays };
 }
 
@@ -1140,8 +1155,9 @@ export function suggestSlots(state, { stagiaire, formation: code, type, aPartirD
   // La fenêtre d'affichage borne les propositions : on ne planifie pas dans le
   // passé, ni à plus de seize semaines. « aujourdHui » est un point d'entrée
   // pour les tests — sans lui ils dériveraient avec le calendrier réel.
+  const ouverts = new Set(joursOuverts(state.openDays));
   const openDays = workingDays(params, aujourdHui)
-    .filter((d) => state.openDays.includes(d) && (!aPartirDu || d >= aPartirDu));
+    .filter((d) => ouverts.has(d) && (!aPartirDu || d >= aPartirDu));
   const slots = [];
   for (let t = params.dayStart; t + params.slotMinutes <= params.dayEnd; t += params.slotMinutes) {
     if (chevauchePause(params, t, t + params.slotMinutes)) continue;
@@ -1242,8 +1258,9 @@ export function suggestTestPratique(state, inscId, { aPartirDu = null, aujourdHu
   const dureeTest = dureeTestFor(formation, params);
 
   const depuis = [cible.datePratique, aPartirDu, aujourdHui].filter(Boolean).sort().at(-1);
+  const ouverts = new Set(joursOuverts(state.openDays));
   const openDays = workingDays(params, aujourdHui)
-    .filter((d) => state.openDays.includes(d) && d >= depuis);
+    .filter((d) => ouverts.has(d) && d >= depuis);
 
   const slots = [];
   for (let t = params.dayStart; t + dureeTest <= params.dayEnd; t += params.slotMinutes) {
@@ -1661,6 +1678,7 @@ function memberNameOf(state, id) {
 // composition suivait la date injectée : la seconde option était introuvable
 // dès que la recherche portait sur autre chose que le jour même.
 function jourSuivant(state, date, aujourdHui = dateDuJour()) {
-  const ouverts = workingDays(state.params, aujourdHui).filter((d) => state.openDays.includes(d));
+  const ouvertsParSite = new Set(joursOuverts(state.openDays));
+  const ouverts = workingDays(state.params, aujourdHui).filter((d) => ouvertsParSite.has(d));
   return ouverts.find((d) => d > date) || null;
 }
