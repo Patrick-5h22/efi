@@ -13,7 +13,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultState, addInscription, addParcours } from '../js/store.js';
 import { lignesYpareo, ypareoCSV, libelleCategorie, COLONNES_YPAREO } from '../js/ypareo.js';
-import { formationByCode } from '../js/config.js';
+import {
+  formationByCode, recommandations, categoriesDe, libelleCourt,
+} from '../js/config.js';
 
 function fixture() {
   const s = defaultState();
@@ -153,4 +155,40 @@ test('CSV : les guillemets d’une raison sociale ne cassent pas le fichier', ()
   });
   const ligne = ypareoCSV(s).split('\r\n')[1];
   assert.ok(ligne.includes('"SARL ""LE PONT"""'), ligne);
+});
+
+// --- Recommandation et catégories, tels que la saisie les présente ---------
+
+test('saisie : les recommandations viennent du catalogue, pas d’une liste figée', () => {
+  const s = fixture();
+  const avant = recommandations(s.formations);
+  assert.ok(avant.includes('R489') && avant.includes('AIPR'), avant.join(', '));
+  assert.ok(!avant.includes('R482'), 'la R482 n’est pas encore au catalogue');
+
+  // Une formation créée dans Paramètres apparaît d'elle-même : une liste
+  // séparée aurait fini par diverger du catalogue.
+  s.formations.push({
+    code: 'R482-A', label: 'Pratique R482 Cat A', reco: 'R482',
+    dureeInitial: 90, dureeRecyclage: 60, tests: false, capacite: 1,
+  });
+  assert.ok(recommandations(s.formations).includes('R482'));
+});
+
+test('saisie : les catégories d’une recommandation, et elles seules', () => {
+  const s = fixture();
+  const cats = categoriesDe(s.formations, 'R489').map((f) => f.code);
+  assert.deepEqual(cats, ['R489-1A', 'R489-1B', 'R489-3', 'R489-5']);
+  assert.deepEqual(categoriesDe(s.formations, 'INCONNUE'), []);
+  // Les deux modalités AIPR sont bien deux choix distincts.
+  assert.equal(categoriesDe(s.formations, 'AIPR').length, 2);
+});
+
+test('saisie : la case à cocher ne répète pas la recommandation', () => {
+  const s = fixture();
+  const court = (code) => libelleCourt(formationByCode(s.formations, code));
+  assert.equal(court('R489-3'), 'Cat. 3');
+  assert.equal(court('R489-1A'), 'Cat. 1A');
+  // Un dispositif sans catégorie garde son nom plutôt qu'un « Cat. » vide.
+  assert.equal(court('HAB-ELEC'), 'Habilitation électrique');
+  assert.equal(libelleCourt(null), '');
 });

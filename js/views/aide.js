@@ -28,7 +28,10 @@ export function renderAide(main) {
           (R489 : 1h30 / 1h00 ; R486 et Hab. élec : 2h00). Ces durées, comme le reste du catalogue, se règlent dans <b>Paramètres</b>.</li>
         <li>Choisir le <b>parcours</b> : « nouveau parcours », ou une vente déjà ouverte pour ce stagiaire.
           Un parcours regroupe les catégories vendues ensemble — « R489 Cat 1A + 3 + 5 » est <b>une</b> vente
-          et <b>trois</b> séances.</li>
+          et <b>trois</b> séances.<br>
+          Pour une vente à plusieurs catégories, le bouton <b>➕ Parcours</b> va plus vite : recommandation,
+          catégories cochées, date de départ, et le moteur propose l'ensemble des séances d'un coup.
+          Les dates restent modifiables une à une ensuite.</li>
         <li>Renseigner si besoin le <b>n° de dossier YPAREO</b> (10 chiffres) et le <b>chiffre d'affaires</b> :
           ils appartiennent au <b>parcours</b>, pas à la séance. Un montant saisi une fois couvre donc toutes
           ses catégories — dans la liste, il s'affiche sur chaque ligne suivi d'une astérisque pour rappeler

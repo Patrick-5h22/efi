@@ -194,6 +194,22 @@ porte-engin ?* Le premier courriel ne nommait que A et F.
 2. **Catégories** ensuite, en **sélection multiple** : un candidat réalise
    plusieurs dispositifs d'une même recommandation en une seule programmation.
 
+> **Fait.** Bouton **➕ Parcours** sur l'écran Inscriptions. Recommandation,
+> catégories cochées, régime, date de départ — le moteur propose l'ensemble des
+> séances (jusqu'à deux options de dates), et l'enregistrement pose exactement
+> ce qui est affiché.
+>
+> Rien de nouveau dans le moteur : c'est `suggestParcours`, celui-là même qui
+> sert le serveur MCP depuis le début. L'assistante n'avait pas de bouton pour
+> y accéder, voilà tout. La saisie ligne par ligne reste et reste juste — elle
+> sert à corriger, déplacer, imposer un formateur.
+>
+> Deux détails qui comptent : la liste des recommandations est **déduite du
+> catalogue** (une formation créée dans Paramètres y apparaît d'elle-même,
+> là où une liste séparée aurait divergé), et toute modification d'un champ
+> **invalide la proposition affichée** — l'enregistrer après avoir décoché une
+> catégorie poserait autre chose que ce qui est montré.
+
 ### Modèle de données
 
 **Une ligne par dispositif, regroupées par `parcoursId`.**
