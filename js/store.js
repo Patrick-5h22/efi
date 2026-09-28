@@ -102,6 +102,12 @@ export function addInscription(state, data) {
     debutTestPratique: data.debutTestPratique ?? null,
     formateurId: data.formateurId || null, // choix manuel (sinon affectation auto)
     testeurId: data.testeurId || null,
+    // Zones d'évolution imposées à la main (sinon affectation automatique,
+    // exactement comme les intervenants). Une par séance : deux plateaux
+    // Cat 3/5 identiques existent justement pour que le test n'attende pas
+    // la formation.
+    zoneId: data.zoneId || null,
+    zoneTestId: data.zoneTestId || null,
     // Théorie de la formation : distance (e-learning hors centre, défaut —
     // rien à planifier) | centre (e-learning en centre : créneau en salle)
     // | presentiel (session inter mutualisée par recommandation)

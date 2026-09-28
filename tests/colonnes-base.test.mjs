@@ -32,6 +32,8 @@ const COLONNES = [
   'dossier_ypareo', 'chiffre_affaires', 'mode_theorie',
   'date_theorie_formation', 'debut_theorie_formation', 'duree_theorie_centre',
   'formateur_theorie_id', 'reserve_par', 'reserve_le',
+  // Ajoutées par la migration 007
+  'zone_id', 'zone_test_id',
 ];
 
 // Champs posés par le serveur MCP (js/mcp.js) et non par addInscription :

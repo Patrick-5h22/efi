@@ -6,7 +6,7 @@ import { app, esc, navigate } from '../app.js';
 import { memberName } from '../store.js';
 import { weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isWeekend, semaineParDefaut } from '../dates.js';
 import { unionDuration, semainesConsultables } from '../engine.js';
-import { chargeComptee, chevauchePause, testSurveille } from '../config.js';
+import { chargeComptee, chevauchePause, testSurveille, siteById } from '../config.js';
 import { openInscriptionForm } from './form.js';
 import { styleGrille, classeLigne } from './grille.js';
 
@@ -258,9 +258,21 @@ function gridHTML(state, days, kind) {
         // L'intervenant entre toujours dans l'infobulle : la cellule ne le
         // nomme plus quand il tient toute la journée, mais le survol doit
         // répondre sans faire relire la colonne de gauche.
+        // La ZONE entre aussi dans l'infobulle. La cellule dit qui et quoi ;
+        // avec trois sites et deux plateaux Cat 3/5 identiques, « où » n'est
+        // plus une évidence, et c'est la seule façon de voir ce que
+        // l'affectation automatique a choisi sans ouvrir la fiche.
+        const nomZone = (r) => {
+          const id = kind === 'F' ? r.zonePratique : (r.zoneTest || r.zonePratique);
+          const z = (state.zones || []).find((x) => x.id === id);
+          if (!z) return '';
+          const site = siteById(state.sites || [], z.siteId)?.label || z.siteId;
+          return ` — ${site} / ${z.label}`;
+        };
         const tip = occupants.map((r) => `${r.insc.stagiaire} — ${r.formation?.label || ''}`
           + `${r.formation?.testOnly ? ' (surveillance)' : ''}${r.insc.statut === 'pre' ? ' (pré-réservé)' : ''}`
-          + ` — ${memberName(state, kind === 'F' ? r.formateurEffectif : r.testeurEffectif) || 'à affecter'}`).join(' | ');
+          + ` — ${memberName(state, kind === 'F' ? r.formateurEffectif : r.testeurEffectif) || 'à affecter'}`
+          + nomZone(r)).join(' | ');
         return {
           // Mêmes occupants, créneaux voisins : une seule cellule. Le libellé
           // s'écrit une fois pour toute la durée de la séance.

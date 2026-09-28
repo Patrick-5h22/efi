@@ -8,10 +8,10 @@
 >
 > **État d'avancement.** Ce document reste la cible. Ce qui en est fait est
 > marqué au fil des sections : la fenêtre de disponibilité (§ 7), les deux
-> modalités AIPR et la durée de test par dispositif (§ 6 et § 8), et le
-> **paramétrage** des sites, zones et matériels partagés (§ 2 à 4). Ce qui
-> n'est pas fait est dit aussi — et notamment : **les zones ne contraignent
-> encore rien**, le moteur les ignore.
+> modalités AIPR et la durée de test par dispositif (§ 6 et § 8), les sites,
+> zones et matériels partagés (§ 2 à 4) — **paramétrage et contraintes du
+> moteur**. Restent en chantier : les jours d'ouverture par site (§ 7), le
+> choix du site à la saisie, et les parcours (§ 5).
 
 **Sources** — courriel « contraintes de sites et de zones à intégrer »
 (16/09/2026), courriel « complément suite à réunion » (18/09/2026), réponses
@@ -44,14 +44,24 @@ heure ni zone ; ses séances, oui. Ne pas les fusionner.
 Trois sites. Le choix du site précède toute programmation : il détermine les
 formations proposables et les zones disponibles.
 
-> **Fait : le paramétrage.** `sites`, `zones` et `ressources` existent dans
-> l'état, sont persistés (migration 006) et se règlent dans l'écran Paramètres
-> (§ 1 bis) — libellé, sessions simultanées, exemplaires.
+> **Fait.** `sites`, `zones` et `ressources` existent dans l'état, sont
+> persistés (migrations 006 et 007) et se règlent dans l'écran Paramètres
+> (§ 1 bis). Le moteur affecte une zone à chaque séance, refuse celles qui ne
+> tiennent pas — « toutes les zones … sont occupées à cette heure », en les
+> nommant — et applique la règle de pôle du § 3. Une zone peut être imposée à
+> la main sur une inscription (`zoneId` / `zoneTestId`), comme un intervenant ;
+> vide, c'est automatique. La zone retenue s'affiche dans la liste des
+> inscriptions et dans l'infobulle des grilles.
 >
-> **Pas fait : la contrainte.** Le moteur ne lit pas encore les zones. Aucune
-> séance n'est refusée pour zone occupée, aucune zone n'est affectée
-> automatiquement, et la règle de pôle du § 3 n'est pas appliquée. L'écran
-> Paramètres le dit en clair plutôt que de laisser croire le contraire.
+> **Deux points à connaître.** Une séance ne compte pour une session de zone
+> qu'une fois : deux candidats, même dispositif, même intervenant, même heure
+> de début sont une seule séance — c'est la Cat 3 et ses deux chariots. Et une
+> **épreuve surveillée** (AIPR) reçoit une zone, donc un site, mais ne consomme
+> pas de session : un QCM se tient dans une salle dont l'outil ne modélise pas
+> les places, comme il ne modélise déjà ni le temps du surveillant ni sa charge.
+>
+> **Pas fait :** les jours d'ouverture restent une liste plate, et la saisie ne
+> demande pas le site — elle propose les plateaux, site nommé.
 
 ### Périgny
 
@@ -124,6 +134,21 @@ tiendra à jour.
 enchaîner Saintes et Périgny dans la même journée. *(à confirmer : la question
 n'a été posée que pour les formateurs)*
 
+> **Fait.** L'anomalie nomme la personne et les deux lieux : « MEDAN Dominique :
+> deux sites trop éloignés le même jour (Périgny et Saintes) ». Elle porte sur
+> **toutes** les séances de la journée, car c'est la journée qui ne tient pas,
+> pas l'une des séances.
+>
+> Le pôle déjà engagé dans la journée n'est pas une préférence de
+> l'affectation automatique mais une **borne**. Traité en préférence, le repli
+> envoyait le second candidat à Saintes dès que la zone de Périgny était
+> prise : l'affectation créait elle-même le déplacement qu'elle est censée
+> interdire, puis le signalait. Mieux vaut annoncer « toutes les zones sont
+> occupées » — c'est la vérité, et c'est réparable.
+>
+> La théorie (test théorique, e-learning en centre, présentiel) n'entre pas
+> dans la règle : ces séances n'ont pas de zone, donc pas de site.
+
 ## 4. Ressources partagées : le porte-engin
 
 Le premier courriel présentait l'interdiction R482 « Cat A et Cat F jamais en
@@ -150,12 +175,15 @@ qui compte, pas la nature de la séance.
 *À confirmer : les catégories B1, C1 et G utilisent-elles aussi le
 porte-engin ?* Le premier courriel ne nommait que A et F.
 
-> **Fait : la déclaration.** La ressource existe, avec son site, sa capacité de
-> 1 et les deux dispositifs qui la requièrent. **Elle ne contraint rien**, pour
-> deux raisons qui se cumulent : le moteur ne lit pas encore les ressources, et
-> les catégories R482 ne sont pas au catalogue. L'écran Paramètres marque la
-> ligne « sans effet : R482-A, R482-F » — une contrainte qui ne s'applique à
-> rien et ne le dirait pas serait pire que pas de contrainte du tout.
+> **Fait.** Le moteur applique la contrainte : deux séances qui requièrent le
+> porte-engin en même temps, sur deux zones différentes, donnent « Porte-engin
+> déjà utilisé à cette heure ». En formation comme en test.
+>
+> **Sans effet aujourd'hui**, pour une seule raison qui reste : les catégories
+> R482 ne sont pas au catalogue. L'écran Paramètres marque la ligne « sans
+> effet : R482-A, R482-F » — une contrainte qui ne s'applique à rien et ne le
+> dirait pas serait pire que pas de contrainte du tout. Le comportement est
+> néanmoins éprouvé, sur des catégories R482 créées pour le test.
 
 ## 5. Parcours
 
