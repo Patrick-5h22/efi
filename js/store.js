@@ -27,7 +27,53 @@ export function defaultState() {
     dayPresence: {},
     inscriptions: [],
     nextId: 1,
+    // Parcours : ce qu'un stagiaire ACHÈTE, par opposition à ce qui se
+    // planifie. Voir addParcours pour ce qu'il porte, et surtout pour ce
+    // qu'il ne porte pas.
+    parcours: [],
+    nextParcoursId: 1,
   };
+}
+
+// --- Parcours --------------------------------------------------------------
+//
+// Un parcours regroupe les lignes d'une même vente : « R489 Cat 1A + 3 + 5 »
+// est UN parcours et TROIS séances. Il ne porte que ce qui ne doit exister
+// qu'une fois — le montant facturé et le n° de dossier YPAREO.
+//
+// Ce qu'il ne porte PAS, et c'est délibéré : ni le stagiaire, ni
+// l'entreprise, ni la recommandation, ni la liste des catégories. Tout cela
+// se déduit de ses lignes. Le stocker en double créerait une seconde source
+// de vérité, qui finirait par contredire les séances — un parcours annoncé
+// « R489 1A, 3, 5 » alors qu'une des trois lignes a été supprimée depuis.
+// Déduire ne coûte rien et ne peut pas diverger.
+export function addParcours(state, data = {}) {
+  const parcours = {
+    id: state.nextParcoursId++,
+    dossierYpareo: (data.dossierYpareo || '').trim() || null,
+    chiffreAffaires: montantOuNull(data.chiffreAffaires),
+  };
+  state.parcours.push(parcours);
+  return parcours;
+}
+
+export function parcoursById(state, id) {
+  return (state.parcours || []).find((p) => p.id === id) || null;
+}
+
+// Lignes d'un parcours, dans l'ordre où elles ont été posées.
+export function lignesDuParcours(state, id) {
+  return state.inscriptions.filter((i) => i.parcoursId === id);
+}
+
+// Un parcours sans plus aucune ligne n'a plus d'objet : il ne serait visible
+// nulle part, mais son montant continuerait de compter dans le chiffre
+// d'affaires. On le retire donc en même temps que sa dernière séance.
+export function purgerParcoursVides(state) {
+  const utilises = new Set(state.inscriptions.map((i) => i.parcoursId).filter((x) => x != null));
+  const avant = state.parcours.length;
+  state.parcours = state.parcours.filter((p) => utilises.has(p.id));
+  return avant - state.parcours.length;
 }
 
 // Données de démonstration d'une installation neuve.
@@ -92,10 +138,9 @@ export function addInscription(state, data) {
   const insc = {
     id: state.nextId++,
     stagiaire: (data.stagiaire || '').trim(),
-    // Gestion — saisi par l'assistante : n° de dossier YPAREO (10 chiffres)
-    // et montant facturé de la ligne.
-    dossierYpareo: (data.dossierYpareo || '').trim() || null,
-    chiffreAffaires: montantOuNull(data.chiffreAffaires),
+    // Gestion : le n° de dossier YPAREO et le montant facturé ne sont plus
+    // portés par la ligne mais par le PARCOURS — une vente, un montant.
+    parcoursId: data.parcoursId ?? null,
     formation: data.formation || null,
     type: data.type || 'Initial',
     datePratique: data.datePratique || null,
@@ -139,6 +184,7 @@ export function updateInscription(state, id, data) {
 export function removeInscription(state, id) {
   const idx = state.inscriptions.findIndex((i) => i.id === id);
   if (idx >= 0) state.inscriptions.splice(idx, 1);
+  purgerParcoursVides(state);
 }
 
 // Vide les inscriptions, et RIEN d'autre. Rend le nombre de lignes retirées.
@@ -155,6 +201,10 @@ export function removeInscription(state, id) {
 export function viderInscriptions(state) {
   const n = state.inscriptions.length;
   state.inscriptions = [];
+  // Les parcours partent avec : ils ne portent que le montant et le dossier
+  // des lignes qu'on vient de retirer. Les garder laisserait un chiffre
+  // d'affaires sans une seule séance pour le justifier.
+  state.parcours = [];
   return n;
 }
 
@@ -264,11 +314,41 @@ export function migrate(state) {
   for (const i of state.inscriptions) {
     if (!i.statut) i.statut = 'confirmee';
     if (!i.modeTheorie) i.modeTheorie = 'distance';
-    // Champs de gestion ajoutés au fil des versions
-    if (i.dossierYpareo === undefined) i.dossierYpareo = null;
-    if (i.chiffreAffaires === undefined) i.chiffreAffaires = null;
   }
   state.nextId = state.nextId || (Math.max(0, ...state.inscriptions.map((i) => i.id)) + 1);
+
+  // Parcours : reprise d'un état où le montant et le dossier étaient portés
+  // par la LIGNE. Chaque ligne reçoit son propre parcours — un pour un.
+  //
+  // Regrouper d'office les lignes d'un même stagiaire serait une
+  // interprétation, pas une reprise : rien ne dit que deux lignes du même
+  // candidat ont été vendues ensemble. Un pour un ne perd rien, ne devine
+  // rien, et laisse le regroupement se faire à la main quand il a un sens.
+  // Le total du chiffre d'affaires est inchangé à l'euro près.
+  state.parcours = Array.isArray(state.parcours) ? state.parcours : [];
+  state.nextParcoursId = state.nextParcoursId
+    || (Math.max(0, ...state.parcours.map((p) => p.id)) + 1);
+  for (const i of state.inscriptions) {
+    if (i.parcoursId != null) {
+      // Ligne déjà rattachée mais dont le parcours a disparu : on le recrée
+      // plutôt que de la laisser pointer dans le vide.
+      if (!state.parcours.some((p) => p.id === i.parcoursId)) {
+        state.parcours.push({ id: i.parcoursId, dossierYpareo: null, chiffreAffaires: null });
+        state.nextParcoursId = Math.max(state.nextParcoursId, i.parcoursId + 1);
+      }
+    } else {
+      const p = addParcours(state, {
+        dossierYpareo: i.dossierYpareo, chiffreAffaires: i.chiffreAffaires,
+      });
+      i.parcoursId = p.id;
+    }
+    delete i.dossierYpareo;
+    delete i.chiffreAffaires;
+  }
+  for (const p of state.parcours) {
+    if (p.dossierYpareo === undefined) p.dossierYpareo = null;
+    if (p.chiffreAffaires === undefined) p.chiffreAffaires = null;
+  }
   return state;
 }
 

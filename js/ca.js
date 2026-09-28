@@ -1,15 +1,26 @@
-// Suivi du chiffre d’affaires — agrégation des montants saisis sur les
-// inscriptions, par mois puis par formation (structure de l'onglet
-// « Chiffre d’affaires » du classeur EFI).
+// Suivi du chiffre d’affaires — agrégation des montants par mois, puis par
+// recommandation (structure de l'onglet « Chiffre d’affaires » du classeur).
 //
-// Conventions reprises du classeur :
-//   • date de référence = date de la PRATIQUE ;
-//   • les lignes annulées sont exclues ;
-//   • le montant est porté par la LIGNE (1 stagiaire × 1 catégorie).
-// Un même dossier YPAREO couvrant plusieurs catégories occupe donc plusieurs
-// lignes : d'où le contrôle de doublons plus bas, qui signale un montant
-// identique répété sur un même dossier — le cas où le CA serait compté deux
-// fois. Aucun calcul métier n'en dépend : c'est une alerte de saisie.
+// Conventions :
+//   • le montant est porté par le PARCOURS — une vente, un montant ;
+//   • date de référence = la première date de pratique de ses séances ;
+//   • un parcours dont toutes les séances sont annulées est exclu.
+//
+// Ce qui a changé, et pourquoi le contrôle de doublons a disparu. Le montant
+// était auparavant porté par la LIGNE (1 stagiaire × 1 catégorie). Un dossier
+// couvrant trois catégories occupait trois lignes, et le même montant recopié
+// sur chacune comptait trois fois. Un contrôle signalait ce cas — sans jamais
+// pouvoir le corriger, faute de savoir laquelle des trois portait la vérité.
+//
+// Le parcours supprime la cause : il n'y a plus qu'un endroit où écrire le
+// montant. Le contrôle n'a plus d'objet, et le retirer vaut mieux que de le
+// garder en décoration.
+//
+// Conséquence assumée sur la ventilation : un parcours « R489 Cat 1A + 3 + 5 »
+// vendu 900 € ne se répartit pas entre ses trois catégories. Le répartir
+// demanderait une règle que personne n'a donnée — au prorata des durées ? à
+// parts égales ? — et qui serait une invention. On ventile donc par
+// RECOMMANDATION, qui est ce qui se vend.
 
 import { formationByCode } from './config.js';
 import { fenetreAffichage } from './dates.js';
@@ -26,17 +37,50 @@ export function fmtEuros(n) {
   return (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 }
 
-// Lignes qui portent un montant et comptent dans le CA
-function lignesFacturees(state) {
-  return state.inscriptions.filter((i) => i.statut !== 'annulee' && i.chiffreAffaires != null);
+// Vue d'un parcours pour le chiffre d'affaires : son montant, ses séances
+// vivantes, et ce qui se déduit d'elles.
+//
+// « recos » plutôt qu'une seule recommandation : la spécification décrit un
+// parcours comme une recommandation et ses catégories, mais rien n'empêche
+// d'en regrouper deux. Plutôt que d'en élire une, on les nomme toutes.
+export function parcoursFactures(state) {
+  const parLigne = new Map();
+  for (const i of state.inscriptions) {
+    if (i.parcoursId == null) continue;
+    if (!parLigne.has(i.parcoursId)) parLigne.set(i.parcoursId, []);
+    parLigne.get(i.parcoursId).push(i);
+  }
+
+  const out = [];
+  for (const p of state.parcours || []) {
+    if (p.chiffreAffaires == null) continue;
+    const lignes = (parLigne.get(p.id) || []).filter((i) => i.statut !== 'annulee');
+    if (!lignes.length) continue; // vente entièrement annulée
+    const dates = lignes.map((i) => i.datePratique).filter(Boolean).sort();
+    const recos = [...new Set(lignes.map((i) =>
+      formationByCode(state.formations, i.formation)?.reco || i.formation || '?'))].sort();
+    out.push({
+      id: p.id,
+      montant: p.chiffreAffaires,
+      dossierYpareo: p.dossierYpareo,
+      stagiaire: lignes[0].stagiaire,
+      lignes,
+      debut: dates[0] || null,
+      recos,
+      // Étiquette de ventilation : la recommandation quand il n'y en a qu'une,
+      // sinon les deux nommées — jamais un choix arbitraire entre elles.
+      cle: recos.join(' + '),
+    });
+  }
+  return out;
 }
 
-// Années civiles proposables : celles des pratiques facturées, plus celles
+// Années civiles proposables : celles des parcours facturés, plus celles
 // couvertes par la fenêtre d'affichage.
 export function anneesDisponibles(state) {
   const set = new Set();
-  for (const i of lignesFacturees(state)) {
-    if (i.datePratique) set.add(i.datePratique.slice(0, 4));
+  for (const p of parcoursFactures(state)) {
+    if (p.debut) set.add(p.debut.slice(0, 4));
   }
   const fenetre = fenetreAffichage();
   for (const d of [fenetre.debut, fenetre.fin]) set.add(d.slice(0, 4));
@@ -45,69 +89,55 @@ export function anneesDisponibles(state) {
 
 export function caSummary(state, annee) {
   const an = String(annee || anneesDisponibles(state)[0] || new Date().getFullYear());
-  const lignes = lignesFacturees(state);
-  const label = (code) => formationByCode(state.formations, code)?.label || code || '(formation inconnue)';
+  const tous = parcoursFactures(state);
 
-  // Les lignes sans date de pratique ne tombent dans aucun mois : on les
-  // isole au lieu de les diluer, pour qu'elles restent visibles.
+  // Les parcours sans aucune date de pratique ne tombent dans aucun mois : on
+  // les isole au lieu de les diluer, pour qu'ils restent visibles.
   const sansDate = { count: 0, total: 0 };
-  const retenues = [];
-  for (const i of lignes) {
-    if (!i.datePratique) { sansDate.count += 1; sansDate.total += i.chiffreAffaires; continue; }
-    if (i.datePratique.slice(0, 4) !== an) continue;
-    retenues.push(i);
+  const retenus = [];
+  for (const p of tous) {
+    if (!p.debut) { sansDate.count += 1; sansDate.total += p.montant; continue; }
+    if (p.debut.slice(0, 4) !== an) continue;
+    retenus.push(p);
   }
 
-  // Mois × formation
   const parMois = new Map();
-  const parFormation = new Map();
-  for (const i of retenues) {
-    const ym = i.datePratique.slice(0, 7);
+  const parReco = new Map();
+  for (const p of retenus) {
+    const ym = p.debut.slice(0, 7);
     if (!parMois.has(ym)) parMois.set(ym, new Map());
     const m = parMois.get(ym);
-    m.set(i.formation, (m.get(i.formation) || 0) + i.chiffreAffaires);
-    parFormation.set(i.formation, (parFormation.get(i.formation) || 0) + i.chiffreAffaires);
+    m.set(p.cle, (m.get(p.cle) || 0) + p.montant);
+    parReco.set(p.cle, (parReco.get(p.cle) || 0) + p.montant);
   }
 
   const mois = [...parMois.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([ym, m]) => {
     const formations = [...m.entries()]
-      .map(([code, total]) => ({ code, label: label(code), total }))
+      .map(([code, total]) => ({ code, label: code, total }))
       .sort((a, b) => b.total - a.total);
     return { ym, label: moisLabel(ym), formations, total: formations.reduce((s, f) => s + f.total, 0) };
   });
 
-  const formations = [...parFormation.entries()]
-    .map(([code, total]) => ({ code, label: label(code), total }))
+  const formations = [...parReco.entries()]
+    .map(([code, total]) => ({ code, label: code, total }))
     .sort((a, b) => b.total - a.total);
 
   const total = formations.reduce((s, f) => s + f.total, 0);
-  const dossiers = new Set(retenues.map((i) => i.dossierYpareo).filter(Boolean));
+  const dossiers = new Set(retenus.map((p) => p.dossierYpareo).filter(Boolean));
 
   return {
     annee: an,
     mois,
     formations,
     total,
-    lignes: retenues.length,
+    // « lignes » compte désormais des VENTES et non des séances : c'est ce
+    // que le total mesure, et le nom est conservé pour les vues.
+    lignes: retenus.length,
+    seances: retenus.reduce((s, p) => s + p.lignes.length, 0),
     dossiers: dossiers.size,
-    sansDossier: retenues.filter((i) => !i.dossierYpareo).length,
+    sansDossier: retenus.filter((p) => !p.dossierYpareo).length,
     sansDate,
-    doublons: doublonsDossier(retenues),
   };
-}
-
-// Même dossier + même montant sur plusieurs lignes : signe probable que le
-// montant du dossier a été recopié sur chaque catégorie au lieu d'être
-// réparti. Signalé, jamais corrigé automatiquement.
-export function doublonsDossier(lignes) {
-  const byKey = new Map();
-  for (const i of lignes) {
-    if (!i.dossierYpareo || !i.chiffreAffaires) continue;
-    const key = `${i.dossierYpareo}|${i.chiffreAffaires}`;
-    if (!byKey.has(key)) byKey.set(key, { dossier: i.dossierYpareo, montant: i.chiffreAffaires, stagiaire: i.stagiaire, lignes: 0 });
-    byKey.get(key).lignes += 1;
-  }
-  return [...byKey.values()].filter((d) => d.lignes > 1).sort((a, b) => b.montant - a.montant);
 }
 
 // Un numéro YPAREO valide compte 10 chiffres. La saisie reste libre (les

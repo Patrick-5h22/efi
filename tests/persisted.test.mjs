@@ -19,10 +19,11 @@ test('persistance : la présence par jour fait partie des champs enregistrés', 
 
 test('persistance : tout champ saisi de l’état par défaut est transmis', () => {
   // Ce qui figure dans defaultState() est saisi, donc doit survivre à un
-  // aller-retour avec la base — hors deux marqueurs internes :
-  //   nextId  : recalculé au chargement à partir des inscriptions ;
+  // aller-retour avec la base — hors trois marqueurs internes :
+  //   nextId / nextParcoursId : recalculés au chargement, à partir du plus
+  //     grand identifiant existant ;
   //   version : marqueur de schéma, posé mais jamais relu à ce jour.
-  const interne = new Set(['nextId', 'version']);
+  const interne = new Set(['nextId', 'nextParcoursId', 'version']);
   const attendus = Object.keys(defaultState()).filter((k) => !interne.has(k));
   for (const champ of attendus) {
     assert.ok(PERSISTED_FIELDS.includes(champ), `champ « ${champ} » jamais enregistré`);

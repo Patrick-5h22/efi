@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultState, addInscription, viderInscriptions, exportJSON, importJSON } from '../js/store.js';
+import { defaultState, addInscription, viderInscriptions, exportJSON, importJSON, addParcours } from '../js/store.js';
 import { computeSchedule } from '../js/engine.js';
 
 function etatGarni() {
@@ -19,10 +19,12 @@ function etatGarni() {
   state.dayAssignments = { '2026-09-14': { formateur: 'p1', testeur: 'p2' } };
   state.params.maxDailyLoad = 420;
   for (const nom of ['UN Premier', 'DEUX Second', 'TROIS Troisieme']) {
+    // Une vente par stagiaire : le montant est porté par le parcours.
+    const p = addParcours(state, { chiffreAffaires: 1250, dossierYpareo: '0123456789' });
     addInscription(state, {
       stagiaire: nom, formation: 'R489-1A', type: 'Initial',
       datePratique: '2026-09-14', debutPratique: 480,
-      chiffreAffaires: 1250, dossierYpareo: '0123456789',
+      parcoursId: p.id,
     });
   }
   return state;
@@ -86,8 +88,10 @@ test('vidage : la sauvegarde prise avant reste réimportable', () => {
   assert.equal(restaure.inscriptions.length, 3);
   assert.deepEqual(restaure.inscriptions.map((i) => i.stagiaire),
     ['UN Premier', 'DEUX Second', 'TROIS Troisieme']);
-  assert.equal(restaure.inscriptions[0].chiffreAffaires, 1250, 'le CA revient avec');
-  assert.equal(restaure.inscriptions[0].dossierYpareo, '0123456789');
+  // Le montant appartient au parcours : c'est là qu'il faut le retrouver.
+  const parcours = restaure.parcours.find((p) => p.id === restaure.inscriptions[0].parcoursId);
+  assert.equal(parcours.chiffreAffaires, 1250, 'le CA revient avec');
+  assert.equal(parcours.dossierYpareo, '0123456789');
   assert.deepEqual(restaure.dayPresence, { '2026-09-14': ['p1'], '2026-09-15': ['p1', 'p2'] });
 });
 

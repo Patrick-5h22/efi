@@ -20,6 +20,7 @@ export const PERSISTED_FIELDS = [
   'openDays',       // jours ouverts EFI
   'dayAssignments', // intervenant du jour
   'dayPresence',    // présence des intervenants par jour
+  'parcours',       // ce qu'un stagiaire achète : montant et dossier YPAREO
   'inscriptions',   // lignes stagiaire × catégorie
 ];
 

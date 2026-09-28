@@ -149,6 +149,15 @@ export function preReserver(brut, args = {}, { par = null, aujourdHui = dateDuJo
 
   const suivant = structuredClone(state);
   const posees = [];
+  // Un parcours pour toute l'option : « R489 Cat 1A + 3 + 5 » est UNE vente.
+  // C'est ce qui permettra à l'assistante de saisir un seul montant, quel que
+  // soit le nombre de catégories que le commercial a pré-réservées.
+  suivant.parcours = suivant.parcours || [];
+  suivant.nextParcoursId = suivant.nextParcoursId
+    || (Math.max(0, ...suivant.parcours.map((p) => p.id)) + 1);
+  const parcours = { id: suivant.nextParcoursId++, dossierYpareo: null, chiffreAffaires: null };
+  suivant.parcours.push(parcours);
+
   for (const ligne of option.lignes) {
     const insc = {
       ...ligne,
@@ -156,8 +165,7 @@ export function preReserver(brut, args = {}, { par = null, aujourdHui = dateDuJo
       statut: 'pre',
       entreprise,
       siret,
-      dossierYpareo: null,
-      chiffreAffaires: null,
+      parcoursId: parcours.id,
       // Trace de l'origine : une pré-réservation venue du terrain doit être
       // reconnaissable par l'assistante qui la confirmera.
       reservePar: par,

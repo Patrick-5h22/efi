@@ -113,6 +113,21 @@ Il n'y a ici aucune nuance à préserver, là où une journée présente dans
 `dayPresence` avec une liste vide signifie « personne ce jour-là ». La RPC rend
 donc l'un ou l'autre indifféremment.
 
+`docs/migrations/009-parcours.sql` ajoute enfin `planning.parcours` — une
+vente : « R489 Cat 1A + 3 + 5 » en est UNE — et `inscriptions.parcours_id`. Le
+montant et le n° de dossier y déménagent.
+
+Elle **ne supprime pas** `inscriptions.dossier_ypareo` ni
+`inscriptions.chiffre_affaires`. Les colonnes restent en place mais ne sont
+plus ni écrites ni relues : elles portent les montants d'avant la reprise, et
+les effacer dans la migration même qui change le modèle rendrait tout retour en
+arrière impossible. La reprise, elle, se fait **côté application** dans
+`migrate()` : chaque ligne existante reçoit son propre parcours, un pour un,
+qui hérite de son montant. Le total est inchangé à l'euro près. Les supprimer
+sera l'affaire d'une migration ultérieure, une fois la reprise constatée en
+production ; d'ici là elles ne peuvent pas diverger, puisque plus rien ne les
+écrit.
+
 Chaque migration reprend les colonnes des précédentes (`add column if not
 exists`) et réécrit les deux RPC au complet : **appliquer la plus récente
 suffit**, quel que soit l'état de la base. Vérifié pour la 007 : appliquée

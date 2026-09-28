@@ -18,7 +18,7 @@ export function renderCA(main, args) {
   main.innerHTML = `
     <div class="page-header">
       <h1>Chiffre d’affaires</h1>
-      <span class="sub">Montants saisis sur les inscriptions, rattachés au mois de la formation pratique — les inscriptions annulées sont exclues</span>
+      <span class="sub">Un montant par <b>parcours</b> — la vente, non la séance —, rattaché au mois de sa première pratique. Les parcours entièrement annulés sont exclus.</span>
       <div class="page-actions">
         <select id="ca-annee">${annees.map((a) => `<option ${a === ca.annee ? 'selected' : ''}>${a}</option>`).join('')}</select>
         <button class="btn btn-secondary" id="btn-ca-csv">⬇ CSV</button>
@@ -29,7 +29,8 @@ export function renderCA(main, args) {
     <div class="kpis">
       <div class="kpi"><div class="kpi-value">${fmtEuros(ca.total)}</div><div class="kpi-label">CA ${ca.annee}</div></div>
       <div class="kpi"><div class="kpi-value">${ca.dossiers}</div><div class="kpi-label">dossier(s) YPAREO</div></div>
-      <div class="kpi"><div class="kpi-value">${ca.lignes}</div><div class="kpi-label">ligne(s) facturée(s)</div></div>
+      <div class="kpi"><div class="kpi-value">${ca.lignes}</div><div class="kpi-label">parcours facturé(s)</div></div>
+      <div class="kpi"><div class="kpi-value">${ca.seances}</div><div class="kpi-label">séance(s) couverte(s)</div></div>
       <div class="kpi"><div class="kpi-value">${fmtEuros(moyenne)}</div><div class="kpi-label">CA moyen / dossier</div></div>
     </div>
 
@@ -40,7 +41,7 @@ export function renderCA(main, args) {
         <h2>${esc(m.label)}</h2>
         <div class="table-wrap">
           <table class="data">
-            <thead><tr><th>Formation</th><th style="text-align:right">Chiffre d’affaires</th></tr></thead>
+            <thead><tr><th>Recommandation</th><th style="text-align:right">Chiffre d’affaires</th></tr></thead>
             <tbody>
               ${m.formations.map((f) => `<tr><td>${esc(f.label)}</td><td style="text-align:right" class="mono">${fmtEuros(f.total)}</td></tr>`).join('')}
               <tr class="ca-total"><td><b>Sous-total ${esc(m.label)}</b></td><td style="text-align:right" class="mono"><b>${fmtEuros(m.total)}</b></td></tr>
@@ -49,14 +50,16 @@ export function renderCA(main, args) {
         </div>
       </div>`).join('') : `
       <div class="card"><p class="muted">Aucun montant saisi pour ${esc(ca.annee)}.
-      Le chiffre d’affaires se renseigne sur chaque inscription, à côté du n° de dossier YPAREO.</p></div>`}
+      Le chiffre d’affaires se renseigne <b>une fois par parcours</b>, dans le formulaire d’inscription, à côté du n° de dossier YPAREO.</p></div>`}
 
     ${ca.formations.length ? `
       <div class="card">
-        <h2>Total par formation — ${esc(ca.annee)}</h2>
+        <h2>Total par recommandation — ${esc(ca.annee)}</h2>
+        <p class="muted">Un parcours se vend par recommandation. Le ventiler entre ses catégories
+        — « R489 Cat 1A + 3 + 5 » à 900 € — demanderait une règle de répartition que personne n’a donnée.</p>
         <div class="table-wrap">
           <table class="data">
-            <thead><tr><th>Formation</th><th style="text-align:right">Chiffre d’affaires</th><th style="text-align:right">Part</th></tr></thead>
+            <thead><tr><th>Recommandation</th><th style="text-align:right">Chiffre d’affaires</th><th style="text-align:right">Part</th></tr></thead>
             <tbody>
               ${ca.formations.map((f) => `<tr>
                 <td>${esc(f.label)}</td>
@@ -77,19 +80,15 @@ export function renderCA(main, args) {
 
 // Points de vigilance sur la saisie — informatifs, jamais bloquants.
 function alertes(ca) {
+  // Le contrôle « même montant répété sur un même dossier » a disparu avec sa
+  // cause : le montant ne s'écrit plus qu'à un seul endroit, le parcours.
   const items = [];
-  if (ca.doublons.length) {
-    items.push(`<b>${ca.doublons.length} montant(s) répété(s) sur un même dossier</b> —
-      ${ca.doublons.slice(0, 4).map((d) => `${esc(d.dossier)} : ${fmtEuros(d.montant)} × ${d.lignes}`).join(', ')}${ca.doublons.length > 4 ? '…' : ''}.
-      Un dossier couvrant plusieurs catégories occupe plusieurs lignes : si le montant total y est recopié,
-      il est compté autant de fois. À répartir, ou à ne porter que sur une ligne.`);
-  }
   if (ca.sansDate.count) {
-    items.push(`<b>${ca.sansDate.count} ligne(s) facturée(s) sans date de pratique</b> (${fmtEuros(ca.sansDate.total)})
-      — non rattachées à un mois, donc absentes des totaux ci-dessous.`);
+    items.push(`<b>${ca.sansDate.count} parcours facturé(s) sans date de pratique</b> (${fmtEuros(ca.sansDate.total)})
+      — non rattachés à un mois, donc absents des totaux ci-dessous.`);
   }
   if (ca.sansDossier) {
-    items.push(`${ca.sansDossier} ligne(s) facturée(s) sans n° de dossier YPAREO.`);
+    items.push(`${ca.sansDossier} parcours facturé(s) sans n° de dossier YPAREO.`);
   }
   if (!items.length) return '';
   return `<div class="card" style="border-left:3px solid var(--warn)">
@@ -101,7 +100,7 @@ function alertes(ca) {
 
 function exportCA(ca) {
   const sep = ';';
-  const lines = [['Mois', 'Formation', 'Chiffre d’affaires'].join(sep)];
+  const lines = [['Mois', 'Recommandation', 'Chiffre d’affaires'].join(sep)];
   for (const m of ca.mois) {
     for (const f of m.formations) lines.push([m.label, f.label, f.total].map(csvCell).join(sep));
     lines.push([m.label, 'Sous-total', m.total].map(csvCell).join(sep));
