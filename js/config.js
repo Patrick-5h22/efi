@@ -331,6 +331,34 @@ export function basculerJour(openDays, siteId, date) {
   return base;
 }
 
+// --- Recommandation et catégories -----------------------------------------
+//
+// La saisie d'un parcours part de la RECOMMANDATION (R489, R486, AIPR…) puis
+// des catégories, en sélection multiple : un candidat réalise plusieurs
+// dispositifs d'une même recommandation en une seule programmation.
+//
+// Ni l'une ni l'autre n'est stockée quelque part : la recommandation est un
+// champ du catalogue, et les catégories sont les formations qui la portent.
+// Une liste séparée aurait fini par diverger du catalogue à la première
+// formation créée dans Paramètres.
+export function recommandations(formations) {
+  return [...new Set((formations || []).map((f) => f.reco).filter(Boolean))].sort();
+}
+
+export function categoriesDe(formations, reco) {
+  return (formations || []).filter((f) => f.reco === reco);
+}
+
+// Libellé court d'un dispositif : « Cat. 3 » plutôt que « Pratique R489 Cat 3 ».
+// La recommandation est déjà choisie à côté ; la répéter sur chaque case à
+// cocher ferait une colonne de doublons.
+export function libelleCourt(formation) {
+  if (!formation) return '';
+  const label = formation.label || formation.code || '';
+  const cat = label.match(/Cat\.?\s*([A-Z0-9]+)/i);
+  return cat ? `Cat. ${cat[1]}` : label.replace(/^Pratique\s+/i, '');
+}
+
 export const MAX_TEAM = 12;
 
 // Équipe d'exemple (identique au classeur)

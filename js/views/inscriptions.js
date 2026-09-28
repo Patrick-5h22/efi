@@ -8,6 +8,7 @@ import { ypareoCSV, lignesYpareo } from '../ypareo.js';
 import { semainesConsultables } from '../engine.js';
 import { siteById } from '../config.js';
 import { openInscriptionForm } from './form.js';
+import { openParcoursForm } from './parcours-form.js';
 import { buildICS, downloadICS } from '../ics.js';
 import { importInscriptionsCSV } from '../csv.js';
 import { fmtEuros, ypareoValide } from '../ca.js';
@@ -64,6 +65,7 @@ export function renderInscriptions(main) {
       <span class="sub">1 ligne = 1 stagiaire × 1 catégorie pratique (+ son test pratique) — ${rows.length} ligne(s), ${errCount ? `<b style="color:var(--error)">${errCount} anomalie(s)</b>` : 'aucune anomalie'}</span>
       <div class="page-actions">
         <button class="btn" id="btn-add">➕ Inscrire un stagiaire</button>
+        <button class="btn" id="btn-add-parcours" title="Une recommandation, plusieurs catégories : le moteur place l’ensemble">➕ Parcours</button>
         <button class="btn btn-secondary" id="btn-csv">⬇ CSV</button>
         <button class="btn btn-secondary" id="btn-ypareo" title="Une ligne par parcours : la recommandation en Formation, les catégories en Commentaire">⬇ YPAREO</button>
         <button class="btn btn-secondary" id="btn-ics" title="Exporter toutes les réservations au format calendrier (.ics)">📅 .ics</button>
@@ -124,6 +126,7 @@ export function renderInscriptions(main) {
   `;
 
   main.querySelector('#btn-add').addEventListener('click', () => openInscriptionForm());
+  main.querySelector('#btn-add-parcours').addEventListener('click', () => openParcoursForm());
   main.querySelector('#f-search').addEventListener('input', (e) => { filters.search = e.target.value; renderInscriptions(main); focusEnd(main, '#f-search'); });
   main.querySelector('#f-formation').addEventListener('change', (e) => { filters.formation = e.target.value; renderInscriptions(main); });
   main.querySelector('#f-week').addEventListener('change', (e) => { filters.week = e.target.value; renderInscriptions(main); });

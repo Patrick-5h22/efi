@@ -117,16 +117,24 @@ donc l'un ou l'autre indifféremment.
 vente : « R489 Cat 1A + 3 + 5 » en est UNE — et `inscriptions.parcours_id`. Le
 montant et le n° de dossier y déménagent.
 
-Elle **ne supprime pas** `inscriptions.dossier_ypareo` ni
-`inscriptions.chiffre_affaires`. Les colonnes restent en place mais ne sont
-plus ni écrites ni relues : elles portent les montants d'avant la reprise, et
-les effacer dans la migration même qui change le modèle rendrait tout retour en
-arrière impossible. La reprise, elle, se fait **côté application** dans
-`migrate()` : chaque ligne existante reçoit son propre parcours, un pour un,
-qui hérite de son montant. Le total est inchangé à l'euro près. Les supprimer
-sera l'affaire d'une migration ultérieure, une fois la reprise constatée en
-production ; d'ici là elles ne peuvent pas diverger, puisque plus rien ne les
-écrit.
+Elle **ne supprimait pas** `inscriptions.dossier_ypareo` ni
+`inscriptions.chiffre_affaires` : les colonnes portaient les montants d'avant
+la reprise, et les effacer dans la migration même qui change le modèle aurait
+rendu tout retour en arrière impossible.
+
+`docs/migrations/010-retrait-colonnes-montant.sql` les retire, et porte son
+propre filet. La reprise se fait **côté application** dans `migrate()` : elle
+n'a donc lieu qu'au premier chargement suivant la 009, et rien ne garantit
+qu'il ait eu lieu avant qu'on lance la 010. Celle-ci **refait donc la reprise
+en SQL** juste avant de supprimer — toute ligne portant encore un montant sans
+parcours reçoit le sien, un pour un. Elle est ainsi sûre quel que soit l'ordre
+des opérations, y compris si la 009 vient d'être appliquée à l'instant.
+
+Le nombre de reprises de secours est annoncé en `NOTICE` ; zéro est le cas
+normal. Mesuré sur la réplique : 3 100 € restés sur quatre lignes sans parcours
+donnent trois parcours et 3 100 €, puis les colonnes disparaissent. Dans le cas
+normal — application déjà rouverte — la migration annonce « aucune reprise
+nécessaire » et ne touche à rien.
 
 Chaque migration reprend les colonnes des précédentes (`add column if not
 exists`) et réécrit les deux RPC au complet : **appliquer la plus récente
