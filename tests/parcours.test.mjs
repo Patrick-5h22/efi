@@ -23,11 +23,17 @@ function fixture({ jours = ['2026-09-14', '2026-09-15', '2026-09-16'], pause = f
 
 const CATS = ['R489-3', 'R489-5', 'R489-1A'];
 
+// « Aujourd'hui » est injecté, comme dans les scénarios MCP. Sans lui, ces
+// tests dérivaient avec le calendrier réel : les trois journées d'exemple
+// sont passées, et la fenêtre de recherche part de la semaine en cours —
+// quatorze tests sont tombés d'un coup le jour où l'on a franchi le 16/09.
+const LE = '2026-09-14'; // lundi, premier jour ouvert de la fixture
+
 // --- Composition ---
 
 test('parcours : les trois catégories sont placées', () => {
   const state = fixture();
-  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   assert.ok(opt, 'une proposition est attendue');
   assert.equal(opt.lignes.length, 3);
   assert.deepEqual(opt.lignes.map((l) => l.formation), CATS, 'l’ordre demandé est respecté');
@@ -35,7 +41,7 @@ test('parcours : les trois catégories sont placées', () => {
 
 test('parcours : la théorie est mutualisée — un seul créneau pour la recommandation', () => {
   const state = fixture();
-  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   const theories = opt.seances.filter((s) => s.genre === 'theorie');
   assert.equal(theories.length, 1, 'R489 ne doit apparaître qu’une fois en théorie');
   assert.match(theories[0].libelle, /R489/);
@@ -47,14 +53,14 @@ test('parcours : la théorie est mutualisée — un seul créneau pour la recomm
 
 test('parcours : chaque catégorie a son test pratique', () => {
   const state = fixture();
-  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   const tests = opt.seances.filter((s) => s.genre === 'test');
   assert.equal(tests.length, 3, 'un test pratique par catégorie');
 });
 
 test('parcours : aucune anomalie dans une proposition', () => {
   const state = fixture();
-  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   const sim = structuredClone(state);
   for (const l of opt.lignes) sim.inscriptions.push(structuredClone(l));
   const { rows } = computeSchedule(sim);
@@ -65,7 +71,7 @@ test('parcours : aucune anomalie dans une proposition', () => {
 
 test('parcours : le déroulé est chronologique', () => {
   const state = fixture();
-  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   for (let i = 1; i < opt.seances.length; i++) {
     const a = opt.seances[i - 1], b = opt.seances[i];
     assert.ok(a.date < b.date || (a.date === b.date && a.debut <= b.debut),
@@ -75,7 +81,7 @@ test('parcours : le déroulé est chronologique', () => {
 
 test('parcours : chaque séance nomme un intervenant', () => {
   const state = fixture();
-  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   for (const s of opt.seances) {
     assert.ok(s.intervenant, `séance « ${s.libelle} » sans intervenant`);
   }
@@ -86,7 +92,7 @@ test('parcours : chaque séance nomme un intervenant', () => {
 test('parcours : aPartirDu est respecté', () => {
   const state = fixture();
   const [opt] = suggestParcours(state, {
-    stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aPartirDu: '2026-09-16',
+    stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aPartirDu: '2026-09-16', aujourdHui: LE,
   });
   assert.ok(opt, 'une proposition est attendue');
   for (const j of opt.jours) assert.ok(j >= '2026-09-16', `${j} est antérieur à la date demandée`);
@@ -95,7 +101,8 @@ test('parcours : aPartirDu est respecté', () => {
 test('suggestSlots : aPartirDu écarte les jours antérieurs', () => {
   const state = fixture();
   const draft = suggestSlots(state, {
-    stagiaire: 'DURAND Thomas', formation: 'R489-3', type: 'Initial', aPartirDu: '2026-09-16',
+    stagiaire: 'DURAND Thomas', formation: 'R489-3', type: 'Initial',
+    aPartirDu: '2026-09-16', aujourdHui: LE,
   });
   assert.ok(draft);
   assert.ok(draft.datePratique >= '2026-09-16', draft.datePratique);
@@ -103,7 +110,9 @@ test('suggestSlots : aPartirDu écarte les jours antérieurs', () => {
 
 test('suggestSlots : sans aPartirDu, le comportement d’origine est inchangé', () => {
   const state = fixture();
-  const draft = suggestSlots(state, { stagiaire: 'DURAND Thomas', formation: 'R489-3', type: 'Initial' });
+  const draft = suggestSlots(state, {
+    stagiaire: 'DURAND Thomas', formation: 'R489-3', type: 'Initial', aujourdHui: LE,
+  });
   assert.equal(draft.datePratique, '2026-09-14', 'le premier jour ouvert est retenu');
 });
 
@@ -112,7 +121,7 @@ test('suggestSlots : sans aPartirDu, le comportement d’origine est inchangé',
 test('parcours : deux options portent sur des jours distincts', () => {
   const state = fixture();
   const opts = suggestParcours(state, {
-    stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', maxOptions: 2,
+    stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', maxOptions: 2, aujourdHui: LE,
   });
   assert.equal(opts.length, 2, `${opts.length} option(s) obtenue(s)`);
   assert.notEqual(opts[0].jours[0], opts[1].jours[0], 'les deux options doivent démarrer un autre jour');
@@ -121,7 +130,7 @@ test('parcours : deux options portent sur des jours distincts', () => {
 test('parcours : maxOptions borne le nombre de propositions', () => {
   const state = fixture();
   const opts = suggestParcours(state, {
-    stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', maxOptions: 1,
+    stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', maxOptions: 1, aujourdHui: LE,
   });
   assert.equal(opts.length, 1);
 });
@@ -130,7 +139,7 @@ test('parcours : maxOptions borne le nombre de propositions', () => {
 
 test('parcours : aucun jour ouvert → aucune proposition, sans planter', () => {
   const state = fixture({ jours: [] });
-  assert.deepEqual(suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' }), []);
+  assert.deepEqual(suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE }), []);
 });
 
 test('parcours : entrée vide ou incomplète → tableau vide', () => {
@@ -152,7 +161,7 @@ test('parcours : les réservations existantes sont respectées', () => {
     dateTestPratique: '2026-09-14', debutTestPratique: 780,
   }];
   state.nextId = 2;
-  const opts = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const opts = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   // Soit ça tient sans conflit, soit ça ne propose rien — jamais une
   // proposition en anomalie.
   for (const opt of opts) {
@@ -165,7 +174,7 @@ test('parcours : les réservations existantes sont respectées', () => {
 
 test('parcours : la pause déjeuner est respectée quand elle est active', () => {
   const state = fixture({ pause: true });
-  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   assert.ok(opt, 'une proposition reste possible avec la pause');
   const { pauseDebut, pauseFin } = state.params;
   for (const s of opt.seances) {
@@ -176,7 +185,7 @@ test('parcours : la pause déjeuner est respectée quand elle est active', () =>
 
 test('parcours : les lignes proposées sont pré-réservées, pas confirmées', () => {
   const state = fixture();
-  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   for (const l of opt.lignes) {
     assert.equal(l.statut, 'pre', 'une proposition ne confirme jamais d’elle-même');
   }
@@ -184,7 +193,7 @@ test('parcours : les lignes proposées sont pré-réservées, pas confirmées', 
 
 test('parcours : le libellé ne répète pas le mot « pratique »', () => {
   const state = fixture();
-  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial' });
+  const [opt] = suggestParcours(state, { stagiaire: 'DURAND Thomas', formations: CATS, type: 'Initial', aujourdHui: LE });
   for (const s of opt.seances) {
     const occurrences = (s.libelle.match(/pratique/gi) || []).length;
     assert.ok(occurrences <= 1, `« ${s.libelle} » dit « pratique » ${occurrences} fois`);

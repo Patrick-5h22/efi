@@ -95,7 +95,7 @@ export function chercherCreneaux(brut, args = {}, { aujourdHui = dateDuJour() } 
   const ramenee = !!demandee && demandee < aujourdHui;
 
   const options = suggestParcours(state, {
-    stagiaire, formations, type, aPartirDu, maxOptions: nbOptions,
+    stagiaire, formations, type, aPartirDu, maxOptions: nbOptions, aujourdHui,
   });
 
   return {
@@ -131,7 +131,7 @@ export function preReserver(brut, args = {}, { par = null, aujourdHui = dateDuJo
   }
 
   const [option] = suggestParcours(state, {
-    stagiaire, formations, type, aPartirDu: jour, maxOptions: 1,
+    stagiaire, formations, type, aPartirDu: jour, maxOptions: 1, aujourdHui,
   });
   if (!option) {
     throw erreur(`Plus aucun créneau disponible à partir du ${fmtDateDay(jour)}. `

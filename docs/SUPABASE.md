@@ -84,9 +84,23 @@ quatre jointures aux RPC pour reconstruire exactement les tableaux que
 l'application manipule. `sites.pole` est une colonne pour la même raison : un
 pôle n'a aujourd'hui aucun attribut propre.
 
+`docs/migrations/007-zone-par-seance.sql` ajoute enfin `zone_id` et
+`zone_test_id` sur `planning.inscriptions` : la zone imposée à la main, vide
+par défaut, sur le modèle de `formateur_id` / `testeur_id`. Deux colonnes et
+non une, parce qu'une ligne porte jusqu'à deux séances de plateau et que les
+deux plateaux Cat 3/5 existent justement pour que le test n'attende pas la
+formation. Pas de clé étrangère vers `planning.zones` : `efi_save_state`
+remplace toutes les tables dans une même transaction, et une contrainte
+référentielle ferait échouer la sauvegarde entière sur une zone supprimée
+entre-temps — au lieu de quoi le moteur signale « zone inconnue » sur la seule
+ligne concernée.
+
 Chaque migration reprend les colonnes des précédentes (`add column if not
 exists`) et réécrit les deux RPC au complet : **appliquer la plus récente
-suffit**, quel que soit l'état de la base.
+suffit**, quel que soit l'état de la base. Vérifié pour la 007 : appliquée
+seule sur un schéma qui n'avait reçu aucune des trois précédentes, elle pose
+tout, et l'aller-retour rend la zone imposée comme la zone laissée en
+automatique.
 
 **Avant d'ajouter un champ à `js/persisted.js` ou à une inscription**, vérifier
 ce que la base rend réellement — en lecture seule, sans rien écrire :

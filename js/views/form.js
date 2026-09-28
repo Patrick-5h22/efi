@@ -3,7 +3,10 @@
 
 import { app, esc, toast } from '../app.js';
 import { addInscription, updateInscription, montantOuNull } from '../store.js';
-import { formationByCode, dureeFor, TYPES, MODES_THEORIE, THEORIE_CENTRE_DUREE_DEFAUT } from '../config.js';
+import {
+  formationByCode, dureeFor, TYPES, MODES_THEORIE, THEORIE_CENTRE_DUREE_DEFAUT,
+  zonesPour, siteById,
+} from '../config.js';
 import { daySlots, fmtTime, workingDays, fmtDateDay } from '../dates.js';
 import { computeSchedule, memberAvailability, suggestSlots, availableSlotsFor, availableTheorieSlots, roomFreeSlots } from '../engine.js';
 
@@ -26,6 +29,8 @@ export function openInscriptionForm(options = {}) {
     debutTestPratique: options.debutTestPratique ?? null,
     formateurId: null,
     testeurId: null,
+    zoneId: null,
+    zoneTestId: null,
     modeTheorie: options.modeTheorie || 'distance',
     dateTheorieFormation: options.dateTheorieFormation || null,
     debutTheorieFormation: options.debutTheorieFormation ?? null,
@@ -172,6 +177,13 @@ export function openInscriptionForm(options = {}) {
           <label class="field">Testeur (si ≠ jour) <select name="testeurId"><option value="">— auto —</option>${memberOptions(init.testeurId)}</select></label>
         </div>
 
+        <h2 style="font-size:14px; margin: 14px 0 8px;">Zones d’évolution <span class="muted">(vide = affectation automatique)</span></h2>
+        <div class="form-grid">
+          <label class="field" id="zone-field">Plateau de la séance <select name="zoneId"><option value="">— auto —</option></select></label>
+          <label class="field" id="zone-test-field">Plateau du test <select name="zoneTestId"><option value="">— auto —</option></select></label>
+        </div>
+        <p class="muted" id="zone-info"></p>
+
         <div id="form-preview" style="margin-top: 12px;"></div>
       </div>
       <div class="dialog-footer">
@@ -202,6 +214,8 @@ export function openInscriptionForm(options = {}) {
     debutTestPratique: $('debutTestPratique').value ? Number($('debutTestPratique').value) : null,
     formateurId: $('formateurId').value || null,
     testeurId: $('testeurId').value || null,
+    zoneId: $('zoneId').value || null,
+    zoneTestId: $('zoneTestId').value || null,
     modeTheorie: $('modeTheorie').value || 'distance',
     dateTheorieFormation: $('dateTheorieFormation').value || null,
     debutTheorieFormation: $('debutTheorieFormation').value ? Number($('debutTheorieFormation').value) : null,
@@ -235,6 +249,8 @@ export function openInscriptionForm(options = {}) {
   const syncGuided = (draft) => {
     const key = [draft.formation, draft.type, draft.datePratique, draft.dateTestPratique,
       draft.modeTheorie, draft.dateTheorieFormation, draft.dureeTheorieCentre, expert].join('|');
+    // La liste des zones ne dépend que de la formation : elle est reconstruite
+    // avec le reste, la clé la couvre déjà.
     if (key === guidedKey) return;
     guidedKey = key;
     const rebuildDay = (name, sel) => {
@@ -276,6 +292,30 @@ export function openInscriptionForm(options = {}) {
           + list.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')
           + (kept ? `<option value="${kept.id}">${esc(kept.name)} (non habilité)</option>` : '');
         el.value = sel || '';
+      }
+    }
+    // Zones d'évolution : seules celles qui ACCUEILLENT le dispositif sont
+    // proposées, site nommé — « R489 Cat 3/5 #1 » ne dit pas où l'on va.
+    {
+      const formation = formationByCode(state.formations, draft.formation);
+      const admises = formation ? zonesPour(state.zones || [], formation) : [];
+      const nomSite = (z) => siteById(state.sites || [], z.siteId)?.label || z.siteId;
+      for (const [name, sel] of [['zoneId', draft.zoneId], ['zoneTestId', draft.zoneTestId]]) {
+        const el = $(name);
+        const garde = sel && !admises.some((z) => z.id === sel)
+          ? (state.zones || []).find((z) => z.id === sel) : null;
+        el.innerHTML = '<option value="">— auto —</option>'
+          + admises.map((z) => `<option value="${z.id}">${esc(nomSite(z))} — ${esc(z.label)}</option>`).join('')
+          + (garde ? `<option value="${garde.id}">${esc(garde.label)} (n’accueille pas ce dispositif)</option>` : '');
+        el.value = sel || '';
+      }
+      const champTest = dialog.querySelector('#zone-test-field');
+      if (champTest) champTest.style.display = formation?.tests ? '' : 'none';
+      const info = dialog.querySelector('#zone-info');
+      if (info) {
+        info.textContent = !formation ? ''
+          : admises.length ? `${admises.length} plateau(x) accueillent ${formation.label}.`
+          : `Aucune zone n’accueille ${formation.label} : la séance sera signalée en anomalie.`;
       }
     }
     // Théorie de la formation : présentiel = rejoindre une session ou en

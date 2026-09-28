@@ -53,7 +53,7 @@ test('parcours : les formations s’enchaînent, les tests s’enchaînent', () 
   const state = etat();
   const [option] = suggestParcours(state, {
     stagiaire: 'CHAINE Un', formations: ['R489-1A', 'R489-3', 'R489-5'],
-    type: 'Initial', aPartirDu: J1, maxOptions: 1,
+    type: 'Initial', aPartirDu: J1, maxOptions: 1, aujourdHui: J1,
   });
   assert.ok(option, 'aucune option proposée');
 
@@ -99,7 +99,7 @@ test('parcours : le temps d’attente des intervenants s’effondre', () => {
   const state = etat();
   const [option] = suggestParcours(state, {
     stagiaire: 'CHAINE Deux', formations: ['R489-1A', 'R489-3', 'R489-5'],
-    type: 'Initial', aPartirDu: J1, maxOptions: 1,
+    type: 'Initial', aPartirDu: J1, maxOptions: 1, aujourdHui: J1,
   });
   assert.ok(option);
 
@@ -174,7 +174,7 @@ test('indisponibilité : le groupement cède, la proposition reste tenable', () 
   const state = etat({ presence: { [J1]: ['p2'] } });
   const [option] = suggestParcours(state, {
     stagiaire: 'SEUL Present', formations: ['R489-1A', 'R489-3'],
-    type: 'Initial', aPartirDu: J1, maxOptions: 1,
+    type: 'Initial', aPartirDu: J1, maxOptions: 1, aujourdHui: J1,
   });
   assert.ok(option, 'une proposition doit rester possible malgré l’absence');
 
@@ -194,7 +194,7 @@ test('le parcours ne s’étale pas sur deux jours quand il tient en un', () => 
   const state = etat({ presence: { [J1]: ['p2'] } });
   const [option] = suggestParcours(state, {
     stagiaire: 'UN Seul Jour', formations: ['R489-1A', 'R489-3'],
-    type: 'Initial', aPartirDu: J1, maxOptions: 1,
+    type: 'Initial', aPartirDu: J1, maxOptions: 1, aujourdHui: J1,
   });
   assert.ok(option);
   assert.equal(new Set(seances(option).map((s) => s.date)).size, 1,

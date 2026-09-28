@@ -5,6 +5,7 @@ import { app, esc, toast } from '../app.js';
 import { removeInscription, memberName } from '../store.js';
 import { fmtTime, fmtDateShort } from '../dates.js';
 import { semainesConsultables } from '../engine.js';
+import { siteById } from '../config.js';
 import { openInscriptionForm } from './form.js';
 import { buildICS, downloadICS } from '../ics.js';
 import { importInscriptionsCSV } from '../csv.js';
@@ -108,11 +109,11 @@ export function renderInscriptions(main) {
             <tr>
               ${sortableTh('id', 'N°')}${sortableTh('stagiaire', 'Stagiaire')}${sortableTh('dossier', 'N° dossier')}${sortableTh('ca', 'CA')}${sortableTh('formation', 'Formation')}<th>Type</th><th>Durée</th>
               ${sortableTh('date', 'Pratique')}<th>Théorie</th><th>Test pratique</th>
-              <th>Formateur</th><th>Testeur</th><th>Reco</th>${sortableTh('semaine', 'Sem.')}${sortableTh('statut', 'Statut')}<th></th>
+              <th>Formateur</th><th>Testeur</th><th>Zone</th><th>Reco</th>${sortableTh('semaine', 'Sem.')}${sortableTh('statut', 'Statut')}<th></th>
             </tr>
           </thead>
           <tbody>
-            ${visible.map((row) => rowHTML(state, row)).join('') || `<tr><td colspan="16" class="muted">Aucune inscription${rows.length ? ' ne correspond aux filtres' : ''}.</td></tr>`}
+            ${visible.map((row) => rowHTML(state, row)).join('') || `<tr><td colspan="17" class="muted">Aucune inscription${rows.length ? ' ne correspond aux filtres' : ''}.</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -180,6 +181,26 @@ function focusEnd(main, sel) {
   el.setSelectionRange(el.value.length, el.value.length);
 }
 
+// Zone d'évolution retenue, pour les deux séances de la ligne. Sans plateau
+// affiché, l'affectation automatique serait invisible : on verrait l'anomalie
+// « toutes les zones sont occupées » sans pouvoir dire lesquelles étaient
+// prises, ni par qui.
+function zoneCell(state, row) {
+  const nom = (id) => {
+    const z = (state.zones || []).find((x) => x.id === id);
+    if (!z) return null;
+    const site = siteById(state.sites || [], z.siteId)?.label || z.siteId;
+    return `<span title="${esc(site)}">${esc(z.label)}</span>`;
+  };
+  const manuel = ' <span title="Choix manuel">✎</span>';
+  const parts = [];
+  if (row.zonePratique) parts.push(nom(row.zonePratique) + (row.insc.zoneId ? manuel : ''));
+  if (row.zoneTest && row.zoneTest !== row.zonePratique) {
+    parts.push(`<span class="muted">test :</span> ` + nom(row.zoneTest) + (row.insc.zoneTestId ? manuel : ''));
+  }
+  return parts.length ? parts.join('<br>') : '<span class="muted">—</span>';
+}
+
 function rowHTML(state, row) {
   const { insc, formation } = row;
   const manuel = ' <span title="Choix manuel">✎</span>';
@@ -213,6 +234,7 @@ function rowHTML(state, row) {
       <td>${insc.dateTestPratique ? `${fmtDateShort(insc.dateTestPratique)}<br>${fmtTime(insc.debutTestPratique)} → ${fmtTime(row.finTestPratique)}` : '<span class="muted">—</span>'}</td>
       <td>${fmtF}</td>
       <td>${fmtT}</td>
+      <td>${zoneCell(state, row)}</td>
       <td>${esc(formation?.reco || '')}</td>
       <td>${row.semaine ?? ''}</td>
       <td>${row.errors.length

@@ -56,6 +56,18 @@ export function renderAide(main) {
         <li><b>Formateur ≠ testeur du même candidat</b> : le formateur du jour de pratique ne peut être le testeur du candidat (théorie ou test pratique).</li>
         <li><b>Habilitations</b> : un intervenant affecté hors de ses habilitations F/T est signalé.</li>
         <li><b>Jours EFI</b> : toute inscription sur un jour non ouvert est signalée.</li>
+        <li><b>Zone d'évolution</b> : chaque séance reçoit automatiquement un plateau parmi ceux qui accueillent
+          son dispositif (Paramètres § 1 bis). Une zone tient le nombre de <b>sessions simultanées</b> qu'on lui a
+          déclaré — d'où « toutes les zones … sont occupées à cette heure », qui nomme les plateaux pris.
+          Deux candidats sur le même dispositif, avec le même intervenant et à la même heure, sont
+          <b>une seule séance</b> : ils ne consomment qu'une session (R489 Cat 3 et ses deux chariots).
+          Un plateau peut être imposé à la main sur l'inscription ; vide, c'est automatique.</li>
+        <li><b>Matériel partagé</b> : un exemplaire unique utilisé par plusieurs zones (le porte-engin de
+          Périgny II) ne peut tenir qu'une séance à la fois, en formation comme en test.</li>
+        <li><b>Déplacement dans la journée</b> : Périgny et Périgny II s'enchaînent, Saintes non. L'anomalie
+          nomme la personne et les deux lieux, et porte sur toutes ses séances du jour — c'est la journée qui
+          ne tient pas. L'affectation automatique ne crée jamais ce déplacement : elle annonce plutôt que
+          les plateaux du site engagé sont pris.</li>
         <li><b>Présence du jour</b> : sur la page Jours EFI, cocher les intervenants présents chaque jour
           (« Tous » par défaut) — l'affectation automatique ne choisit que parmi eux, et un intervenant
           positionné un jour où il n'est pas présent est signalé.</li>

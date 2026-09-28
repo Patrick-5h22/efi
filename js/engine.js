@@ -2,7 +2,11 @@
 // les intervenants effectifs (affectation automatique) et les contrôles (STATUT).
 // Reproduit les règles du classeur "Planification EFI v4.2".
 
-import { formationByCode, dureeFor, dureeTheorieFor, chargeComptee, dureeTestFor, testSurveille, pauseCreneau, chevauchePause, dansLaFenetre, libelleFenetre } from './config.js';
+import {
+  formationByCode, dureeFor, dureeTheorieFor, chargeComptee, dureeTestFor, testSurveille,
+  pauseCreneau, chevauchePause, dansLaFenetre, libelleFenetre,
+  zonesPour, admetDispositif, siteById, poleDuSite,
+} from './config.js';
 import { isoWeek, overlaps, workingDays, joursOuvrables, bornesDuMois, fenetreAffichage, addDays, fmtTime, mondayOf, dateDuJour, isWeekend, semainesAffichees } from './dates.js';
 
 // ---------------------------------------------------------------------------
@@ -29,6 +33,10 @@ export function computeSchedule(state) {
       formation,
       duree,
       dureeTest: dureeT,
+      // Zones d'évolution effectives — choisies par la passe 4, ou imposées
+      // à la saisie (zoneId / zoneTestId), exactement comme les intervenants.
+      zonePratique: null,
+      zoneTest: null,
       cancelled: insc.statut === 'annulee',
       finPratique: insc.debutPratique != null ? insc.debutPratique + duree : null,
       finTestPratique: insc.debutTestPratique != null ? insc.debutTestPratique + dureeT : null,
@@ -222,6 +230,9 @@ export function computeSchedule(state) {
     }
   }
 
+  // Passe 4 — zones d'évolution, matériels partagés et règle de pôle.
+  affecterZones(rows, state);
+
   // --- Contrôles ----------------------------------------------------------
   validateRows(active, { state, params, openDays, ouvrable, theoryDays, theoryTesters, qualified, presentOn, theorySessions });
 
@@ -238,13 +249,202 @@ export function computeSchedule(state) {
 }
 
 // ---------------------------------------------------------------------------
+// Zones d'évolution, matériels partagés et règle de pôle
+//
+// Une zone porte les dispositifs qu'elle admet et son nombre de SESSIONS
+// simultanées ; un matériel partagé (le porte-engin de Périgny II) est un
+// exemplaire unique que plusieurs zones se disputent. Les deux se vérifient de
+// la même façon : compter ce qui se chevauche, comparer à la capacité.
+//
+// Ce qui rend les deux « règles » du courriel d'Emmanuel inutiles à écrire :
+// l'impossibilité de tenir une R485 et une R489 Cat 1A en même temps n'est pas
+// une règle, c'est une zone unique à une session. Les deux plateaux Cat 3/5 en
+// parallèle, de même : deux zones à une session chacune.
+//
+// ⚠ Deux lignes ne comptent pour UNE session que si elles sont réellement la
+// même séance : même dispositif, même intervenant, même heure de début. C'est
+// la R489 Cat 3 et ses deux chariots — deux candidats, un formateur, une zone,
+// une session. Deux séances du même dispositif qui se chevauchent SANS
+// commencer ensemble sont bien deux sessions : sur un plateau c'est la
+// réalité, et pour une salle de QCM qui en tiendrait plusieurs, c'est le
+// paramètre « sessions simultanées » de la zone qu'il faut ouvrir.
+//
+// Sans zone déclarée dans l'état, cette passe ne fait rien : pas de modèle,
+// pas de contrainte. C'est ce qui permet à un planning d'avant les sites de
+// continuer à fonctionner à l'identique.
+// ---------------------------------------------------------------------------
+function affecterZones(rows, state) {
+  const zones = state.zones || [];
+  const sites = state.sites || [];
+  const ressources = state.ressources || [];
+  if (!zones.length) return;
+
+  const zoneById = new Map(zones.map((z) => [z.id, z]));
+  const occupation = new Map(); // porteurId -> [{ date, start, end, cle }]
+  const listeDe = (id) => {
+    if (!occupation.has(id)) occupation.set(id, []);
+    return occupation.get(id);
+  };
+
+  // Libre au sens « il reste de la place » : soit la séance EST déjà là (même
+  // clé), soit le nombre de séances distinctes qui se chevauchent n'atteint
+  // pas la capacité.
+  const placeLibre = (id, capacite, date, start, end, cle) => {
+    const croisent = listeDe(id).filter((b) => b.date === date && overlaps(b.start, b.end, start, end));
+    if (croisent.some((b) => b.cle === cle)) return true;
+    return new Set(croisent.map((b) => b.cle)).size < Math.max(1, capacite || 1);
+  };
+  const poser = (id, date, start, end, cle) => listeDe(id).push({ date, start, end, cle });
+
+  // Pôles engagés dans la journée, par stagiaire et par intervenant. On s'en
+  // sert d'abord comme PRÉFÉRENCE (choisir une zone qui ne casse pas la
+  // journée), puis comme contrôle une fois tout posé.
+  const engagements = new Map(); // `${acteur}|${date}` -> [{ row, siteId, quoi }]
+  const engager = (acteur, quoi, date, siteId, row) => {
+    if (!acteur || !siteId) return;
+    const cle = `${acteur}|${date}`;
+    if (!engagements.has(cle)) engagements.set(cle, { quoi, liste: [] });
+    engagements.get(cle).liste.push({ row, siteId });
+  };
+  const polesEngages = (acteur, date) => new Set(
+    (engagements.get(`${acteur}|${date}`)?.liste || [])
+      .map((e) => poleDuSite(sites, e.siteId)).filter(Boolean)
+  );
+
+  // Choix d'une zone : parmi celles qui admettent le dispositif et où il reste
+  // de la place, on préfère celle qui reste dans le pôle déjà engagé ce
+  // jour-là — sans quoi l'affectation automatique créerait elle-même le
+  // déplacement qu'elle est censée interdire.
+  const choisirZone = (formation, date, start, end, cle, acteurs, consomme) => {
+    const admises = zonesPour(zones, formation);
+    if (!admises.length) return { zone: null, motif: 'aucune' };
+
+    // Le pôle déjà engagé dans la journée n'est pas une préférence mais une
+    // BORNE. Traité en simple préférence, le repli envoyait le second candidat
+    // à Saintes dès que la zone de Périgny était prise : l'affectation
+    // automatique créait elle-même le déplacement qu'elle est censée
+    // interdire, puis le signalait en anomalie. Mieux vaut dire « toutes les
+    // zones sont occupées » — c'est la vérité, et c'est réparable.
+    const souhaites = new Set();
+    for (const a of acteurs) for (const p of polesEngages(a, date)) souhaites.add(p);
+    const possibles = souhaites.size
+      ? admises.filter((z) => souhaites.has(poleDuSite(sites, z.siteId)))
+      : admises;
+    // Pôles inconciliables (le stagiaire ici, l'intervenant là) : rien ne peut
+    // satisfaire les deux. On place quand même, et la règle de pôle le dira.
+    const retenues = possibles.length ? possibles : admises;
+
+    if (!consomme) return { zone: retenues[0], motif: null };
+    const libres = retenues.filter((z) => placeLibre(z.id, z.sessions, date, start, end, cle));
+    if (!libres.length) return { zone: null, motif: 'occupees', admises: retenues };
+    return { zone: libres[0], motif: null };
+  };
+
+  const nomSite = (siteId) => siteById(sites, siteId)?.label || siteId;
+
+  // Une séance : la pratique (ou l'épreuve seule) et le test pratique passent
+  // ici l'une après l'autre, avec leur propre zone. Deux plateaux identiques
+  // existent justement pour que le test n'ait pas à attendre la formation.
+  const placer = (row, { date, start, end, imposee, champ, acteurs, libelle, consomme }) => {
+    const { formation } = row;
+    const cle = `${formation.code}|${acteurs[0] || '?'}|${date}|${start}`;
+
+    let zone;
+    if (imposee) {
+      zone = zoneById.get(imposee) || null;
+      if (!zone) {
+        row.errors.push(`${libelle} : zone inconnue`);
+      } else if (!admetDispositif(zone, formation)) {
+        row.errors.push(`${libelle} : la zone « ${zone.label} » n’accueille pas ${formation.label}`);
+        zone = null;
+      } else if (consomme && !placeLibre(zone.id, zone.sessions, date, start, end, cle)) {
+        row.errors.push(`${libelle} : zone « ${zone.label} » déjà occupée à cette heure`);
+      }
+    } else {
+      const choix = choisirZone(formation, date, start, end, cle, acteurs, consomme);
+      zone = choix.zone;
+      if (!zone && choix.motif === 'aucune') {
+        // Un dispositif sans zone n'est pas planifiable : le dire vaut mieux
+        // que de le poser sur un plateau qui n'existe pas.
+        row.errors.push(`${libelle} : aucune zone n’accueille ${formation.label}`);
+      } else if (!zone) {
+        row.errors.push(`${libelle} : toutes les zones de ${formation.label} `
+          + `sont occupées à cette heure (${choix.admises.map((z) => z.label).join(', ')})`);
+      }
+    }
+    if (!zone) return;
+
+    row[champ] = zone.id;
+
+    // Une épreuve SURVEILLÉE ne consomme pas de session : elle reçoit une zone
+    // — donc un site, donc un pôle — mais n'occupe pas le plateau. C'est la
+    // même règle que partout ailleurs pour la surveillance, qui ne mobilise ni
+    // l'intervenant, ni la charge du jour, ni le taux d'occupation : un QCM se
+    // tient dans une salle, et l'outil ne modélise pas les places de cette
+    // salle. Deux candidats décalés d'une demi-heure ne doivent pas se
+    // disputer un plateau qui n'en est pas un.
+    const stagiaire = row.insc.stagiaire?.trim().toLowerCase();
+    if (stagiaire) engager(`s:${stagiaire}`, row.insc.stagiaire.trim(), date, zone.siteId, row);
+    for (const a of acteurs) engager(`p:${a}`, memberNameOf(state, a), date, zone.siteId, row);
+
+    if (!consomme) return;
+
+    poser(zone.id, date, start, end, cle);
+
+    // Matériels partagés requis par ce dispositif — l'occupation du matériel
+    // compte, quelle que soit la nature de la séance : formation comme test.
+    for (const res of ressources.filter((r) => admetDispositif(r, formation))) {
+      if (!placeLibre(`res:${res.id}`, res.capacite, date, start, end, cle)) {
+        row.errors.push(`${libelle} : ${res.label} déjà utilisé à cette heure`);
+      }
+      poser(`res:${res.id}`, date, start, end, cle);
+    }
+  };
+
+  for (const row of rows) {
+    const { insc, formation } = row;
+    if (row.cancelled || !formation) continue;
+
+    if (insc.datePratique && insc.debutPratique != null) {
+      placer(row, {
+        date: insc.datePratique, start: insc.debutPratique, end: row.finPratique,
+        imposee: insc.zoneId, champ: 'zonePratique',
+        acteurs: [formation.testOnly ? row.testeurEffectif : row.formateurEffectif].filter(Boolean),
+        libelle: formation.testOnly ? 'Épreuve' : 'Pratique',
+        consomme: !formation.testOnly,
+      });
+    }
+    if (insc.dateTestPratique && insc.debutTestPratique != null && formation.tests) {
+      placer(row, {
+        date: insc.dateTestPratique, start: insc.debutTestPratique, end: row.finTestPratique,
+        imposee: insc.zoneTestId, champ: 'zoneTest',
+        acteurs: [row.testeurEffectif].filter(Boolean),
+        libelle: testSurveille(formation) ? 'Épreuve' : 'Test pratique',
+        consomme: !testSurveille(formation),
+      });
+    }
+  }
+
+  // Règle de pôle — Périgny et Périgny II s'enchaînent dans la journée,
+  // Saintes non. Une comparaison de pôles plutôt qu'une matrice de temps de
+  // trajet : la seconde demanderait un paramétrage que personne ne tiendrait
+  // à jour, et se tromperait quand même.
+  for (const [, { quoi, liste }] of engagements) {
+    const poles = new Set(liste.map((e) => poleDuSite(sites, e.siteId)).filter(Boolean));
+    if (poles.size < 2) continue;
+    const lieux = [...new Set(liste.map((e) => nomSite(e.siteId)))].sort();
+    const message = `${quoi} : deux sites trop éloignés le même jour (${lieux.join(' et ')})`;
+    for (const { row } of liste) if (!row.errors.includes(message)) row.errors.push(message);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Contrôles automatiques — colonne STATUT
 // ---------------------------------------------------------------------------
 function validateRows(rows, ctx) {
   const { state, params, openDays, ouvrable, theoryTesters, qualified, presentOn, theorySessions = [] } = ctx;
   const theoryEnd = params.theoryTime + params.theoryDuration;
   const pratiqueLabel = (row) => (row.formation?.testOnly ? 'Épreuve' : 'Pratique');
-  const memberNameOf = (st, id) => st.team.find((m) => m.id === id)?.name || id;
 
   const checkDay = (row, date, label) => {
     if (!date) return;
@@ -1291,27 +1491,33 @@ export function roomFreeSlots(state, { date, duration }, excludeId = null) {
 // d'elle-même, suggestSlots reconnaissant qu'elle est déjà planifiée pour ce
 // stagiaire et cette recommandation.
 // ---------------------------------------------------------------------------
-export function suggestParcours(state, { stagiaire, formations: codes, type = 'Initial', aPartirDu = null, maxOptions = 2 }) {
+export function suggestParcours(state, {
+  stagiaire, formations: codes, type = 'Initial', aPartirDu = null, maxOptions = 2,
+  // Même point d'entrée que suggestSlots : sans lui, un « aujourd'hui »
+  // injecté par le serveur MCP était accepté puis perdu en chemin, et toute
+  // la chaîne retombait sur l'horloge réelle.
+  aujourdHui = dateDuJour(),
+} = {}) {
   if (!stagiaire || !Array.isArray(codes) || !codes.length) return [];
 
   const options = [];
   let depuis = aPartirDu;
 
   for (let n = 0; n < Math.max(1, maxOptions); n++) {
-    const parcours = composerParcours(state, { stagiaire, codes, type, aPartirDu: depuis });
+    const parcours = composerParcours(state, { stagiaire, codes, type, aPartirDu: depuis, aujourdHui });
     if (!parcours) break;
     options.push(parcours);
     // Option suivante : chercher à partir du lendemain du premier jour retenu,
     // pour proposer des dates réellement distinctes et non deux variantes du
     // même jour.
-    const lendemain = jourSuivant(state, parcours.jours[0]);
+    const lendemain = jourSuivant(state, parcours.jours[0], aujourdHui);
     if (!lendemain) break;
     depuis = lendemain;
   }
   return options;
 }
 
-function composerParcours(state, { stagiaire, codes, type, aPartirDu }) {
+function composerParcours(state, { stagiaire, codes, type, aPartirDu, aujourdHui }) {
   // Deux passes d'abord : toutes les formations, puis tous les tests. C'est ce
   // qui rend les journées continues — le formateur enchaîne ses formations, le
   // testeur enchaîne ses tests.
@@ -1321,11 +1527,11 @@ function composerParcours(state, { stagiaire, codes, type, aPartirDu }) {
   // tenir dans la journée alors que l'alternance y tenait, et une proposition
   // moins jolie vaut mieux que pas de proposition. « Dans la mesure du
   // possible » : le groupement est une préférence, jamais une condition.
-  return enDeuxPasses(state, { stagiaire, codes, type, aPartirDu })
-    || enUnePasse(state, { stagiaire, codes, type, aPartirDu });
+  return enDeuxPasses(state, { stagiaire, codes, type, aPartirDu, aujourdHui })
+    || enUnePasse(state, { stagiaire, codes, type, aPartirDu, aujourdHui });
 }
 
-function enDeuxPasses(state, { stagiaire, codes, type, aPartirDu }) {
+function enDeuxPasses(state, { stagiaire, codes, type, aPartirDu, aujourdHui }) {
   const sim = structuredClone(state);
   const lignes = [];
 
@@ -1338,7 +1544,7 @@ function enDeuxPasses(state, { stagiaire, codes, type, aPartirDu }) {
   // parcours qui tenait en un.
   let plancher = aPartirDu;
   for (const code of codes) {
-    const draft = suggestSlots(sim, { stagiaire, formation: code, type, aPartirDu: plancher, sansTest: true });
+    const draft = suggestSlots(sim, { stagiaire, formation: code, type, aPartirDu: plancher, sansTest: true, aujourdHui });
     if (!draft) return null;
     plancher = draft.datePratique;
     const insc = { id: sim.nextId++, statut: 'pre', modeTheorie: 'distance', ...draft };
@@ -1349,7 +1555,7 @@ function enDeuxPasses(state, { stagiaire, codes, type, aPartirDu }) {
   // Passe 2 — les tests pratiques, enchaînés entre eux, après leur formation.
   for (const ligne of lignes) {
     if (!formationByCode(sim.formations, ligne.formation)?.tests) continue;
-    const test = suggestTestPratique(sim, ligne.id, { aPartirDu: ligne.datePratique });
+    const test = suggestTestPratique(sim, ligne.id, { aPartirDu: ligne.datePratique, aujourdHui });
     if (!test) return null;
     Object.assign(ligne, test);
   }
@@ -1357,12 +1563,12 @@ function enDeuxPasses(state, { stagiaire, codes, type, aPartirDu }) {
   return finaliserParcours(state, sim, lignes);
 }
 
-function enUnePasse(state, { stagiaire, codes, type, aPartirDu }) {
+function enUnePasse(state, { stagiaire, codes, type, aPartirDu, aujourdHui }) {
   const sim = structuredClone(state);
   const lignes = [];
 
   for (const code of codes) {
-    const draft = suggestSlots(sim, { stagiaire, formation: code, type, aPartirDu });
+    const draft = suggestSlots(sim, { stagiaire, formation: code, type, aPartirDu, aujourdHui });
     if (!draft) return null; // une catégorie ne passe pas : le parcours entier échoue
     const insc = { id: sim.nextId++, statut: 'pre', modeTheorie: 'distance', ...draft };
     sim.inscriptions.push(insc);
@@ -1442,12 +1648,19 @@ function seancesDuParcours(state, rows) {
   return uniques.sort((a, b) => a.date.localeCompare(b.date) || a.debut - b.debut);
 }
 
+// Nom d'un intervenant. À défaut son identifiant : un message d'anomalie
+// nomme quelqu'un, et « null hors de sa période de disponibilité » n'aide
+// personne. Sans identifiant du tout, rien à nommer.
 function memberNameOf(state, id) {
   if (!id) return null;
-  return state.team.find((m) => m.id === id)?.name || null;
+  return state.team.find((m) => m.id === id)?.name || id;
 }
 
-function jourSuivant(state, date) {
-  const ouverts = workingDays(state.params).filter((d) => state.openDays.includes(d));
+// Dernier maillon de la chaîne « aujourd'hui ». Sans le paramètre, cette
+// fonction interrogeait l'horloge réelle alors que tout le reste de la
+// composition suivait la date injectée : la seconde option était introuvable
+// dès que la recherche portait sur autre chose que le jour même.
+function jourSuivant(state, date, aujourdHui = dateDuJour()) {
+  const ouverts = workingDays(state.params, aujourdHui).filter((d) => state.openDays.includes(d));
   return ouverts.find((d) => d > date) || null;
 }
