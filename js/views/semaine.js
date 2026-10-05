@@ -114,7 +114,10 @@ function gridHTML(state, days, kind) {
   const openSet = new Set(joursOuverts(state.openDays));
   const theoryEnd = state.params.theoryTime + state.params.theoryDuration;
 
-  const head = `<tr><th class="day-col">Jour</th><th class="who-col">Intervenant</th>${slots.map((t) => `<th>${fmtTime(t)}</th>`).join('')}</tr>`;
+  // L'intervenant d'abord, le jour ensuite : c'est la colonne de gauche qui
+  // reste collée au défilement, et le nom y est plus utile que la date — la
+  // date se retrouve, un nom se cherche.
+  const head = `<tr><th class="who-col">Intervenant</th><th class="day-col">Jour</th>${slots.map((t) => `<th>${fmtTime(t)}</th>`).join('')}</tr>`;
 
   const body = days.map((date) => {
     const open = openSet.has(date);
@@ -322,10 +325,12 @@ function gridHTML(state, days, kind) {
           // désormais sur fond sombre, où « muted-foreground » ne se lit plus.
           return `<span class="${over ? 'jour-charge-depasse' : ''}" title="Charge de pratique de ${name} : ${fmtTime(load).replace(':', 'h')} (max ${maxLabel}/formateur)">${name} ${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''}</span>`;
         });
-        loadInfo = `${parts.join(' · ')} <span class="jour-plafond">/ ${maxLabel}</span>`;
+        loadInfo = `<span class="qui-charge">${parts.join(' · ')} <span class="jour-plafond">/ ${maxLabel}</span></span>`;
       }
     }
-    return `<tr${classeLigne(date)}>${celluleJour(date, loadInfo)}<td class="who-col">${who}</td>${cells}</tr>`;
+    // La charge du jour accompagne désormais l'INTERVENANT : c'est la sienne,
+    // et la colonne du jour n'a plus que la largeur de sa date.
+    return `<tr${classeLigne(date)}><td class="who-col">${who}${loadInfo}</td>${celluleJour(date)}${cells}</tr>`;
   }).join('');
 
   // Les deux grilles ont le même nombre de créneaux, donc la même largeur

@@ -326,13 +326,31 @@ table.planning th, table.planning td {
   overflow-wrap: anywhere;
 }
 table.planning th { background: var(--muted); font-size: 10.5px; color: var(--muted-foreground); }
+/* Largeurs des deux colonnes de gauche. Elles doivent rester d'accord avec
+   LARGEUR_JOUR et LARGEUR_QUI (js/views/grille.js), qui servent à calculer la
+   largeur minimale du tableau : si les deux divergent, le tableau se comprime
+   ou déborde de ce qu'il a annoncé. */
 table.planning th.day-col, table.planning td.day-col {
-  text-align: left; width: 126px; font-weight: 600;
-  background: var(--muted); position: sticky; left: 0; z-index: 1;
-  color: var(--foreground);
+  text-align: left; width: 100px; font-weight: 600;
+  background: var(--muted); color: var(--foreground);
 }
 table.planning th.who-col, table.planning td.who-col {
-  text-align: left; width: 112px; background: var(--muted); font-size: 11px;
+  text-align: left; width: 142px; background: var(--muted); font-size: 11px;
+}
+/* La colonne de gauche reste collée au défilement horizontal, quelle qu'elle
+   soit : l'intervenant dans la grille de semaine, le jour dans les plannings
+   globaux, qui n'ont pas de colonne « Intervenant ». Accrocher le collant à
+   « day-col » l'aurait figée au milieu de la grille de semaine depuis que la
+   date est passée en seconde position. */
+table.planning th:first-child, table.planning td:first-child {
+  position: sticky; left: 0; z-index: 1;
+}
+/* La charge du jour par formateur, sous son nom. Elle n'est plus sur fond
+   sombre : elle reprend donc la couleur discrète des informations secondaires. */
+.qui-charge {
+  display: block; margin-top: 2px; font-size: 10px; font-weight: 400;
+  color: var(--muted-foreground);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* Hauteur de ligne uniforme (la valeur vient de js/views/grille.js, posée en
    style d'attribut sur le tableau). Sans elle, chaque ligne se dimensionnait
@@ -361,7 +379,7 @@ table.planning.planning-global td.day-col { white-space: nowrap; }
 table.planning:not(.planning-global) td.day-col,
 table.planning:not(.planning-global) tr.ligne-alt td.day-col {
   background: var(--jour-fond); color: var(--jour-texte);
-  padding: 5px 8px; line-height: 1.1;
+  padding: 5px 6px; line-height: 1.1; text-align: center;
 }
 .jour-sem {
   display: block; font-size: 10px; font-weight: 700;
@@ -370,20 +388,16 @@ table.planning:not(.planning-global) tr.ligne-alt td.day-col {
 .jour-date {
   display: block; font-size: 28px; font-weight: 800;
   line-height: 1.05; letter-spacing: -0.02em;
+  /* Jamais sur deux lignes : repliée en « 05/1 » + « 0 », la date faisait
+     monter sa journée à 82 px pendant que les autres restaient à 66, et la
+     grille repartait en escalier. La colonne est dimensionnée pour la
+     contenir ; ceci est la ceinture. */
+  white-space: nowrap;
 }
 /* La charge du jour vit maintenant sur fond sombre : « muted-foreground » n'y
    était plus lisible, et le rouge d'un dépassement non plus. */
-.jour-note {
-  display: block; font-size: 9px; font-weight: 500; opacity: 0.85; margin-top: 1px;
-  letter-spacing: -0.01em;
-  /* Sur une seule ligne, quitte à couper : repliée, « GARCIA 03h00 / 06h00 »
-     poussait sa journée plus haut que les autres et la grille repartait en
-     escalier — ce que la hauteur uniforme sert justement à éviter. Le détail
-     complet reste dans l'infobulle de chaque formateur. */
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
 .jour-plafond { opacity: 0.7; }
-.jour-charge-depasse { font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
+.jour-charge-depasse { color: var(--error); font-weight: 700; }
 
 /* Le trait qui encadre la journée. « border-collapse » fait que la bordure
    basse d'une journée et la bordure haute de la suivante n'en forment qu'une :
@@ -621,13 +635,13 @@ dialog.cmdk {
      c'est « table-layout: fixed » qui s'en charge, pas cette largeur. */
   table.planning { font-size: 8.5px; min-width: 0 !important; }
   table.planning th, table.planning td { padding: 1px 2px; }
-  table.planning th.day-col, table.planning td.day-col { width: 72px; }
+  table.planning th.day-col, table.planning td.day-col { width: 58px; }
   /* À l'impression la colonne tombe à 72 px : la date reprend une taille
      raisonnable, le trait de journée reste. */
   .jour-date { font-size: 15px; }
   .jour-sem { font-size: 8px; letter-spacing: 0.08em; }
-  .jour-note { font-size: 7.5px; }
-  table.planning th.who-col, table.planning td.who-col { width: 78px; }
+  .qui-charge { font-size: 7.5px; }
+  table.planning th.who-col, table.planning td.who-col { width: 92px; }
   .grid-wrap, .table-wrap { overflow: visible; }
   a { color: inherit; text-decoration: none; }
 }

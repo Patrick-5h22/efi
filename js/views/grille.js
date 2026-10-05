@@ -12,10 +12,16 @@
 
 import { dayOfWeek, fmtJourSemaine, fmtJourMois } from '../dates.js';
 
-// « Jour » porte la date ET la charge du jour par formateur
-// (« MEDAN 01h30 / 06h00 ») : plus étroite, cette ligne passait sur deux.
-export const LARGEUR_JOUR = 142;      // colonne « Jour »
-export const LARGEUR_QUI = 112;       // colonne « Intervenant », quand elle existe
+// « Jour » ne porte plus que sa date, en gros : « 05/10 » en 28 px mesure
+// 86 px, d'où les 100 px de la colonne — mesuré, pas estimé. La charge
+// du jour par formateur (« MEDAN 01h30 / 06h00 ») a rejoint l'intervenant, à
+// qui elle appartient — d'où les 142 px de cette colonne-là, sans quoi la
+// ligne de charge se replie.
+//
+// Dans les plannings globaux, qui n'ont pas de colonne « Intervenant », la
+// colonne « Jour » reste la première et garde son en-tête d'origine.
+export const LARGEUR_JOUR = 100;      // colonne « Jour »
+export const LARGEUR_QUI = 142;       // colonne « Intervenant », quand elle existe
 export const LARGEUR_CRENEAU = 58;    // une demi-heure
 
 // Hauteur de ligne uniforme, pour la vue Semaine seulement. Une cellule
@@ -59,11 +65,10 @@ export function styleGrille(nbCreneaux, { intervenant = false, hauteur = HAUTEUR
 // où une journée commence et où elle finit. Le trait qui encadre chaque
 // journée s'en charge désormais (css/style.css), et la date en 28 px se lit
 // sans chercher la colonne de gauche.
-export function celluleJour(date, dessous = '') {
+export function celluleJour(date) {
   return `<td class="day-col jour-bloc">`
     + `<span class="jour-sem">${fmtJourSemaine(date, 3)}</span>`
     + `<span class="jour-date">${fmtJourMois(date)}</span>`
-    + (dessous ? `<span class="jour-note">${dessous}</span>` : '')
     + '</td>';
 }
 
