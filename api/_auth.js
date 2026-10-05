@@ -81,6 +81,18 @@ export const auth = betterAuth({
           return {
             name: profile.name,
             email: profile.email,
+            // Entra n'émet AUCUN claim « email_verified », et les claims de
+            // repli que cherche better-auth (verified_primary_email) ne sont
+            // pas activés par défaut : sans cette ligne, le fournisseur rend
+            // emailVerified = false et chaque compte créé ici l'est avec une
+            // adresse réputée non vérifiée. C'est faux — l'adresse vient du
+            // jeton d'identité d'un tenant restreint, et l'accès est encore
+            // filtré par les groupes autorisés juste au-dessus. Nul ne choisit
+            // l'adresse qu'Entra inscrit dans son jeton.
+            //
+            // Cette ligne est spread APRÈS emailVerified dans le fournisseur
+            // (@better-auth/core, microsoft-entra-id.mjs) : elle l'emporte.
+            emailVerified: true,
             ...(role ? { role } : {}),
           };
         },
@@ -120,6 +132,28 @@ export const auth = betterAuth({
     accountLinking: {
       enabled: true,
       trustedProviders: ['microsoft'],
+      // Pourquoi false. better-auth refuse la liaison quand la ligne LOCALE
+      // porte email_verified = false (requireLocalEmailVerified, vrai par
+      // défaut — voir oauth2/link-account.mjs). Or Entra n'émettant pas le
+      // claim, toutes les lignes déjà créées ici le sont à false : la
+      // condition ne protégeait rien, elle bloquait tout rattachement futur.
+      //
+      // Symptôme : un utilisateur dont le compte existe déjà mais dont le
+      // couple (microsoft, oid) n'est lié à rien — compte venu d'efi-placement,
+      // ou identité Entra recréée donc oid changé — se voit refuser la
+      // connexion avec « account_not_linked ». Les autres ne voient rien :
+      // leur oid est déjà lié, et ce chemin ne passe pas par la vérification.
+      //
+      // Ce que la condition protège ailleurs : un tiers dépose un compte local
+      // non vérifié à l'adresse d'un collègue, attend qu'il arrive par OAuth,
+      // et hérite de sa session. Ici l'inscription est fermée sur cette
+      // application (disableSignUp) et l'adresse vient du jeton d'un tenant
+      // restreint, filtré par groupes.
+      //
+      // À retirer quand toutes les lignes héritées porteront email_verified
+      // = true : « emailVerified: true » ci-dessus les répare au fil des
+      // connexions (overrideUserInfo rejoue le mapping à chaque fois).
+      requireLocalEmailVerified: false,
     },
     fields: {
       userId: 'user_id',
