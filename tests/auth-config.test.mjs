@@ -51,6 +51,30 @@ test('better-auth : connexion Microsoft (Entra ID) configurée', () => {
     'un compte existant (même email) est rattaché à son identité Microsoft');
 });
 
+// Le refus « account_not_linked » qu'a rencontré un utilisateur dont le compte
+// existait déjà sans être lié à son identité Entra. Deux réglages s'y
+// répondent, et aucun des deux ne se voyait : ils sont tous les deux des
+// DÉFAUTS de better-auth qu'il faut contredire explicitement.
+test('better-auth : un compte existant peut être lié à son identité Microsoft', () => {
+  const o = auth.options;
+  // Entra n'émet pas « email_verified » : sans ce réglage, better-auth refuse
+  // la liaison de toute ligne locale — c'est-à-dire de toutes, ici.
+  assert.equal(o.account.accountLinking.requireLocalEmailVerified, false,
+    'la vérification locale ne doit pas bloquer la liaison : Entra ne la renseigne jamais');
+
+  // Et la source du mal : le profil doit annoncer l'adresse comme vérifiée,
+  // sans quoi chaque nouveau compte naît avec la même infirmité.
+  const map = o.socialProviders.microsoft.mapProfileToUser;
+  const avant = process.env.MICROSOFT_ALLOWED_GROUPS;
+  delete process.env.MICROSOFT_ALLOWED_GROUPS;
+  try {
+    assert.equal(map({ name: 'Test', email: 't@cipecma.com' }).emailVerified, true,
+      'l’adresse vient du jeton d’identité Entra : elle est vérifiée');
+  } finally {
+    if (avant !== undefined) process.env.MICROSOFT_ALLOWED_GROUPS = avant;
+  }
+});
+
 test('better-auth : groupes Entra — accès et rôle appliqués à la connexion Microsoft', () => {
   const map = auth.options.socialProviders.microsoft.mapProfileToUser;
   assert.equal(typeof map, 'function');
