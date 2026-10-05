@@ -209,8 +209,10 @@ const bandes = await p.evaluate(() => {
     date: tr.querySelector('.jour-date')?.textContent.trim(),
     traitHaut: parseFloat(getComputedStyle(tr.querySelector('td.day-col')).borderTopWidth),
     // textContent et non innerText : les capitales viennent du CSS, et
-    // innerText rendrait le texte TEL QU'IL EST PEINT — « MAR ».
+    // innerText rendrait le texte TEL QU'IL EST PEINT — « MARDI ».
     capitales: getComputedStyle(tr.querySelector('.jour-sem')).textTransform,
+    poidsJour: getComputedStyle(tr.querySelector('.jour-sem')).fontWeight,
+    poidsDate: getComputedStyle(tr.querySelector('.jour-date')).fontWeight,
     alt: tr.classList.contains('ligne-alt'),
     h: Math.round(tr.getBoundingClientRect().height),
     fondJour: fond(tr.querySelector('td.day-col')),
@@ -226,7 +228,7 @@ check('une ligne sur deux porte la bande',
   bandes.filter((l) => l.alt).length === 2 && bandes.filter((l) => !l.alt).length === 3,
   bandes.map((l) => `${l.jour}${l.alt ? '*' : ''}`).join(' '));
 check('la bande suit le jour de la semaine (mardi, jeudi)',
-  bandes.every((l) => l.alt === ['Mar', 'Jeu'].includes(l.jour)),
+  bandes.every((l) => l.alt === ['Mardi', 'Jeudi'].includes(l.jour)),
   bandes.filter((l) => l.alt).map((l) => l.jour).join(', '));
 
 const [alt] = bandes.filter((l) => l.alt);
@@ -242,10 +244,17 @@ check('…et il tranche avec le créneau libre voisin',
   normale.fondJour !== normale.fondLibre, `${normale.fondJour} vs ${normale.fondLibre}`);
 check('la date s’écrit en gros', bandes.every((l) => /^\d{2}\/\d{2}$/.test(l.date || '')),
   bandes.map((l) => l.date).join(' '));
-check('le jour de la semaine la surmonte', bandes.every((l) => /^[A-Za-zÉé]{3}$/.test(l.jour || '')),
+// Le jour s'écrit en entier : c'est une demande explicite, et rien ne la
+// tenait — repasser à « Mar » n'aurait fait échouer aucune suite.
+check('le jour de la semaine la surmonte, écrit en ENTIER',
+  bandes.every((l) => ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
+    .includes(l.jour || '')),
   bandes.map((l) => l.jour).join(' '));
 check('…en capitales', bandes.every((l) => l.capitales === 'uppercase'),
   [...new Set(bandes.map((l) => l.capitales))].join(', '));
+check('…et sans gras : c’est une étiquette, la date est le titre',
+  bandes.every((l) => Number(l.poidsJour) <= 500 && Number(l.poidsDate) > Number(l.poidsJour)),
+  `jour ${bandes[0]?.poidsJour} · date ${bandes[0]?.poidsDate}`);
 check('un trait franc referme chaque journée',
   bandes.every((l) => l.traitHaut >= 2), bandes.map((l) => l.traitHaut).join(', '));
 
@@ -264,18 +273,35 @@ const colonnes = await p.evaluate(() => {
   const td = tbl.querySelector('td.day-col');
   const date = td.querySelector('.jour-date');
   // Largeur réelle du texte, hors contrainte de la cellule.
-  const son = document.createElement('span');
-  const cs = getComputedStyle(date);
-  son.textContent = date.textContent;
-  son.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${cs.font};letter-spacing:${cs.letterSpacing}`;
-  document.body.appendChild(son);
-  const texte = son.getBoundingClientRect().width;
-  son.remove();
+  const mesurer = (texte, el) => {
+    const son = document.createElement('span');
+    const cs = getComputedStyle(el);
+    son.textContent = texte;
+    son.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap'
+      + `;font:${cs.font};letter-spacing:${cs.letterSpacing};text-transform:${cs.textTransform}`;
+    document.body.appendChild(son);
+    const w = son.getBoundingClientRect().width;
+    son.remove();
+    return w;
+  };
+  const texte = mesurer(date.textContent, date);
+  // Le PIRE des sept jours, pas celui qui se trouve affiché : la grille d'une
+  // autre semaine ne doit pas découvrir que « dimanche » ne rentre pas.
+  const sem = td.querySelector('.jour-sem');
+  const pire = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
+    .map((j) => ({ j, w: mesurer(j, sem) })).sort((a, z) => z.w - a.w)[0];
+  const padTd = getComputedStyle(td);
   const premier = tbl.querySelector('tbody tr td') || tbl.querySelector('tr td');
   return {
     entetes,
     largeurJour: Math.round(td.getBoundingClientRect().width),
     largeurTexte: Math.ceil(texte),
+    // Place réellement disponible pour le texte, padding déduit.
+    utile: td.getBoundingClientRect().width
+      - parseFloat(padTd.paddingLeft) - parseFloat(padTd.paddingRight),
+    pireJour: pire.j,
+    largeurPireJour: Math.ceil(pire.w),
+    replieJour: sem.getClientRects().length > 1,
     collant: getComputedStyle(premier).position,
     classePremier: premier.className,
   };
@@ -292,6 +318,12 @@ check('la colonne « Jour » est à la taille de sa date, sans excès',
   colonnes.largeurJour >= colonnes.largeurTexte + 8
   && colonnes.largeurJour <= colonnes.largeurTexte + 32,
   `colonne ${colonnes.largeurJour} px pour ${colonnes.largeurTexte} px de texte`);
+// La condition posée pour écrire le jour en entier : « pourvu que cela tienne
+// en largeur ». Le jour le plus long de la semaine, et non celui qui se trouve
+// à l'écran — sans quoi la suite passerait un mardi et casserait un dimanche.
+check(`le plus long jour de la semaine y tient d’une seule ligne (${colonnes.pireJour})`,
+  colonnes.largeurPireJour <= colonnes.utile && !colonnes.replieJour,
+  `${colonnes.pireJour} : ${colonnes.largeurPireJour} px pour ${Math.floor(colonnes.utile)} px utiles`);
 const libreAlt = bandes.find((l) => l.alt && l.fondLibre)?.fondLibre;
 const libreNormal = bandes.find((l) => !l.alt && l.fondLibre)?.fondLibre;
 check('un créneau libre est teinté sur la bande, pas ailleurs',
@@ -309,11 +341,11 @@ check('un jour fermé garde la sienne', fondsFermes.length === 1, fondsFermes.jo
 // ligne dépasse donc, mais d'une ligne de texte — pas du double. Avant, la
 // formation était réécrite pour chaque stagiaire et mercredi faisait 103 px
 // contre 46 aux autres.
-const sansPile = bandes.filter((l) => !['Mer'].includes(l.jour));
+const sansPile = bandes.filter((l) => !['Mercredi'].includes(l.jour));
 check('toutes les lignes ordinaires ont exactement la même hauteur',
   new Set(sansPile.map((l) => l.h)).size === 1,
   sansPile.map((l) => `${l.jour} ${l.h}px`).join(' | '));
-const mer = bandes.find((l) => l.jour === 'Mer');
+const mer = bandes.find((l) => l.jour === 'Mercredi');
 const ordinaire = sansPile[0].h;
 check('une cellule à deux stagiaires n’ajoute qu’une ligne de texte',
   mer.h > ordinaire && mer.h < ordinaire * 2,

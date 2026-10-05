@@ -381,9 +381,18 @@ table.planning:not(.planning-global) tr.ligne-alt td.day-col {
   background: var(--jour-fond); color: var(--jour-texte);
   padding: 5px 6px; line-height: 1.1; text-align: center;
 }
+/* Le jour de la semaine, en entier et sans gras. Il surmonte la date : c'est
+   une étiquette, pas un titre, et le gras la mettait au même niveau d'insistance
+   que la date en 28 px. « DIMANCHE », le plus long, mesure 66 px ici pour 88 px
+   utiles — mesuré, pas estimé.
+
+   « nowrap » pour la même raison que sur la date : replié sur deux lignes, un
+   jour ferait monter sa ligne au-dessus des autres et la grille repartirait en
+   escalier. La colonne est dimensionnée pour le contenir ; ceci est la ceinture. */
 .jour-sem {
-  display: block; font-size: 10px; font-weight: 700;
+  display: block; font-size: 10px; font-weight: 500;
   letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.8;
+  white-space: nowrap;
 }
 .jour-date {
   display: block; font-size: 28px; font-weight: 800;
@@ -635,11 +644,16 @@ dialog.cmdk {
      c'est « table-layout: fixed » qui s'en charge, pas cette largeur. */
   table.planning { font-size: 8.5px; min-width: 0 !important; }
   table.planning th, table.planning td { padding: 1px 2px; }
-  table.planning th.day-col, table.planning td.day-col { width: 58px; }
-  /* À l'impression la colonne tombe à 72 px : la date reprend une taille
-     raisonnable, le trait de journée reste. */
+  /* À l'impression la date reprend une taille raisonnable et le trait de
+     journée reste, mais la colonne se resserre — et c'est là que le jour écrit
+     en entier devient contraignant : « DIMANCHE » en 8 px / 0.08em mesure
+     49 px pour 46 px utiles, et se replierait. D'où 66 px de colonne et un
+     interlettrage réduit : 46 px de texte pour 54 px utiles. Six pixels de
+     plus sur une seule colonne, à côté d'une vingtaine de créneaux à 58 px,
+     ne changent rien à la tenue de la page. */
+  table.planning th.day-col, table.planning td.day-col { width: 66px; }
   .jour-date { font-size: 15px; }
-  .jour-sem { font-size: 8px; letter-spacing: 0.08em; }
+  .jour-sem { font-size: 8px; letter-spacing: 0.04em; }
   .qui-charge { font-size: 7.5px; }
   table.planning th.who-col, table.planning td.who-col { width: 92px; }
   .grid-wrap, .table-wrap { overflow: visible; }

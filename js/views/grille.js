@@ -65,9 +65,14 @@ export function styleGrille(nbCreneaux, { intervenant = false, hauteur = HAUTEUR
 // où une journée commence et où elle finit. Le trait qui encadre chaque
 // journée s'en charge désormais (css/style.css), et la date en 28 px se lit
 // sans chercher la colonne de gauche.
+//
+// Le jour s'écrit EN ENTIER, plus en trois lettres. « DIMANCHE », le plus
+// long, mesure 66 px en 10 px maigre — la colonne en offre 88, puisque c'est
+// la date qui la dimensionne. Abréger ne gagnait donc aucune place ; cela
+// coûtait seulement une lecture (« JEU » se cherche, « JEUDI » se lit).
 export function celluleJour(date) {
   return `<td class="day-col jour-bloc">`
-    + `<span class="jour-sem">${fmtJourSemaine(date, 3)}</span>`
+    + `<span class="jour-sem">${fmtJourSemaine(date)}</span>`
     + `<span class="jour-date">${fmtJourMois(date)}</span>`
     + '</td>';
 }
