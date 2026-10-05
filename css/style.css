@@ -351,6 +351,48 @@ table.planning td { height: var(--h-ligne, auto); vertical-align: middle; }
 table.planning.planning-global td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 table.planning.planning-global td.day-col { white-space: nowrap; }
 
+/* En-tête de jour des grilles de SEMAINE (le planning global garde le sien :
+   86 lignes de 28 px n'ont pas la place d'une date en 28 px).
+   
+   L'alternance claire/foncée seule ne suffisait pas à voir où une journée
+   commence et où elle finit. Deux réponses qui se cumulent : le bloc du jour
+   passe à contre-ton du reste de la grille, date en gros ; et un trait franc
+   referme chaque journée sur ses quatre côtés. */
+table.planning:not(.planning-global) td.day-col,
+table.planning:not(.planning-global) tr.ligne-alt td.day-col {
+  background: var(--jour-fond); color: var(--jour-texte);
+  padding: 5px 8px; line-height: 1.1;
+}
+.jour-sem {
+  display: block; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.8;
+}
+.jour-date {
+  display: block; font-size: 28px; font-weight: 800;
+  line-height: 1.05; letter-spacing: -0.02em;
+}
+/* La charge du jour vit maintenant sur fond sombre : « muted-foreground » n'y
+   était plus lisible, et le rouge d'un dépassement non plus. */
+.jour-note {
+  display: block; font-size: 9px; font-weight: 500; opacity: 0.85; margin-top: 1px;
+  letter-spacing: -0.01em;
+  /* Sur une seule ligne, quitte à couper : repliée, « GARCIA 03h00 / 06h00 »
+     poussait sa journée plus haut que les autres et la grille repartait en
+     escalier — ce que la hauteur uniforme sert justement à éviter. Le détail
+     complet reste dans l'infobulle de chaque formateur. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.jour-plafond { opacity: 0.7; }
+.jour-charge-depasse { font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
+
+/* Le trait qui encadre la journée. « border-collapse » fait que la bordure
+   basse d'une journée et la bordure haute de la suivante n'en forment qu'une :
+   deux journées voisines sont séparées par un seul trait, pas deux. */
+table.planning:not(.planning-global) td { border-top: 2px solid var(--jour-trait); }
+table.planning:not(.planning-global) tr:last-child td { border-bottom: 2px solid var(--jour-trait); }
+table.planning:not(.planning-global) td:first-child { border-left: 2px solid var(--jour-trait); }
+table.planning:not(.planning-global) td:last-child { border-right: 2px solid var(--jour-trait); }
+
 /* Bandes horizontales : une ligne sur deux est teintée, pour suivre un jour
    sur toute la largeur sans changer de ligne en route. La teinte ne touche
    que les cellules NEUTRES — libre, hors service, et les deux colonnes de
@@ -580,6 +622,11 @@ dialog.cmdk {
   table.planning { font-size: 8.5px; min-width: 0 !important; }
   table.planning th, table.planning td { padding: 1px 2px; }
   table.planning th.day-col, table.planning td.day-col { width: 72px; }
+  /* À l'impression la colonne tombe à 72 px : la date reprend une taille
+     raisonnable, le trait de journée reste. */
+  .jour-date { font-size: 15px; }
+  .jour-sem { font-size: 8px; letter-spacing: 0.08em; }
+  .jour-note { font-size: 7.5px; }
   table.planning th.who-col, table.planning td.who-col { width: 78px; }
   .grid-wrap, .table-wrap { overflow: visible; }
   a { color: inherit; text-decoration: none; }

@@ -205,7 +205,12 @@ const bandes = await p.evaluate(() => {
   const tbl = document.querySelector('#main table.planning');
   const fond = (el) => (el ? getComputedStyle(el).backgroundColor : null);
   return [...tbl.querySelectorAll('tr')].slice(1).map((tr) => ({
-    jour: tr.querySelector('td.day-col')?.textContent.trim().slice(0, 3),
+    jour: tr.querySelector('.jour-sem')?.textContent.trim(),
+    date: tr.querySelector('.jour-date')?.textContent.trim(),
+    traitHaut: parseFloat(getComputedStyle(tr.querySelector('td.day-col')).borderTopWidth),
+    // textContent et non innerText : les capitales viennent du CSS, et
+    // innerText rendrait le texte TEL QU'IL EST PEINT — « MAR ».
+    capitales: getComputedStyle(tr.querySelector('.jour-sem')).textTransform,
     alt: tr.classList.contains('ligne-alt'),
     h: Math.round(tr.getBoundingClientRect().height),
     fondJour: fond(tr.querySelector('td.day-col')),
@@ -226,8 +231,23 @@ check('la bande suit le jour de la semaine (mardi, jeudi)',
 
 const [alt] = bandes.filter((l) => l.alt);
 const [normale] = bandes.filter((l) => !l.alt);
-check('la colonne « Jour » change de fond d’une bande à l’autre',
-  alt.fondJour !== normale.fondJour, `${alt.fondJour} vs ${normale.fondJour}`);
+
+// L'en-tête de jour ne suit plus la bande, et c'est voulu : il est désormais
+// un bloc à contre-ton, identique d'une journée à l'autre. L'alternance seule
+// ne suffisait pas à voir où un jour commence — le bloc et le trait s'en
+// chargent, la bande ne sert plus qu'à suivre la ligne vers la droite.
+check('l’en-tête de jour est un bloc uniforme, bande ou non',
+  alt.fondJour === normale.fondJour, `${alt.fondJour} vs ${normale.fondJour}`);
+check('…et il tranche avec le créneau libre voisin',
+  normale.fondJour !== normale.fondLibre, `${normale.fondJour} vs ${normale.fondLibre}`);
+check('la date s’écrit en gros', bandes.every((l) => /^\d{2}\/\d{2}$/.test(l.date || '')),
+  bandes.map((l) => l.date).join(' '));
+check('le jour de la semaine la surmonte', bandes.every((l) => /^[A-Za-zÉé]{3}$/.test(l.jour || '')),
+  bandes.map((l) => l.jour).join(' '));
+check('…en capitales', bandes.every((l) => l.capitales === 'uppercase'),
+  [...new Set(bandes.map((l) => l.capitales))].join(', '));
+check('un trait franc referme chaque journée',
+  bandes.every((l) => l.traitHaut >= 2), bandes.map((l) => l.traitHaut).join(', '));
 const libreAlt = bandes.find((l) => l.alt && l.fondLibre)?.fondLibre;
 const libreNormal = bandes.find((l) => !l.alt && l.fondLibre)?.fondLibre;
 check('un créneau libre est teinté sur la bande, pas ailleurs',

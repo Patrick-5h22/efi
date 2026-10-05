@@ -8,7 +8,7 @@ import { weekDays, daySlots, fmtTime, fmtDateDay, fmtDateShort, isWeekend, semai
 import { unionDuration, semainesConsultables } from '../engine.js';
 import { chargeComptee, chevauchePause, testSurveille, siteById, joursOuverts } from '../config.js';
 import { openInscriptionForm } from './form.js';
-import { styleGrille, classeLigne } from './grille.js';
+import { styleGrille, classeLigne, celluleJour } from './grille.js';
 
 export function renderSemaine(main, args) {
   const state = app.state;
@@ -318,12 +318,14 @@ function gridHTML(state, days, kind) {
         const parts = [...byTrainer.entries()].map(([id, load]) => {
           const over = load > state.params.maxDailyLoad;
           const name = id === '?' ? '?' : esc(memberName(state, id).split(' ')[0] || id);
-          return `<span style="color:${over ? 'var(--error)' : 'var(--muted-foreground)'}" title="Charge de pratique de ${name} : ${fmtTime(load).replace(':', 'h')} (max ${maxLabel}/formateur)">${name} ${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''}</span>`;
+          // Les couleurs passent par des classes : l'en-tête de jour est
+          // désormais sur fond sombre, où « muted-foreground » ne se lit plus.
+          return `<span class="${over ? 'jour-charge-depasse' : ''}" title="Charge de pratique de ${name} : ${fmtTime(load).replace(':', 'h')} (max ${maxLabel}/formateur)">${name} ${fmtTime(load).replace(':', 'h')}${over ? ' ⚠' : ''}</span>`;
         });
-        loadInfo = `<br><span style="font-weight:400;font-size:10px">${parts.join(' · ')} <span style="color:var(--muted-foreground)">/ ${maxLabel}</span></span>`;
+        loadInfo = `${parts.join(' · ')} <span class="jour-plafond">/ ${maxLabel}</span>`;
       }
     }
-    return `<tr${classeLigne(date)}><td class="day-col">${fmtDateDay(date)}${loadInfo}</td><td class="who-col">${who}</td>${cells}</tr>`;
+    return `<tr${classeLigne(date)}>${celluleJour(date, loadInfo)}<td class="who-col">${who}</td>${cells}</tr>`;
   }).join('');
 
   // Les deux grilles ont le même nombre de créneaux, donc la même largeur
