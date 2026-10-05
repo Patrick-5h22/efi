@@ -248,6 +248,50 @@ check('…en capitales', bandes.every((l) => l.capitales === 'uppercase'),
   [...new Set(bandes.map((l) => l.capitales))].join(', '));
 check('un trait franc referme chaque journée',
   bandes.every((l) => l.traitHaut >= 2), bandes.map((l) => l.traitHaut).join(', '));
+
+// ---------------------------------------------------------------------------
+// L'ordre des deux colonnes de gauche, et la largeur de celle du jour.
+//
+// L'intervenant vient en PREMIER : c'est la colonne de gauche qui reste collée
+// au défilement horizontal, et un nom s'y cherche là où une date se retrouve.
+// Rien ne le vérifiait — la colonne a pu passer de l'autre côté sans qu'une
+// seule suite bronche.
+// ---------------------------------------------------------------------------
+const colonnes = await p.evaluate(() => {
+  const tbl = document.querySelector('#main table.planning');
+  const entetes = [...tbl.querySelectorAll('tr th')].slice(0, 2)
+    .map((th) => ({ texte: th.textContent.trim(), classe: th.className }));
+  const td = tbl.querySelector('td.day-col');
+  const date = td.querySelector('.jour-date');
+  // Largeur réelle du texte, hors contrainte de la cellule.
+  const son = document.createElement('span');
+  const cs = getComputedStyle(date);
+  son.textContent = date.textContent;
+  son.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${cs.font};letter-spacing:${cs.letterSpacing}`;
+  document.body.appendChild(son);
+  const texte = son.getBoundingClientRect().width;
+  son.remove();
+  const premier = tbl.querySelector('tbody tr td') || tbl.querySelector('tr td');
+  return {
+    entetes,
+    largeurJour: Math.round(td.getBoundingClientRect().width),
+    largeurTexte: Math.ceil(texte),
+    collant: getComputedStyle(premier).position,
+    classePremier: premier.className,
+  };
+});
+
+check('la colonne « Intervenant » vient en premier',
+  colonnes.entetes[0]?.texte === 'Intervenant', colonnes.entetes.map((e) => e.texte).join(' | '));
+check('…et « Jour » juste après',
+  colonnes.entetes[1]?.texte === 'Jour', colonnes.entetes.map((e) => e.texte).join(' | '));
+check('c’est la PREMIÈRE colonne qui reste collée au défilement',
+  colonnes.collant === 'sticky' && colonnes.classePremier.includes('who-col'),
+  `${colonnes.collant} sur « ${colonnes.classePremier} »`);
+check('la colonne « Jour » est à la taille de sa date, sans excès',
+  colonnes.largeurJour >= colonnes.largeurTexte + 8
+  && colonnes.largeurJour <= colonnes.largeurTexte + 32,
+  `colonne ${colonnes.largeurJour} px pour ${colonnes.largeurTexte} px de texte`);
 const libreAlt = bandes.find((l) => l.alt && l.fondLibre)?.fondLibre;
 const libreNormal = bandes.find((l) => !l.alt && l.fondLibre)?.fondLibre;
 check('un créneau libre est teinté sur la bande, pas ailleurs',
