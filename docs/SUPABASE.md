@@ -222,6 +222,32 @@ retiré des groupes garde sa session en cours (7 jours max) mais sera
 refusé à sa prochaine connexion Microsoft. La connexion par email + mot
 de passe n'est pas concernée par ces règles.
 
+### Vérifier ce que ces bornes laissent réellement passer
+
+`MICROSOFT_TENANT_ID` et `MICROSOFT_ALLOWED_GROUPS` décident à elles deux
+de qui peut entrer, et **toutes deux échouent vers le plus permissif sans
+jamais lever d'erreur** : tenant absent → `api/_auth.js` retombe sur
+`common`, c'est-à-dire n'importe quel compte Microsoft, personnel
+compris ; groupes vides → `isAllowed()` accepte tout le monde. Un
+déploiement grand ouvert est donc indiscernable d'un déploiement
+verrouillé tant qu'on se contente de constater que les variables sont
+renseignées — `common` est une valeur renseignée.
+
+D'où un diagnostic, qui dit la **forme** des valeurs et ce qu'elles
+laissent passer, jamais les valeurs elles-mêmes :
+
+- `GET /api/diag-entra` — réservé aux **gestionnaires**, et exécuté là où
+  les variables vivent réellement (c'est le seul endroit qui juge la
+  production) ;
+- `npm run entra` — la même logique sur l'environnement local, utile
+  après un `vercel env pull`. Sort en 1 sur une alerte, pour qu'une CI
+  ou un cron puisse s'en saisir.
+
+Quatre verdicts : `ok` (le tenant restreint, avec ou sans groupes),
+`attention` (seuls les groupes retiennent — un compte d'une autre
+organisation membre d'un groupe autorisé entrerait), `alerte` (aucune
+barrière) et `inactif` (pas d'application Azure configurée).
+
 ## Déploiement (intégration Git Vercel)
 
 Le dépôt est connecté au projet Vercel `efi` : **chaque push sur `main`
