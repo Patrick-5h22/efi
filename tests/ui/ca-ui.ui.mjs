@@ -66,7 +66,16 @@ await page.keyboard.press('Escape'); await page.waitForTimeout(300);
 await page.goto(BASE + '/#/ca'); await page.waitForTimeout(600);
 const ca = await page.locator('#main').innerText();
 check('écran CA accessible', ca.includes('Chiffre d’affaires'));
-check('bloc mensuel « Septembre 2026 »', ca.includes('Septembre 2026'));
+// Le libellé du mois est LU dans l'état, jamais écrit en clair : les jours
+// ouverts d'une installation neuve suivent la fenêtre glissante, et le test
+// est tombé tout seul le jour où le calendrier a passé septembre.
+const moisAttendu = await page.evaluate(async () => {
+  const { moisLabel } = await import('/js/ca.js');
+  const st = JSON.parse(localStorage.getItem('efi-planning-v1'));
+  const i = st.inscriptions.find((x) => x.stagiaire === 'NEAU Emmanuel');
+  return moisLabel(i.datePratique.slice(0, 7));
+});
+check(`bloc mensuel « ${moisAttendu} »`, ca.includes(moisAttendu), moisAttendu);
 check('sous-total mensuel', ca.includes('Sous-total'));
 check('total par recommandation', ca.includes('Total par recommandation'));
 check('KPI dossier', ca.includes('dossier(s) YPAREO'));

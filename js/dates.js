@@ -84,8 +84,22 @@ export function fmtDateShort(iso) {
 
 export function fmtDateDay(iso) {
   if (!iso) return '';
+  return `${fmtJourSemaine(iso, 3)} ${fmtJourMois(iso)}`;
+}
+
+// Les deux moitiés de fmtDateDay, séparément : l'en-tête de jour des grilles
+// écrit le jour de la semaine en petites capitales AU-DESSUS de la date, en
+// gros. « Lun 05/10 » sur une seule ligne ne se lisait pas de loin.
+export function fmtJourSemaine(iso, lettres = 0) {
+  if (!iso) return '';
+  const nom = DAY_NAMES[dayOfWeek(iso)] || '';
+  return lettres ? nom.slice(0, lettres) : nom;
+}
+
+export function fmtJourMois(iso) {
+  if (!iso) return '';
   const d = parseISO(iso);
-  return `${DAY_NAMES[dayOfWeek(iso)].slice(0, 3)} ${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -10,11 +10,11 @@
 // La largeur fixe supprimant tout plancher par cellule, c'est au tableau de
 // porter sa largeur minimale ; en deçà, c'est à son conteneur de défiler.
 
-import { dayOfWeek } from '../dates.js';
+import { dayOfWeek, fmtJourSemaine, fmtJourMois } from '../dates.js';
 
 // « Jour » porte la date ET la charge du jour par formateur
 // (« MEDAN 01h30 / 06h00 ») : plus étroite, cette ligne passait sur deux.
-export const LARGEUR_JOUR = 126;      // colonne « Jour »
+export const LARGEUR_JOUR = 142;      // colonne « Jour »
 export const LARGEUR_QUI = 112;       // colonne « Intervenant », quand elle existe
 export const LARGEUR_CRENEAU = 58;    // une demi-heure
 
@@ -24,7 +24,10 @@ export const LARGEUR_CRENEAU = 58;    // une demi-heure
 // en escalier. 46 px logent les trois lignes ; c'est un plancher, une cellule
 // à deux stagiaires pousse encore sa ligne plutôt que de rogner un nom.
 //
-export const HAUTEUR_LIGNE = 46;
+// Portée à 66 px quand l'en-tête de jour est passé en gros : le bloc du jour
+// y écrit trois lignes — jour de la semaine, date en 28 px, charge — et 46 px
+// les écrasait. C'est toujours un plancher, pas un plafond.
+export const HAUTEUR_LIGNE = 66;
 
 // Les plannings globaux ont leur propre hauteur, plus courte : 86 jours à
 // 46 px feraient quatre mille pixels. Leurs lignes n'étaient pas égales non
@@ -46,6 +49,22 @@ export function largeurMinGrille(nbCreneaux, { intervenant = false } = {}) {
 // seul, le nombre de créneaux venant des paramètres.
 export function styleGrille(nbCreneaux, { intervenant = false, hauteur = HAUTEUR_LIGNE } = {}) {
   return `min-width:${largeurMinGrille(nbCreneaux, { intervenant })}px;--h-ligne:${hauteur}px`;
+}
+
+// En-tête de jour des grilles de semaine : le jour de la semaine en petites
+// capitales, la DATE en gros, et ce que la vue veut ajouter en dessous (la
+// charge du jour par formateur).
+//
+// Pourquoi si gros : l'alternance claire/foncée seule ne suffisait pas à voir
+// où une journée commence et où elle finit. Le trait qui encadre chaque
+// journée s'en charge désormais (css/style.css), et la date en 28 px se lit
+// sans chercher la colonne de gauche.
+export function celluleJour(date, dessous = '') {
+  return `<td class="day-col jour-bloc">`
+    + `<span class="jour-sem">${fmtJourSemaine(date, 3)}</span>`
+    + `<span class="jour-date">${fmtJourMois(date)}</span>`
+    + (dessous ? `<span class="jour-note">${dessous}</span>` : '')
+    + '</td>';
 }
 
 // Une ligne sur deux est teintée (voir « ligne-alt » dans css/style.css).
