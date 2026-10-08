@@ -163,15 +163,18 @@ test('saisie : les recommandations viennent du catalogue, pas d’une liste fig�
   const s = fixture();
   const avant = recommandations(s.formations);
   assert.ok(avant.includes('R489') && avant.includes('AIPR'), avant.join(', '));
-  assert.ok(!avant.includes('R482'), 'la R482 n’est pas encore au catalogue');
+  // La R482 est arrivée au catalogue le 06/10 et figure donc dans la liste
+  // sans qu'aucune liste séparée n'ait eu à être tenue à jour.
+  assert.ok(avant.includes('R482'), avant.join(', '));
+  assert.ok(!avant.includes('R490'), 'une recommandation absente reste absente');
 
   // Une formation créée dans Paramètres apparaît d'elle-même : une liste
   // séparée aurait fini par diverger du catalogue.
   s.formations.push({
-    code: 'R482-A', label: 'Pratique R482 Cat A', reco: 'R482',
+    code: 'R490-1', label: 'Pratique R490 Cat 1', reco: 'R490',
     dureeInitial: 90, dureeRecyclage: 60, tests: false, capacite: 1,
   });
-  assert.ok(recommandations(s.formations).includes('R482'));
+  assert.ok(recommandations(s.formations).includes('R490'));
 });
 
 test('saisie : les catégories d’une recommandation, et elles seules', () => {

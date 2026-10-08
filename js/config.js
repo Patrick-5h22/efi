@@ -39,6 +39,28 @@ export const DEFAULT_FORMATIONS = [
   { code: 'R485-1', label: 'Pratique R485 Cat 1', reco: 'R485', dureeInitial: 90, dureeRecyclage: 60, tests: true, capacite: 1 },
   { code: 'R485-2', label: 'Pratique R485 Cat 2', reco: 'R485', dureeInitial: 90, dureeRecyclage: 60, tests: true, capacite: 1 },
   { code: 'HAB-ELEC', label: 'Habilitation électrique', reco: 'HAB ELEC', dureeInitial: 120, dureeRecyclage: 120, tests: false, capacite: 1 },
+  // R482 (engins de chantier), site de Périgny II. Durées confirmées par
+  // Benoit le 06/10/2026.
+  //
+  // Trois particularités, qui tiennent ensemble :
+  //
+  //   — Initial et recyclage durent AUTANT (3h00). Ce n'est pas un oubli :
+  //     c'est ce qui permet de « mixer des personnes en initial et recyclage »
+  //     dans une même session, comme il le demande. Des durées différentes
+  //     rendraient ce mélange impossible.
+  //   — Capacité 3, et une seule catégorie par session. Le moteur groupe déjà
+  //     les candidats de MÊME catégorie jusqu'à la capacité : les deux règles
+  //     n'en font qu'une ici.
+  //   — Le test pratique se passe candidat par candidat (13h, 14h, 15h…), d'où
+  //     une durée PAR CANDIDAT : 1h30 en Cat A, 1h00 ailleurs. Le moteur pose
+  //     un test par inscription, l'enchaînement en découle.
+  //
+  // La catégorie G n'y figure pas : « pas de formation EFI sur cette
+  // catégorie » (Benoit, 06/10/2026). L'offre est A, B1, C1, F.
+  { code: 'R482-A', label: 'Pratique R482 Cat A', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 90 },
+  { code: 'R482-B1', label: 'Pratique R482 Cat B1', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 60 },
+  { code: 'R482-C1', label: 'Pratique R482 Cat C1', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 60 },
+  { code: 'R482-F', label: 'Pratique R482 Cat F', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 60 },
   // AIPR : la formation se fait à distance (e-learning) — seule l'épreuve
   // (QCM surveillé, 2h00) est planifiée sur site, tenue par un testeur.
   // Surveillance : ne consomme pas de temps d'intervenant (chargeComptee).
@@ -47,14 +69,18 @@ export const DEFAULT_FORMATIONS = [
   // Deux séances, deux intervenants — un formateur (charge comptée), puis un
   // testeur pour le QCM, qui reste de la surveillance (testSurveille).
   //
-  // ⚠ La durée de la partie FORMATION n'est pas encore arrêtée (question en
-  // attente). 3h30 est une valeur d'attente, alignée sur l'e-learning en
-  // centre, et non une durée validée : elle se corrige dans Paramètres sans
-  // toucher au code. La durée de l'ÉPREUVE, elle, est connue : 2h00, comme
-  // dans la modalité « épreuve seule ».
+  // Durée de la partie FORMATION : 3h00, confirmée par Benoit le 06/10/2026
+  // — « formation théorique sur site en E learning, en autonomie sur le
+  // créneau 08h00-11h00 ». Elle remplace les 3h30 posées en attente.
+  // La durée de l'ÉPREUVE reste 2h00, comme dans la modalité « épreuve seule ».
+  //
+  // ⚠ « En autonomie » reste à éclaircir : la charge est comptée ici, donc un
+  // formateur est réputé mobilisé pendant ces 3h00. Si le stagiaire est seul
+  // devant son poste, il faudra passer chargeComptee à false — sinon on
+  // occupe un formateur pour rien dans le plafond quotidien.
   {
     code: 'AIPR-FORM', label: 'AIPR (formation + épreuve)', reco: 'AIPR',
-    dureeInitial: 210, dureeRecyclage: 210, tests: true, capacite: 12,
+    dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 12,
     testOnly: false, chargeComptee: true, dureeTest: 120, testSurveille: true,
   },
 ];
@@ -244,14 +270,24 @@ export const DEFAULT_ZONES = [
 // contrainte vaut en formation COMME en test : c'est l'occupation du matériel
 // qui compte, pas la nature de la séance.
 //
-// ⚠ Les catégories R482 n'existent pas encore au catalogue : cette ressource
-// n'a donc encore aucun effet. L'écran Paramètres le signale plutôt que de
-// laisser croire à une contrainte active. Reste à confirmer si B1, C1 et G
-// utilisent aussi le porte-engin — le courriel ne nommait que A et F.
+// La contrainte se joue à la JOURNÉE, pas au créneau. Précision de Benoit du
+// 06/10/2026 : « la seule contrainte c'est de ne pas avoir le même jour une
+// formation + tests cat A et une autre formation + tests catégorie F ».
+//
+// La nuance n'est pas de détail. Un matériel partagé ordinaire interdit deux
+// séances QUI SE CHEVAUCHENT ; ici une Cat A le matin et une Cat F l'après-midi
+// seraient acceptées alors qu'elles sont interdites. D'où « exclusifJour » :
+// sur une journée donnée, toutes les séances qui touchent ce matériel doivent
+// relever du MÊME dispositif. Le porte-engin ne se remet pas en configuration
+// entre deux catégories dans la journée — c'est une contrainte physique, pas
+// un conflit d'agenda.
+//
+// B1 et C1 ne sont pas concernées : elles peuvent tourner en parallèle d'une
+// Cat A comme d'une Cat F. La catégorie G ne figure pas au catalogue.
 export const DEFAULT_RESSOURCES = [
   {
     id: 'porte-engin', siteId: 'perigny2', label: 'Porte-engin', capacite: 1,
-    dispositifs: ['R482-A', 'R482-F'], recos: [],
+    dispositifs: ['R482-A', 'R482-F'], recos: [], exclusifJour: true,
   },
 ];
 

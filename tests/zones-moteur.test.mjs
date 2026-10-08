@@ -15,7 +15,8 @@ const J = '2026-09-21'; // lundi
 const K = '2026-09-22';
 
 const QUALS = Object.fromEntries(
-  ['R489-1A', 'R489-1B', 'R489-3', 'R489-5', 'R485-1', 'R485-2', 'R486-A', 'HAB-ELEC', 'AIPR', 'AIPR-FORM']
+  ['R489-1A', 'R489-1B', 'R489-3', 'R489-5', 'R485-1', 'R485-2', 'R486-A', 'HAB-ELEC', 'AIPR', 'AIPR-FORM',
+    'R482-A', 'R482-B1', 'R482-C1', 'R482-F']
     .map((c) => [c, { F: true, T: true }]));
 
 function etat() {
@@ -150,36 +151,84 @@ test('zone : décalées dans la journée, les deux séances cohabitent', () => {
 
 // --- Le matériel partagé --------------------------------------------------
 
-test('matériel partagé : un exemplaire, une séance à la fois', () => {
+// Le porte-engin ne se partage pas DANS LA JOURNÉE entre deux catégories.
+// Benoit, 06/10/2026 : « ne pas avoir le même jour une formation + tests cat A
+// et une autre formation + tests catégorie F ».
+//
+// C'est plus strict qu'un matériel partagé ordinaire, et le piège est là : un
+// contrôle au créneau laisserait passer le matin contre l'après-midi, qui ne
+// se chevauchent pas. Les deux cas sont donc éprouvés séparément.
+const r482 = (s, over) => pose(s, {
+  dateTheorie: null, dateTestPratique: null, debutTestPratique: null, ...over,
+});
+
+test('porte-engin : deux catégories le même jour, même à des heures différentes', () => {
   const s = etat();
-  // La R482 n'est pas au catalogue : on la crée ici pour éprouver le
-  // porte-engin, qui l'attend. Deux zones R482 existent déjà à Périgny II,
-  // et elles admettent la recommandation entière.
-  s.formations.push(
-    { code: 'R482-A', label: 'Pratique R482 Cat A', reco: 'R482', dureeInitial: 90, dureeRecyclage: 60, tests: false, capacite: 1, testOnly: false, chargeComptee: true, dureeTest: null, testSurveille: false },
-    { code: 'R482-F', label: 'Pratique R482 Cat F', reco: 'R482', dureeInitial: 90, dureeRecyclage: 60, tests: false, capacite: 1, testOnly: false, chargeComptee: true, dureeTest: null, testSurveille: false },
-    { code: 'R482-B1', label: 'Pratique R482 Cat B1', reco: 'R482', dureeInitial: 90, dureeRecyclage: 60, tests: false, capacite: 1, testOnly: false, chargeComptee: true, dureeTest: null, testSurveille: false },
-  );
-  for (const m of s.team) for (const c of ['R482-A', 'R482-F', 'R482-B1']) m.quals[c] = { F: true, T: true };
-
-  // Cat A et Cat F en même temps : deux zones libres, mais UN porte-engin.
-  pose(s, { stagiaire: 'UN', formation: 'R482-A', formateurId: 'p1', dateTheorie: null, dateTestPratique: null, debutTestPratique: null });
-  pose(s, { stagiaire: 'DEUX', formation: 'R482-F', formateurId: 'p2', dateTheorie: null, dateTestPratique: null, debutTestPratique: null });
+  // Cat A le MATIN, Cat F l'APRÈS-MIDI : aucun chevauchement, et pourtant
+  // interdit. C'est précisément ce qu'un matériel ordinaire laisserait passer.
+  r482(s, { stagiaire: 'UN', formation: 'R482-A', formateurId: 'p1', debutPratique: 480 });
+  r482(s, { stagiaire: 'DEUX', formation: 'R482-F', formateurId: 'p2', debutPratique: 840 });
   const rows = lignes(s);
-  assert.equal(rows[0].zonePratique, 'z-r482-1');
-  assert.equal(rows[1].zonePratique, 'z-r482-2', 'la seconde trouve bien un plateau libre…');
-  assert.ok(rows[1].errors.some((e) => /Porte-engin déjà utilisé/.test(e)),
-    `…mais pas le porte-engin : ${rows[1].errors.join(' | ')}`);
+  assert.deepEqual(anomaliesDePlateau(rows[0]), [], rows[0].errors.join(' | '));
+  assert.ok(rows[1].errors.some((e) => /une seule catégorie par journée/.test(e)),
+    `la seconde doit être refusée : ${rows[1].errors.join(' | ')}`);
+  // Et le reproche ne doit PAS parler d'heure : décaler ne réglerait rien.
+  assert.ok(!rows[1].errors.some((e) => /déjà utilisé à cette heure/.test(e)),
+    'une seule anomalie, et la bonne');
+  assert.ok(rows[1].errors.some((e) => /Cat A/.test(e)),
+    `l’anomalie nomme la catégorie qui tient la journée : ${rows[1].errors.join(' | ')}`);
+});
 
-  // Une catégorie qui ne le requiert pas n'est pas gênée.
-  const t = etat();
-  t.formations = s.formations;
-  t.team = s.team;
-  pose(t, { stagiaire: 'UN', formation: 'R482-A', formateurId: 'p1', dateTheorie: null, dateTestPratique: null, debutTestPratique: null });
-  pose(t, { stagiaire: 'DEUX', formation: 'R482-B1', formateurId: 'p2', dateTheorie: null, dateTestPratique: null, debutTestPratique: null });
-  for (const r of lignes(t)) {
+test('porte-engin : la même catégorie deux fois dans la journée reste permise', () => {
+  const s = etat();
+  // Deux sessions de Cat A à des heures distinctes : le matériel ne change pas
+  // de configuration, rien ne s'y oppose.
+  r482(s, { stagiaire: 'UN', formation: 'R482-A', formateurId: 'p1', debutPratique: 480 });
+  r482(s, { stagiaire: 'DEUX', formation: 'R482-A', formateurId: 'p2', debutPratique: 840 });
+  for (const r of lignes(s)) {
     assert.ok(!r.errors.some((e) => /Porte-engin/.test(e)), r.errors.join(' | '));
   }
+});
+
+test('porte-engin : deux catégories le MÊME jour mais sur deux jours distincts, non', () => {
+  const s = etat();
+  r482(s, { stagiaire: 'UN', formation: 'R482-A', formateurId: 'p1' });
+  r482(s, { stagiaire: 'DEUX', formation: 'R482-F', formateurId: 'p2', datePratique: K });
+  for (const r of lignes(s)) {
+    assert.ok(!r.errors.some((e) => /Porte-engin/.test(e)), r.errors.join(' | '));
+  }
+});
+
+test('porte-engin : B1 et C1 ne le réclament pas et tournent en parallèle', () => {
+  const s = etat();
+  r482(s, { stagiaire: 'UN', formation: 'R482-A', formateurId: 'p1' });
+  r482(s, { stagiaire: 'DEUX', formation: 'R482-B1', formateurId: 'p2' });
+  r482(s, { stagiaire: 'TROIS', formation: 'R482-C1', formateurId: 'p3' });
+  for (const r of lignes(s)) {
+    assert.ok(!r.errors.some((e) => /Porte-engin/.test(e)), r.errors.join(' | '));
+  }
+});
+
+test('matériel ordinaire : la règle du créneau continue de s’appliquer', () => {
+  // Sans « exclusifJour », un matériel à un exemplaire n'interdit que le
+  // chevauchement — c'est le comportement qu'avaient tous les matériels, et
+  // il ne doit pas avoir changé sous leurs pieds.
+  const s = etat();
+  s.ressources = s.ressources.map((r) => (r.id === 'porte-engin'
+    ? { ...r, exclusifJour: false } : r));
+  r482(s, { stagiaire: 'UN', formation: 'R482-A', formateurId: 'p1', debutPratique: 480 });
+  r482(s, { stagiaire: 'DEUX', formation: 'R482-F', formateurId: 'p2', debutPratique: 840 });
+  for (const r of lignes(s)) {
+    assert.ok(!r.errors.some((e) => /Porte-engin/.test(e)),
+      `le matin et l’après-midi ne se chevauchent pas : ${r.errors.join(' | ')}`);
+  }
+  // Mais au même moment, il refuse toujours.
+  const t = etat();
+  t.ressources = s.ressources;
+  r482(t, { stagiaire: 'UN', formation: 'R482-A', formateurId: 'p1', debutPratique: 480 });
+  r482(t, { stagiaire: 'DEUX', formation: 'R482-F', formateurId: 'p2', debutPratique: 480 });
+  assert.ok(lignes(t)[1].errors.some((e) => /déjà utilisé à cette heure/.test(e)),
+    lignes(t)[1].errors.join(' | '));
 });
 
 // --- La règle de pôle -----------------------------------------------------

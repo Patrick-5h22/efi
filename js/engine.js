@@ -299,6 +299,15 @@ function affecterZones(rows, state) {
   };
   const poser = (id, date, start, end, cle) => listeDe(id).push({ date, start, end, cle });
 
+  // Matériels à exclusivité journalière : quel dispositif occupe déjà la
+  // journée. Le PREMIER posé gagne la journée — les lignes sont parcourues
+  // dans l'ordre, et c'est le même ordre qui sert partout ailleurs, donc le
+  // reproche tombe toujours sur la même séance d'une lecture à l'autre.
+  const jourDuMateriel = new Map(); // `${resId}|${date}` -> code du dispositif
+  const dispositifDuJour = (resId, date) => jourDuMateriel.get(`${resId}|${date}`) || null;
+  const marquerJour = (resId, date, code) => jourDuMateriel.set(`${resId}|${date}`, code);
+  const libelleDe = (code) => (state.formations || []).find((f) => f.code === code)?.label || code;
+
   // Pôles engagés dans la journée, par stagiaire et par intervenant. On s'en
   // sert d'abord comme PRÉFÉRENCE (choisir une zone qui ne casse pas la
   // journée), puis comme contrôle une fois tout posé.
@@ -409,8 +418,23 @@ function affecterZones(rows, state) {
     // Matériels partagés requis par ce dispositif — l'occupation du matériel
     // compte, quelle que soit la nature de la séance : formation comme test.
     for (const res of ressources.filter((r) => admetDispositif(r, formation))) {
-      if (!placeLibre(`res:${res.id}`, res.capacite, date, start, end, cle)) {
-        row.errors.push(`${libelle} : ${res.label} déjà utilisé à cette heure`);
+      // Exclusivité à la journée : certains matériels ne se repartagent pas
+      // entre deux dispositifs dans la même journée, même à des heures
+      // distinctes (porte-engin : Cat A le matin et Cat F l'après-midi sont
+      // interdites). La vérification au créneau, elle, continue de s'appliquer
+      // à l'intérieur d'un même dispositif.
+      const autre = res.exclusifJour ? dispositifDuJour(res.id, date) : null;
+      if (autre && autre !== formation.code) {
+        // La journée prime : se plaindre EN PLUS du créneau donnerait deux
+        // anomalies pour une seule cause, et la seconde ferait croire qu'un
+        // décalage horaire suffirait à régler le problème. Il ne suffit pas.
+        row.errors.push(`${libelle} : ${res.label} est pris par ${libelleDe(autre)} ce jour-là`
+          + ' — une seule catégorie par journée');
+      } else {
+        if (res.exclusifJour && !autre) marquerJour(res.id, date, formation.code);
+        if (!placeLibre(`res:${res.id}`, res.capacite, date, start, end, cle)) {
+          row.errors.push(`${libelle} : ${res.label} déjà utilisé à cette heure`);
+        }
       }
       poser(`res:${res.id}`, date, start, end, cle);
     }

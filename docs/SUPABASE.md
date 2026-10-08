@@ -136,6 +136,21 @@ donnent trois parcours et 3 100 €, puis les colonnes disparaissent. Dans le ca
 normal — application déjà rouverte — la migration annonce « aucune reprise
 nécessaire » et ne touche à rien.
 
+`docs/migrations/011-exclusivite-jour-materiel.sql` ajoute
+`ressources.exclusif_jour` (booléen, défaut `false`). Un matériel partagé
+ordinaire interdit deux séances **qui se chevauchent** ; le porte-engin de
+Périgny II obéit à une règle plus stricte — « ne pas avoir le même jour une
+formation + tests cat A et une autre formation + tests catégorie F » (Benoit,
+06/10/2026). Une Cat A le matin et une Cat F l'après-midi ne se chevauchent
+pas et sont pourtant interdites : le matériel ne se reconfigure pas d'une
+catégorie à l'autre dans la journée.
+
+Le défaut `false` est délibéré : c'est le comportement qu'avaient tous les
+matériels jusqu'ici, et un défaut à `true` aurait refusé aujourd'hui des
+plannings qui passaient hier, sans rien annoncer. Vérifié sur la réplique :
+l'aller-retour conserve le drapeau, et un matériel qui ne le porte pas revient
+bien à `false`.
+
 Chaque migration reprend les colonnes des précédentes (`add column if not
 exists`) et réécrit les deux RPC au complet : **appliquer la plus récente
 suffit**, quel que soit l'état de la base. Vérifié pour la 007 : appliquée

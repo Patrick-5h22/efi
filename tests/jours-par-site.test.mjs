@@ -116,11 +116,10 @@ test('moteur : un site fermé refuse la séance, même si un autre ouvre', () =>
   // La R482 ne se tient qu'à Périgny II, fermé. Le contrôle général, lui, voit
   // bien un jour ouvert : c'est exactement le trou que le contrôle par site
   // vient boucher.
-  s.formations.push({
-    code: 'R482-A', label: 'Pratique R482 Cat A', reco: 'R482',
-    dureeInitial: 90, dureeRecyclage: 60, tests: false, capacite: 1,
-    testOnly: false, chargeComptee: true, dureeTest: null, testSurveille: false,
-  });
+  //
+  // La R482 est au catalogue depuis le 06/10 : ces fixtures la poussaient
+  // elles-mêmes, et le doublon aurait été silencieux — c'est l'entrée réelle
+  // qui l'emporte, avec ses tests. On prend donc celle du catalogue.
   pose(s, { formation: 'R482-A', formateurId: 'p1' });
   const [r] = computeSchedule(s).rows;
   assert.ok(!r.errors.some((e) => /jour non ouvert/.test(e)),
@@ -132,14 +131,13 @@ test('moteur : un site fermé refuse la séance, même si un autre ouvre', () =>
 
 test('moteur : le même dispositif passe le jour où le site ouvre', () => {
   const s = etat({ ouverts: { perigny: [J], perigny2: [K], saintes: [] } });
-  s.formations.push({
-    code: 'R482-A', label: 'Pratique R482 Cat A', reco: 'R482',
-    dureeInitial: 90, dureeRecyclage: 60, tests: false, capacite: 1,
-    testOnly: false, chargeComptee: true, dureeTest: null, testSurveille: false,
-  });
   pose(s, { formation: 'R482-A', formateurId: 'p1', datePratique: K });
   const [r] = computeSchedule(s).rows;
-  assert.deepEqual(r.errors, [], r.errors.join(' | '));
+  // Seules les anomalies de LIEU nous regardent ici : la fixture ne pose
+  // volontairement ni test pratique ni test théorique, et les réclamer est
+  // juste — mais sans rapport avec le jour d'ouverture.
+  const lieu = r.errors.filter((e) => /zone|plateau|site|ouvert/i.test(e));
+  assert.deepEqual(lieu, [], r.errors.join(' | '));
   assert.ok(['z-r482-1', 'z-r482-2'].includes(r.zonePratique), r.zonePratique);
 });
 
