@@ -139,7 +139,8 @@ test('base : aucun champ de formation ne perd sa colonne sans qu’on le sache',
 // sans colonne serait accepté sans erreur et perdu au premier aller-retour.
 const COLONNES_SITES = ['id', 'label', 'pole', 'position'];
 const COLONNES_ZONES = ['id', 'site_id', 'label', 'dispositifs', 'recos', 'sessions', 'position'];
-const COLONNES_RESSOURCES = ['id', 'site_id', 'label', 'capacite', 'dispositifs', 'recos', 'position'];
+const COLONNES_RESSOURCES = ['id', 'site_id', 'label', 'capacite', 'dispositifs', 'recos', 'position',
+  'exclusif_jour']; // migration 011 — exclusivité à la journée (porte-engin)
 
 test('base : sites, zones et matériels gardent leurs colonnes', () => {
   const s = defaultState();

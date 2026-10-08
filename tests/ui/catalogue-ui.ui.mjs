@@ -21,36 +21,42 @@ check('R485 Cat 1 et Cat 2 au catalogue', cat.includes('R485-1') && cat.includes
 check('colonne « Charge comptée » présente', cat.includes('Charge comptée'));
 
 // 2. Création d'un produit depuis l'interface
-await page.fill('#nf-code', 'r482-b');
-await page.fill('#nf-label', 'Pratique R482 Cat B');
-await page.fill('#nf-reco', 'r482');
+//
+// Le code est volontairement ABSENT du catalogue réel. Il valait « R482-B »
+// jusqu'à l'arrivée de la R482 au catalogue, et la vérification de
+// suppression — « le texte ne contient plus R482-B » — s'est mise à échouer
+// sur « R482-B1 », qui le contient. Un code hors catalogue évite ce piège
+// plutôt que de durcir l'assertion à chaque collision.
+await page.fill('#nf-code', 'r490-b');
+await page.fill('#nf-label', 'Pratique R490 Cat B');
+await page.fill('#nf-reco', 'r490');
 await page.fill('#nf-init', '2');
 await page.fill('#nf-recy', '1.5');
 await page.click('#btn-add-formation'); await page.waitForTimeout(500);
 const afterAdd = await page.locator('#main').innerText();
-check('formation créée, code normalisé en majuscules', afterAdd.includes('R482-B'), '');
-check('recommandation normalisée', await page.locator('input[data-f$="|reco"]').last().inputValue() === 'R482');
+check('formation créée, code normalisé en majuscules', afterAdd.includes('R490-B'), '');
+check('recommandation normalisée', await page.locator('input[data-f$="|reco"]').last().inputValue() === 'R490');
 
 // 3. Code en double refusé
-await page.fill('#nf-code', 'R482-B');
+await page.fill('#nf-code', 'R490-B');
 await page.fill('#nf-label', 'Doublon');
-await page.fill('#nf-reco', 'R482');
+await page.fill('#nf-reco', 'R490');
 await page.click('#btn-add-formation'); await page.waitForTimeout(400);
 check('code en double refusé', (await page.locator('#toast-zone').innerText()).includes('existe déjà'));
 
 // 4. Le nouveau produit alimente automatiquement l'onglet Équipe
 await page.goto(BASE + '/#/equipe'); await page.waitForTimeout(400);
-check('colonnes F/T créées dans Équipe', (await page.locator('#main').innerText()).includes('R482-B'));
-const nQual = await page.locator('input[data-qual*="R482-B"]').count();
+check('colonnes F/T créées dans Équipe', (await page.locator('#main').innerText()).includes('R490-B'));
+const nQual = await page.locator('input[data-qual*="R490-B"]').count();
 check('deux cases (F et T) par intervenant', nQual >= 4, `${nQual} cases`);
 
 // 5. Le produit est proposé à l'inscription
 await page.goto(BASE + '/#/inscriptions'); await page.waitForTimeout(400);
 await page.click('#btn-add'); await page.waitForTimeout(400);
 const opts = await page.locator('select[name=formation] option').allInnerTexts();
-check('produit proposé dans le formulaire', opts.some((o) => o.includes('R482 Cat B')));
+check('produit proposé dans le formulaire', opts.some((o) => o.includes('R490 Cat B')));
 check('R485 proposées aussi', opts.some((o) => o.includes('R485 Cat 1')));
-await page.selectOption('select[name=formation]', 'R482-B'); await page.waitForTimeout(400);
+await page.selectOption('select[name=formation]', 'R490-B'); await page.waitForTimeout(400);
 check('durée initiale reprise (02h00)', (await page.locator('#duree-info').innerText()).includes('02h00'));
 await page.click('#btn-cancel').catch(() => page.keyboard.press('Escape'));
 await page.waitForTimeout(300);
@@ -70,12 +76,12 @@ check('catalogue inchangé', await page.locator('[data-del-formation]').count() 
 // 7. Suppression d'un produit inutilisé
 const idxFree = await page.evaluate(() => {
   const st = JSON.parse(localStorage.getItem('efi-planning-v1'));
-  return st.formations.findIndex((f) => f.code === 'R482-B');
+  return st.formations.findIndex((f) => f.code === 'R490-B');
 });
 await page.locator(`[data-del-formation="${idxFree}"]`).click(); await page.waitForTimeout(500);
-check('produit inutilisé retiré', !(await page.locator('#main').innerText()).includes('R482-B'));
+check('produit inutilisé retiré', !(await page.locator('#main').innerText()).includes('R490-B'));
 await page.goto(BASE + '/#/equipe'); await page.waitForTimeout(400);
-check('colonnes d’habilitation retirées d’Équipe', !(await page.locator('#main').innerText()).includes('R482-B'));
+check('colonnes d’habilitation retirées d’Équipe', !(await page.locator('#main').innerText()).includes('R490-B'));
 
 // 8. Charge comptée : décocher sort la formation du plafond
 await page.goto(BASE + '/#/parametres'); await page.waitForTimeout(400);

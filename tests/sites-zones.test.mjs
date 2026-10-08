@@ -88,11 +88,11 @@ test('zone : Périgny II est dédié à la R482, et à rien d’autre', () => {
     assert.deepEqual(z.recos, ['R482']);
     assert.deepEqual(z.dispositifs, []);
   }
-  // Aucune formation du catalogue actuel n'y a sa place : la R482 reste à créer.
-  for (const f of s.formations) {
-    assert.ok(!zonesPour(s.zones, f, 'perigny2').length,
-      `${f.code} ne devrait pas avoir de zone à Périgny II`);
-  }
+  // Depuis le 06/10 la R482 est au catalogue : ces zones ont cessé d'être
+  // vides. Et elles n'accueillent QUE la R482 — c'est le sens de « dédié ».
+  const admises = s.formations.filter((f) => zonesPour(s.zones, f, 'perigny2').length);
+  assert.deepEqual(admises.map((f) => f.code).sort(),
+    ['R482-A', 'R482-B1', 'R482-C1', 'R482-F']);
 });
 
 test('site : une formation peut se tenir sur plusieurs sites', () => {
@@ -118,7 +118,7 @@ test('site : les deux modalités AIPR partagent la même zone', () => {
 
 // --- Le matériel partagé --------------------------------------------------
 
-test('matériel partagé : le porte-engin est déclaré, et sans effet pour l’instant', () => {
+test('matériel partagé : le porte-engin contraint désormais pour de bon', () => {
   const s = etat();
   const pe = s.ressources.find((r) => r.id === 'porte-engin');
   assert.ok(pe, 'le porte-engin est déclaré');
@@ -126,26 +126,30 @@ test('matériel partagé : le porte-engin est déclaré, et sans effet pour l’
   assert.equal(pe.capacite, 1, 'un seul exemplaire, accessible des deux côtés');
   assert.deepEqual(pe.dispositifs, ['R482-A', 'R482-F']);
 
-  // Il ne s'applique à rien tant que la R482 n'est pas au catalogue — et cela
-  // doit se VOIR, pas se deviner : c'est ce que « referencesInconnues » sert
-  // à afficher dans l'écran Paramètres.
-  assert.deepEqual(referencesInconnues(pe, s.formations), ['R482-A', 'R482-F']);
+  // Il visait deux codes qui n'existaient pas : l'écran Paramètres le disait
+  // « sans effet ». Les deux sont au catalogue depuis le 06/10, l'avertissement
+  // n'a donc plus lieu d'être.
+  assert.deepEqual(referencesInconnues(pe, s.formations), []);
+
+  // Et la contrainte se joue à la JOURNÉE, pas au créneau : c'est le sens de
+  // la réponse de Benoit, et c'est ce qui distingue ce matériel d'un plateau.
+  assert.equal(pe.exclusifJour, true);
+
+  // B1 et C1 ne sont pas concernées — elles tournent en parallèle d'une A.
+  for (const code of ['R482-B1', 'R482-C1']) {
+    assert.ok(!admetDispositif(pe, dispositif(s, code)), code);
+  }
 });
 
 test('références inconnues : ce qui n’existe pas au catalogue est signalé', () => {
   const s = etat();
-  // Les seules références en attente sont volontaires : les deux zones de
-  // Périgny II et le porte-engin visent la R482, qui reste à créer. Elles sont
-  // signalées « sans effet » dans l'écran Paramètres — une zone qui nomme un
-  // code absent n'admet rien, et le taire serait pire que de l'écrire.
-  const enAttente = s.zones.filter((z) => referencesInconnues(z, s.formations).length);
-  assert.deepEqual(enAttente.map((z) => z.id), ['z-r482-1', 'z-r482-2']);
-  assert.deepEqual(referencesInconnues(enAttente[0], s.formations), ['R482']);
-
-  // Toutes les autres zones admettent des dispositifs qui existent bel et bien.
-  for (const z of s.zones.filter((x) => !x.recos.includes('R482'))) {
-    assert.deepEqual(referencesInconnues(z, s.formations), [], `zone ${z.id}`);
-  }
+  // Plus aucune référence en attente : la R482 était la dernière, et son
+  // arrivée au catalogue a éteint l'avertissement d'elle-même — personne n'a
+  // eu à toucher aux zones ni au porte-engin. C'était l'intérêt de viser une
+  // RECOMMANDATION plutôt que d'énumérer des codes.
+  const enAttente = [...s.zones, ...s.ressources]
+    .filter((p) => referencesInconnues(p, s.formations).length);
+  assert.deepEqual(enAttente.map((p) => p.id), []);
 
   // Code comme recommandation sont repérés.
   assert.deepEqual(

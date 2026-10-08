@@ -173,8 +173,12 @@ test('épreuve surveillée : elle ne pèse pas dans le taux d’occupation', () 
   assert.equal(occ(avec), occ(sans),
     'la surveillance du QCM ne mobilise pas de temps d’intervenant');
 
-  // La partie FORMATION, elle, pèse bien : 3h30 sur des créneaux de 30 min.
-  assert.equal(occ(sans), 7);
+  // La partie FORMATION, elle, pèse bien. La durée se lit au catalogue plutôt
+  // que de se recopier ici : elle a déjà bougé une fois (3h30 d'attente, puis
+  // 3h00 confirmées le 06/10), et un nombre en dur n'aurait fait qu'échouer
+  // sans rien apprendre.
+  const dureeForm = formationByCode(sans.formations, 'AIPR-FORM').dureeInitial;
+  assert.equal(occ(sans), dureeForm / 30, `${dureeForm} min sur des créneaux de 30 min`);
 });
 
 test('épreuve surveillée : habilité et présent suffit, même occupé ailleurs', () => {

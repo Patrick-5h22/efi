@@ -37,15 +37,15 @@ check('les dispositifs admis sont dits en clair',
 check('une recommandation entière se dit comme telle', /toute la R482/.test(texte),
   texte.split('\n').find((l) => l.includes('R482')) || '—');
 
-// La R482 n'est pas au catalogue : les zones et le porte-engin qui la visent
-// doivent le DIRE, plutôt que de paraître actifs.
+// Trois badges « sans effet » s'affichaient tant que la R482 manquait au
+// catalogue : les deux zones de Périgny II et le porte-engin. Elle y est
+// depuis le 06/10, et l'avertissement doit s'être éteint TOUT SEUL — personne
+// n'a touché ni aux zones ni au matériel. C'est ce que vaut le fait de viser
+// une recommandation plutôt que d'énumérer des codes.
 const sansEffet = await p.evaluate(() =>
   [...document.querySelectorAll('#main .badge-warn')].map((b) => b.textContent.trim()));
-check('les références en attente portent « sans effet »',
-  sansEffet.length === 3 && sansEffet.every((t) => t.startsWith('sans effet')),
-  `${sansEffet.length} badge(s) : ${sansEffet.join(' | ')}`);
-check('…dont le porte-engin, qui ne contraint encore rien',
-  sansEffet.some((t) => t.includes('R482-A')), sansEffet.join(' | '));
+check('plus aucune référence en attente : la R482 est arrivée',
+  sansEffet.length === 0, `${sansEffet.length} badge(s) : ${sansEffet.join(' | ')}`);
 
 // Les deux zones Cat 3/5 et la zone mutualisée sont le cœur du modèle.
 const zones = await p.evaluate(() =>
