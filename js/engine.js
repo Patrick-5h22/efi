@@ -105,10 +105,15 @@ export function computeSchedule(state) {
 
   // avoid = intervenant à éviter (formateur du candidat) : on ne le retient
   // que si personne d'autre n'est disponible.
-  const pickPerson = (date, code, kind, freeFn, avoid = null) => {
+  const pickPerson = (date, code, kind, freeFn, avoid = null, prefer = null) => {
     const preferred = kind === 'F' ? dayAssign(date).formateur : dayAssign(date).testeur;
     const candidates = [];
-    if (preferred) candidates.push(preferred);
+    // « prefer » passe devant l'affectation du jour : il sert à faire tenir
+    // deux rôles de la journée par la MÊME personne quand c'est voulu. Les
+    // deux ne se contredisent pas en pratique — quand un testeur du jour est
+    // affecté à la main, c'est déjà lui qui surveille la théorie.
+    if (prefer) candidates.push(prefer);
+    if (preferred && !candidates.includes(preferred)) candidates.push(preferred);
     for (const m of team) if (!candidates.includes(m.id)) candidates.push(m.id);
     let fallback = null;
     for (const id of candidates) {
@@ -133,7 +138,18 @@ export function computeSchedule(state) {
         (id) => isFreeForTraining(id, date, start, end, formation));
       if (!row.formateurEffectif) row.errors.push('Aucun formateur disponible');
     }
-    addBusy(row.formateurEffectif, { date, start, end, kind: 'formation', formation: formation.code, inscId: insc.id });
+    // Une séance dont la charge n'est pas comptée ne bloque pas l'agenda de
+    // son intervenant : il est nommé — quelqu'un en répond — mais il reste
+    // libre de tenir autre chose pendant ce temps. C'est le cas de l'AIPR
+    // « formation + épreuve », où le stagiaire fait son e-learning seul.
+    //
+    // La passe 1 bis applique déjà cette règle à la surveillance d'épreuve
+    // (« le superviseur n'est pas bloqué »). Elle vaut pour la même raison
+    // ici : compter la charge et bloquer l'agenda sont les deux faces d'une
+    // seule question — cette personne est-elle occupée ?
+    if (chargeComptee(formation)) {
+      addBusy(row.formateurEffectif, { date, start, end, kind: 'formation', formation: formation.code, inscId: insc.id });
+    }
   }
 
   // Passe 1 bis — formations « épreuve seule » (ex. AIPR : la formation se
@@ -221,8 +237,19 @@ export function computeSchedule(state) {
       if (insc.testeurId) {
         row.testeurEffectif = insc.testeurId;
       } else {
+        // Le surveillant du test théorique du matin fait passer les tests
+        // pratiques de l'après-midi : « c'est le testeur qui fera passer les
+        // tests pratique l'après midi » (Benoit, 09/10/2026). Sans cette
+        // préférence, les deux passes choisissaient indépendamment et
+        // pouvaient mobiliser une TROISIÈME personne pour rien.
+        //
+        // C'est une préférence, pas une obligation : s'il n'est pas habilité
+        // au dispositif ou déjà pris, on retombe sur le choix ordinaire. Il
+        // reste par construction distinct du formateur du candidat — la
+        // passe 2 écarte déjà les formateurs du jour.
         row.testeurEffectif = pickPerson(date, formation.code, 'T',
-          (id) => isFree(id, date, start, end), row.formateurEffectif);
+          (id) => isFree(id, date, start, end), row.formateurEffectif,
+          theoryTesters.get(date) || null);
         if (!row.testeurEffectif) row.errors.push('Aucun testeur disponible');
       }
       addBusy(row.testeurEffectif, { date, start, end, kind: 'test', formation: formation.code, inscId: insc.id });

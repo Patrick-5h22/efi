@@ -172,18 +172,40 @@ se nomme, et s'étend sans règle nouvelle. Elle couvre aussi le fait que la
 contrainte vaut **en formation comme en test** : c'est l'occupation du matériel
 qui compte, pas la nature de la séance.
 
-*À confirmer : les catégories B1, C1 et G utilisent-elles aussi le
-porte-engin ?* Le premier courriel ne nommait que A et F.
+### La contrainte est à la JOURNÉE, pas au créneau
 
-> **Fait.** Le moteur applique la contrainte : deux séances qui requièrent le
-> porte-engin en même temps, sur deux zones différentes, donnent « Porte-engin
-> déjà utilisé à cette heure ». En formation comme en test.
+Précision décisive, obtenue le 06/10/2026 :
+
+> « La seule contrainte c'est de ne pas avoir le même jour une formation +
+> tests cat A et une autre formation + tests catégorie F. » — Benoit
 >
-> **Sans effet aujourd'hui**, pour une seule raison qui reste : les catégories
-> R482 ne sont pas au catalogue. L'écran Paramètres marque la ligne « sans
-> effet : R482-A, R482-F » — une contrainte qui ne s'applique à rien et ne le
-> dirait pas serait pire que pas de contrainte du tout. Le comportement est
-> néanmoins éprouvé, sur des catégories R482 créées pour le test.
+> « Il ne faut pas de caces R482 A et F le même jour, **ni le matin ni
+> l'après-midi**. » — Benoit, 09/10/2026, en réponse à une demande de
+> confirmation explicite
+
+Un matériel partagé ordinaire interdit deux séances **qui se chevauchent**.
+Une Cat A le matin et une Cat F l'après-midi ne se chevauchent pas, et sont
+pourtant interdites : le porte-engin ne se reconfigure pas d'une catégorie à
+l'autre dans la journée. C'est une contrainte **physique**, pas un conflit
+d'agenda — et le modèle, qui ne connaissait que le créneau, était trop
+permissif sans que rien ne le dise.
+
+D'où un drapeau porté par le matériel, `exclusifJour`, et non une règle
+écrite en dur pour le porte-engin : le jour où un autre matériel se comporte
+pareil, il se déclare. Son défaut est `false`, soit le comportement de tous
+les matériels existants.
+
+**B1 et C1 ne sont pas concernées** et tournent en parallèle d'une Cat A comme
+d'une Cat F. La catégorie G ne figure pas au catalogue.
+
+> **Fait, et effectif.** Les quatre catégories R482 sont au catalogue depuis le
+> 08/10/2026 : la contrainte s'applique pour de bon. L'avertissement « sans
+> effet » de l'écran Paramètres s'est éteint de lui-même, sans qu'on touche
+> ni aux zones ni au matériel — c'était l'intérêt de viser une recommandation
+> plutôt que d'énumérer des codes.
+>
+> Quand la journée est prise, l'anomalie **ne parle pas d'heure** : se
+> plaindre aussi du créneau laisserait croire qu'un décalage suffirait.
 
 ## 5. Parcours
 
@@ -293,6 +315,19 @@ recommandation et la liste des catégories sans calcul.
 > de théorie de formation (e-learning en centre 3h30, présentiel 7h00 Initial /
 > 3h30 Recyclage) et le test théorique (créneau fixe 11:00, 1h00, groupe de 12)
 > sont **inchangés**.
+
+> **Qui surveille le test théorique.** « Il faut quelqu'un pour surveiller,
+> c'est le testeur qui fera passer les tests pratique l'après-midi » (Benoit,
+> 09/10/2026). Le créneau de 11:00 et sa durée d'1h00 — quel que soit le
+> nombre de candidats — étaient déjà ceux du modèle ; ce qui manquait, c'est
+> que le surveillant et le testeur de l'après-midi soient la **même personne**.
+>
+> Les deux étaient choisis par des passes distinctes et pouvaient diverger.
+> Avec un seul formateur dans la journée, elles tombaient d'accord par hasard ;
+> avec deux sessions en parallèle — les deux plateaux de Périgny II — elles
+> mobilisaient trois personnes là où une suffit. Le testeur de l'après-midi
+> suit désormais le surveillant du matin, par **préférence** : s'il n'est pas
+> habilité au dispositif ou déjà pris, le choix ordinaire reprend la main.
 
 ### R489 — une catégorie
 
@@ -419,7 +454,25 @@ liste unique (colonne « Séance » de l'écran Paramètres) :
 | Modalité | Contenu planifié | Intervenant |
 |---|---|---|
 | `AIPR` — épreuve surveillée | l'épreuve seule | testeur, charge non comptée |
-| `AIPR-FORM` — formation + épreuve | formation sur site, **puis** épreuve | formateur (charge comptée), puis testeur (hors charge) |
+| `AIPR-FORM` — formation + épreuve | formation sur site, **puis** épreuve | formateur **nommé mais libre**, puis testeur (hors charge) |
+
+La formation d'`AIPR-FORM` est elle aussi **hors charge** depuis le
+09/10/2026 : « le stagiaire sera seul devant son poste — le formateur lui
+donne la tablette en début de session et le laisse en autonomie dans la
+salle » (Benoit). Un formateur reste donc nommé, puisque quelqu'un en répond,
+mais son agenda n'est pas bloqué et ces 3h00 ne pèsent ni dans son plafond
+quotidien ni dans le taux d'occupation.
+
+Compter la charge et bloquer l'agenda sont les deux faces d'une même
+question — *cette personne est-elle occupée ?* — et le moteur les traite
+désormais ensemble : une séance à charge non comptée ne réserve plus son
+intervenant. La surveillance d'épreuve appliquait déjà cette règle ; elle
+vaut maintenant pour toute séance, quel que soit le dispositif.
+
+*Limite assumée.* La remise de la tablette en début de séance n'est pas
+modélisée : rien n'empêche le moteur de placer ce formateur ailleurs à 08h00
+pile. La règle de pôle interdit déjà le saut entre sites dans la journée ; au
+sein d'un même site, cela reste à l'œil de l'assistante.
 
 Trois drapeaux (`testOnly`, `tests`, `testSurveille`) décrivaient en réalité
 trois modalités, et seules trois combinaisons ont un sens. Elles sont exposées
@@ -440,12 +493,20 @@ Paramètres sans toucher au code. La durée de l'**épreuve** est connue : 2h00.
 
 ## 9. Ce qui reste ouvert
 
+Les quatre premières ont été tranchées par **Benoit** les 06 et 09/10/2026 —
+elles étaient adressées à Emmanuel, qui les lui a transmises.
+
+| # | Question | Réponse | État |
+|---|---|---|---|
+| 1 | Durées de **pratique** R482 (Initial / Recyclage) par catégorie | 3h00 / 3h00 partout ; test 1h30 en Cat A, 1h00 ailleurs ; 3 candidats max | **au catalogue** |
+| 2 | Durée de la partie **formation** de l'AIPR « formation + épreuve » | 3h00, en autonomie — aucun intervenant mobilisé | **fait** |
+| 3 | B1, C1, G utilisent-elles le **porte-engin** ? | non, A et F seulement — et l'exclusion est à la journée | **fait** |
+| 4 | La liste `A, B1, C1, F, G` est-elle l'offre R482 **complète** ? | sans G : « pas de formation EFI sur cette catégorie » | **fait** |
+
+Restent ouvertes :
+
 | # | Question | Pour | Bloque |
 |---|---|---|---|
-| 1 | Durées de **pratique** R482 (Initial / Recyclage) par catégorie | Emmanuel | la R482 entière |
-| 2 | Durée de la partie **formation** de l'AIPR « formation + épreuve » | Emmanuel | rien (3h30 en attendant, réglable) |
-| 3 | B1, C1, G utilisent-elles le **porte-engin** ? | Emmanuel | la ressource partagée |
-| 4 | La liste `A, B1, C1, F, G` est-elle l'offre R482 **complète** ? | Emmanuel | le catalogue R482 |
 | 5 | La règle de **pôle** s'applique-t-elle aussi aux stagiaires ? | Emmanuel | rien (défaut : oui) |
 | 6 | Répartition par zone de `1A + 1B + (3 ou 5)` | Emmanuel | rien (cas théorique) |
 | 7 | La **présence** devient-elle par site ? | Emmanuel | rien (défaut : non) |

@@ -343,6 +343,86 @@ test('affectation auto : le testeur évite le formateur du candidat', () => {
   assert.deepEqual(rows[0].errors, []);
 });
 
+// « Il faut quelqu'un pour surveiller, c'est le testeur qui fera passer les
+// tests pratique l'après midi » (Benoit, 09/10/2026).
+//
+// Le piège est qu'avec UN SEUL formateur dans la journée, les deux passes
+// tombent d'accord par hasard : celui qui surveille la théorie est aussi le
+// premier candidat libre pour l'après-midi. Il faut DEUX sessions en
+// parallèle — les deux plateaux de Périgny II — pour que l'ancien
+// comportement se voie : la passe 2 écarte TOUS les formateurs du jour, la
+// passe 3 n'écarte que celui du candidat. Elles divergeaient alors, et trois
+// personnes se partageaient ce que Benoit confie à une seule.
+test('le surveillant de la théorie fait passer les tests de l’après-midi', () => {
+  const s = freshState();
+  const quals = Object.fromEntries(
+    ['R482-B1', 'R482-C1'].map((c) => [c, { F: true, T: true }]));
+  s.team = [
+    { id: 'p1', name: 'MEDAN Dominique', quals: structuredClone(quals) },
+    { id: 'p2', name: 'GARCIA Thierry', quals: structuredClone(quals) },
+    { id: 'p3', name: 'LEROY Sophie', quals: structuredClone(quals) },
+  ];
+  s.inscriptions = [];
+  s.nextId = 1;
+  // Deux catégories en parallèle sur les deux plateaux, deux formateurs.
+  // Ni B1 ni C1 ne touchent au porte-engin : elles peuvent coexister.
+  addInscription(s, {
+    stagiaire: 'A Un', formation: 'R482-B1', type: 'Initial', formateurId: 'p1',
+    datePratique: '2026-09-01', debutPratique: 480, dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 780,
+  });
+  addInscription(s, {
+    stagiaire: 'B Deux', formation: 'R482-C1', type: 'Initial', formateurId: 'p2',
+    datePratique: '2026-09-01', debutPratique: 480, dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 840,
+  });
+  const { rows } = computeSchedule(s);
+
+  // La théorie échoit à la seule personne qui ne forme pas ce jour-là.
+  assert.equal(rows[0].testeurTheorie, 'p3');
+  assert.equal(rows[1].testeurTheorie, 'p3');
+
+  // Et c'est elle qui enchaîne l'après-midi, pour les DEUX candidats.
+  assert.equal(rows[0].testeurEffectif, 'p3', 'le testeur suit le surveillant');
+  assert.equal(rows[1].testeurEffectif, 'p3');
+
+  // Ce qui n'empiète pas sur la règle formateur ≠ testeur.
+  for (const r of rows) {
+    assert.notEqual(r.formateurEffectif, r.testeurEffectif);
+    assert.ok(!r.errors.some((e) => /= testeur/.test(e)), r.errors.join(' | '));
+  }
+});
+
+test('…mais la préférence cède si le surveillant n’est pas libre', () => {
+  // Ce n'est qu'une préférence : un testeur déjà pris à cette heure-là ne
+  // doit pas faire échouer la séance, sinon la règle deviendrait un piège.
+  const s = freshState();
+  const quals = Object.fromEntries(
+    ['R482-B1', 'R482-C1'].map((c) => [c, { F: true, T: true }]));
+  s.team = [
+    { id: 'p1', name: 'MEDAN Dominique', quals: structuredClone(quals) },
+    { id: 'p2', name: 'GARCIA Thierry', quals: structuredClone(quals) },
+    { id: 'p3', name: 'LEROY Sophie', quals: structuredClone(quals) },
+  ];
+  s.inscriptions = [];
+  s.nextId = 1;
+  addInscription(s, {
+    stagiaire: 'A Un', formation: 'R482-B1', type: 'Initial', formateurId: 'p1',
+    datePratique: '2026-09-01', debutPratique: 480, dateTheorie: '2026-09-01',
+    dateTestPratique: '2026-09-01', debutTestPratique: 780,
+  });
+  addInscription(s, {
+    stagiaire: 'B Deux', formation: 'R482-C1', type: 'Initial', formateurId: 'p2',
+    datePratique: '2026-09-01', debutPratique: 480, dateTheorie: '2026-09-01',
+    // Même heure que le test de A : p3 ne peut pas être aux deux endroits.
+    dateTestPratique: '2026-09-01', debutTestPratique: 780,
+  });
+  const { rows } = computeSchedule(s);
+  assert.equal(rows[0].testeurEffectif, 'p3');
+  assert.notEqual(rows[1].testeurEffectif, 'p3', 'le second retombe sur quelqu’un d’autre');
+  assert.ok(rows[1].testeurEffectif, 'et il en trouve un');
+});
+
 test('intervenant en formation et en test en même temps détecté (choix manuels)', () => {
   const state = freshState();
   addInscription(state, {
