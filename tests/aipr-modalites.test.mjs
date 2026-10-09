@@ -16,7 +16,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultState, migrate } from '../js/store.js';
+import { defaultState, migrate, addInscription } from '../js/store.js';
 import { computeSchedule, occupancyByDay, availableSlotsFor, suggestSlots, memberAvailability } from '../js/engine.js';
 import {
   dureeTestFor, testSurveille, modaliteDe, appliquerModalite, MODALITES_SEANCE,
@@ -55,11 +55,14 @@ test('AIPR : les deux modalités sont au catalogue, et sélectionnables', () => 
   assert.equal(seule.tests, false);
   assert.equal(seule.chargeComptee, false);
 
-  // Formation + épreuve : deux séances. La formation compte dans la charge,
-  // l'épreuve reste de la surveillance.
+  // Formation + épreuve : deux séances, et AUCUNE des deux ne mobilise de
+  // temps d'intervenant. L'épreuve est de la surveillance ; la formation est
+  // un e-learning que le stagiaire fait seul — « le formateur lui donne la
+  // tablette en début de session et le laisse en autonomie dans la salle »
+  // (Benoit, 09/10/2026). Un formateur reste nommé, personne n'est bloqué.
   assert.equal(avec.testOnly, false);
   assert.equal(avec.tests, true, 'l’épreuve occupe le créneau de test');
-  assert.equal(avec.chargeComptee, true, 'la formation, elle, mobilise un formateur');
+  assert.equal(avec.chargeComptee, false, 'le stagiaire est seul devant son poste');
   assert.equal(avec.testSurveille, true);
   assert.equal(avec.dureeTest, 120, 'le QCM tient 2h00, comme dans l’autre modalité');
 
@@ -173,12 +176,35 @@ test('épreuve surveillée : elle ne pèse pas dans le taux d’occupation', () 
   assert.equal(occ(avec), occ(sans),
     'la surveillance du QCM ne mobilise pas de temps d’intervenant');
 
-  // La partie FORMATION, elle, pèse bien. La durée se lit au catalogue plutôt
-  // que de se recopier ici : elle a déjà bougé une fois (3h30 d'attente, puis
-  // 3h00 confirmées le 06/10), et un nombre en dur n'aurait fait qu'échouer
-  // sans rien apprendre.
-  const dureeForm = formationByCode(sans.formations, 'AIPR-FORM').dureeInitial;
-  assert.equal(occ(sans), dureeForm / 30, `${dureeForm} min sur des créneaux de 30 min`);
+  // La partie FORMATION ne pèse pas davantage, depuis que l'e-learning est
+  // reconnu comme fait EN AUTONOMIE (09/10/2026). Les deux séances d'un
+  // parcours « formation + épreuve » sont donc à charge nulle, et la journée
+  // apparaît libre — ce qui est la vérité : personne n'y est mobilisé.
+  assert.equal(occ(sans), 0, 'un e-learning en autonomie n’occupe aucun intervenant');
+});
+
+test('AIPR en autonomie : le formateur est nommé, mais reste libre', () => {
+  // Le point qui comptait pour Benoit : ne plus bloquer trois heures de
+  // formateur pour une séance où le stagiaire est seul. Sortir la charge du
+  // plafond ne suffisait pas — la passe 1 bloquait l'agenda sans condition.
+  const s = etat();
+  s.inscriptions = [ligne()];
+  const [r] = computeSchedule(s).rows;
+  assert.ok(r.formateurEffectif, 'quelqu’un en répond tout de même');
+
+  // Et il peut tenir autre chose au même moment, sur le même site.
+  const t = etat();
+  t.inscriptions = [ligne()];
+  const formateur = computeSchedule(t).rows[0].formateurEffectif;
+  addInscription(t, {
+    stagiaire: 'AUTRE Un', formation: 'R489-1A', type: 'Initial',
+    statut: 'confirmee', modeTheorie: 'distance',
+    datePratique: J, debutPratique: 480, formateurId: formateur,
+    dateTheorie: J, dateTestPratique: J, debutTestPratique: 900,
+  });
+  const conflits = computeSchedule(t).rows
+    .flatMap((r2) => r2.errors).filter((e) => /occupé|chevauch|déjà/i.test(e));
+  assert.deepEqual(conflits, [], 'aucun conflit : l’e-learning ne l’occupe pas');
 });
 
 test('épreuve surveillée : habilité et présent suffit, même occupé ailleurs', () => {

@@ -74,14 +74,21 @@ export const DEFAULT_FORMATIONS = [
   // créneau 08h00-11h00 ». Elle remplace les 3h30 posées en attente.
   // La durée de l'ÉPREUVE reste 2h00, comme dans la modalité « épreuve seule ».
   //
-  // ⚠ « En autonomie » reste à éclaircir : la charge est comptée ici, donc un
-  // formateur est réputé mobilisé pendant ces 3h00. Si le stagiaire est seul
-  // devant son poste, il faudra passer chargeComptee à false — sinon on
-  // occupe un formateur pour rien dans le plafond quotidien.
+  // « En autonomie » : tranché par Benoit le 09/10/2026 — « le stagiaire sera
+  // seul devant son poste (le formateur lui donne la tablette en début de
+  // session et le laisse en autonomie dans la salle) ». Aucun formateur n'est
+  // donc mobilisé pendant ces 3h00 : chargeComptee passe à false, ce qui le
+  // sort du plafond quotidien, du taux d'occupation, ET de son agenda — il
+  // reste libre de tenir autre chose pendant ce temps.
+  //
+  // Limite assumée : le moteur ne modélise pas la remise de la tablette en
+  // début de session. Rien ne l'empêche donc de placer ce formateur ailleurs
+  // à 08h00 pile. La règle de pôle interdit déjà le saut entre sites dans la
+  // journée ; au sein d'un même site, c'est à l'assistante de voir.
   {
     code: 'AIPR-FORM', label: 'AIPR (formation + épreuve)', reco: 'AIPR',
     dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 12,
-    testOnly: false, chargeComptee: true, dureeTest: 120, testSurveille: true,
+    testOnly: false, chargeComptee: false, dureeTest: 120, testSurveille: true,
   },
 ];
 
