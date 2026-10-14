@@ -118,6 +118,8 @@ const COLONNES_FORMATIONS = [
   'test_only', 'charge_comptee',
   // Ajoutées par la migration 005
   'duree_test', 'test_surveille',
+  // Ajoutées par la migration 012 — horaires imposés du dispositif
+  'debut_impose', 'debut_tests_impose',
 ];
 
 const COLONNES_TEAM = [

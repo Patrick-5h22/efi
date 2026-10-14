@@ -6,6 +6,7 @@ import {
   formationByCode, dureeFor, dureeTheorieFor, chargeComptee, dureeTestFor, testSurveille,
   pauseCreneau, chevauchePause, dansLaFenetre, libelleFenetre,
   zonesPour, admetDispositif, siteById, poleDuSite, joursOuverts, siteOuvertLe,
+  debutImposeDe, debutTestsImposeDe,
 } from './config.js';
 import { isoWeek, overlaps, workingDays, joursOuvrables, bornesDuMois, fenetreAffichage, addDays, fmtTime, mondayOf, dateDuJour, isWeekend, semainesAffichees } from './dates.js';
 
@@ -534,6 +535,20 @@ function validateRows(rows, ctx) {
     }
   };
 
+  // Horaires imposés par le dispositif. La formation doit commencer à l'heure
+  // dite ; les tests, eux, ne peuvent pas commencer AVANT la leur — ils
+  // s'enchaînent ensuite candidat par candidat, et le deuxième passe donc plus
+  // tard que le premier sans que ce soit une faute.
+  //
+  // On signale, on ne refuse pas : l'assistante garde la main pour un cas
+  // particulier, et voit ce qu'elle fait.
+  const checkImpose = (row, start, impose, label, exact) => {
+    if (start == null || impose == null) return;
+    if (exact ? start !== impose : start < impose) {
+      row.errors.push(`${label} : créneau imposé — ${exact ? '' : 'à partir de '}${fmtTime(impose)}`);
+    }
+  };
+
   // Théorie commune par stagiaire × recommandation
   const theoryByStagiaireReco = new Map();
   for (const r of rows) {
@@ -554,6 +569,8 @@ function validateRows(rows, ctx) {
     checkDay(row, insc.dateTestPratique, 'Test pratique');
     checkWindow(row, insc.debutPratique, row.finPratique, pratiqueLabel(row));
     checkWindow(row, insc.debutTestPratique, row.finTestPratique, 'Test pratique');
+    checkImpose(row, insc.debutPratique, debutImposeDe(formation), pratiqueLabel(row), true);
+    checkImpose(row, insc.debutTestPratique, debutTestsImposeDe(formation), 'Test pratique', false);
 
     if (insc.datePratique && insc.debutPratique == null) row.errors.push(`Heure de début de ${formation.testOnly ? 'l’épreuve' : 'pratique'} manquante`);
     if (!insc.datePratique) row.errors.push(`Date de ${formation.testOnly ? 'l’épreuve' : 'pratique'} manquante`);
@@ -1209,10 +1226,30 @@ export function suggestSlots(state, { stagiaire, formation: code, type, aPartirD
   const ouverts = new Set(joursOuverts(state.openDays));
   const openDays = workingDays(params, aujourdHui)
     .filter((d) => ouverts.has(d) && (!aPartirDu || d >= aPartirDu));
+  // Un dispositif à horaire imposé n'offre qu'un seul départ possible : le
+  // proposer ailleurs reviendrait à suggérer une anomalie. La journée bascule
+  // alors au lendemain quand ce créneau est pris, ce qui est le comportement
+  // attendu — une seule session de 08h00 par plateau et par jour.
+  const impose = debutImposeDe(formation);
   const slots = [];
-  for (let t = params.dayStart; t + params.slotMinutes <= params.dayEnd; t += params.slotMinutes) {
-    if (chevauchePause(params, t, t + params.slotMinutes)) continue;
-    slots.push(t);
+  if (impose != null) {
+    slots.push(impose);
+  } else {
+    for (let t = params.dayStart; t + params.slotMinutes <= params.dayEnd; t += params.slotMinutes) {
+      if (chevauchePause(params, t, t + params.slotMinutes)) continue;
+      slots.push(t);
+    }
+  }
+
+  // Les TESTS ont leur propre liste. Ils la partageaient avec la formation, ce
+  // qui ne se voyait pas tant que les deux couraient sur toute la journée :
+  // avec un horaire imposé, « slots » se réduit à [08:00] et les tests
+  // n'auraient plus eu un seul créneau où se poser l'après-midi.
+  const plancherTest = debutTestsImposeDe(formation) ?? params.dayStart;
+  const slotsTest = [];
+  for (let t = plancherTest; t + dureeTest <= params.dayEnd; t += params.slotMinutes) {
+    if (chevauchePause(params, t, t + dureeTest)) continue;
+    slotsTest.push(t);
   }
 
   // La théorie de la recommandation est-elle déjà planifiée pour ce stagiaire
@@ -1277,7 +1314,7 @@ export function suggestSlots(state, { stagiaire, formation: code, type, aPartirD
         // n'évalue pas une pratique avant de l'avoir enseignée. Ce n'était
         // qu'une préférence, et elle cédait dès qu'aucun créneau ne restait
         // après — d'où une formation à 15:30 et son test à 08:00.
-        const possibles = testDay === day ? slots.filter((t) => t >= start + duree) : slots;
+        const possibles = testDay === day ? slotsTest.filter((t) => t >= start + duree) : slotsTest;
         const ordered = parEnchainement(possibles, ancrages(state, testDay, 'test', excludeId),
           dureeTest);
         for (const testStart of ordered) {
@@ -1313,8 +1350,12 @@ export function suggestTestPratique(state, inscId, { aPartirDu = null, aujourdHu
   const openDays = workingDays(params, aujourdHui)
     .filter((d) => ouverts.has(d) && d >= depuis);
 
+  // Les tests d'un dispositif à horaire imposé ne commencent pas avant
+  // l'heure dite, mais s'enchaînent librement après : trois candidats se
+  // suivent, et le second passe forcément plus tard que le premier.
+  const plancher = debutTestsImposeDe(formation) ?? params.dayStart;
   const slots = [];
-  for (let t = params.dayStart; t + dureeTest <= params.dayEnd; t += params.slotMinutes) {
+  for (let t = plancher; t + dureeTest <= params.dayEnd; t += params.slotMinutes) {
     if (chevauchePause(params, t, t + dureeTest)) continue;
     slots.push(t);
   }

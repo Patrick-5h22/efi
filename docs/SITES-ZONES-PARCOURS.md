@@ -316,6 +316,34 @@ recommandation et la liste des catégories sans calcul.
 > 3h30 Recyclage) et le test théorique (créneau fixe 11:00, 1h00, groupe de 12)
 > sont **inchangés**.
 
+> **La journée R482 est à horaires IMPOSÉS** — « créneaux imposés, il faut
+> conserver » (Benoit, 09/10/2026) :
+>
+> | Créneau | Séance |
+> |---|---|
+> | 08h00–11h00 | formation pratique |
+> | 11h00–12h00 | test théorique |
+> | 13h00–… | tests pratiques, un candidat à la fois |
+>
+> Le moteur plaçait jusqu'ici **librement** dans la journée, et c'est le bon
+> comportement pour tout le reste du catalogue. La contrainte est donc
+> déclarée par DISPOSITIF (`debutImpose`, `debutTestsImpose`, migration 012)
+> plutôt qu'écrite en dur pour la R482 : elle vient de l'organisation du
+> plateau, pas du code, et se corrige dans la ligne du catalogue — deux
+> colonnes « Formation à » et « Tests dès » dans l'écran Paramètres. Vide
+> signifie placement libre.
+>
+> **Deux sémantiques distinctes, et c'est le point délicat.** La formation
+> commence *à* l'heure dite ; les tests ne commencent *pas avant* la leur,
+> puis s'enchaînent — 13h/14h/15h en B1-C1-F, 13h/14h30/16h en Cat A. Les
+> confondre donnerait l'un de deux défauts : soit le deuxième candidat serait
+> refusé parce qu'il passe à 14h00, soit la formation pourrait glisser à
+> 09h00 sans que rien ne le signale.
+>
+> Conséquence voulue : une seule session de 08h00 par plateau et par jour.
+> Les deux plateaux de Périgny II en autorisent deux ; la troisième attend le
+> lendemain, et le moteur le propose de lui-même.
+
 > **Qui surveille le test théorique.** « Il faut quelqu'un pour surveiller,
 > c'est le testeur qui fera passer les tests pratique l'après-midi » (Benoit,
 > 09/10/2026). Le créneau de 11:00 et sa durée d'1h00 — quel que soit le

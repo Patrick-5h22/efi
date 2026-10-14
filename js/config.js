@@ -57,10 +57,22 @@ export const DEFAULT_FORMATIONS = [
   //
   // La catégorie G n'y figure pas : « pas de formation EFI sur cette
   // catégorie » (Benoit, 06/10/2026). L'offre est A, B1, C1, F.
-  { code: 'R482-A', label: 'Pratique R482 Cat A', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 90 },
-  { code: 'R482-B1', label: 'Pratique R482 Cat B1', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 60 },
-  { code: 'R482-C1', label: 'Pratique R482 Cat C1', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 60 },
-  { code: 'R482-F', label: 'Pratique R482 Cat F', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 60 },
+  //
+  // La journée R482 est à HORAIRES IMPOSÉS — « créneaux imposés, il faut
+  // conserver » (Benoit, 09/10/2026) :
+  //
+  //   08h00–11h00  formation pratique      → debutImpose: 480
+  //   11h00–12h00  test théorique          → déjà params.theoryTime
+  //   13h00–…      tests pratiques, un candidat à la fois
+  //                                        → debutTestsImpose: 780
+  //
+  // Les tests s'enchaînent d'eux-mêmes à partir de 13h00, chacun durant le
+  // temps déclaré : 13h/14h/15h en B1-C1-F, 13h/14h30/16h en Cat A. Il n'y a
+  // donc rien à écrire pour l'enchaînement, seulement l'heure de départ.
+  { code: 'R482-A', label: 'Pratique R482 Cat A', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 90, debutImpose: 480, debutTestsImpose: 780 },
+  { code: 'R482-B1', label: 'Pratique R482 Cat B1', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 60, debutImpose: 480, debutTestsImpose: 780 },
+  { code: 'R482-C1', label: 'Pratique R482 Cat C1', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 60, debutImpose: 480, debutTestsImpose: 780 },
+  { code: 'R482-F', label: 'Pratique R482 Cat F', reco: 'R482', dureeInitial: 180, dureeRecyclage: 180, tests: true, capacite: 3, dureeTest: 60, debutImpose: 480, debutTestsImpose: 780 },
   // AIPR : la formation se fait à distance (e-learning) — seule l'épreuve
   // (QCM surveillé, 2h00) est planifiée sur site, tenue par un testeur.
   // Surveillance : ne consomme pas de temps d'intervenant (chargeComptee).
@@ -179,7 +191,26 @@ export const FORMATION_DEFAUT = {
   dureeInitial: 90, dureeRecyclage: 60,
   tests: true, capacite: 1, testOnly: false, chargeComptee: true,
   dureeTest: null, testSurveille: false,
+  debutImpose: null, debutTestsImpose: null,
 };
+
+// Horaires imposés d'un dispositif. « null » — le cas général — veut dire
+// que le moteur place librement dans la journée ; une valeur fige l'heure de
+// début. Deux réglages distincts parce que ce sont deux séances distinctes :
+// la formation du matin et les tests de l'après-midi.
+//
+// Pourquoi un réglage du DISPOSITIF et non une règle écrite en dur pour la
+// R482 : la contrainte vient de l'organisation du plateau, pas du code, et
+// elle se corrige dans Paramètres le jour où l'organisation change.
+export function debutImposeDe(formation) {
+  const v = formation?.debutImpose;
+  return Number.isFinite(v) ? v : null;
+}
+
+export function debutTestsImposeDe(formation) {
+  const v = formation?.debutTestsImpose;
+  return Number.isFinite(v) ? v : null;
+}
 
 export const TYPES = ['Initial', 'Recyclage'];
 
