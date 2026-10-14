@@ -234,6 +234,60 @@ export function saveState(storage, state) {
   storage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+// Reprises ponctuelles du paramétrage LIVRÉ.
+//
+// Certains réglages du catalogue arrivent après coup : le code les gère, la
+// base sait les stocker, mais les lignes déjà enregistrées portent null et
+// RIEN ne les remplit. La fonctionnalité est alors livrée inerte — c'est
+// exactement ce qui s'est passé pour les horaires imposés de la journée R482
+// et pour l'exclusivité du porte-engin : migration 012 passée, cinq contrôles
+// de structure au vert, et quatre `debut_impose` à null en base.
+//
+// ── Pourquoi un marqueur, et non « le champ est-il absent ? » ─────────────
+//
+// Parce que depuis la 012, efi_load_state rend « debutImpose: null » pour
+// TOUTES les formations. « Jamais renseigné » et « vidé exprès dans
+// Paramètres » ont la même tête. Le marqueur, lui, les distingue : il dit que
+// la reprise A DÉJÀ EU LIEU, donc qu'un champ vide est désormais un choix.
+// Sans lui, chaque rechargement ressusciterait une valeur que l'utilisateur
+// vient d'effacer — le contraire d'une reprise.
+//
+// Il vit dans params, donc dans le jsonb de planning.params : persisté tel
+// quel, sans colonne ni migration SQL.
+//
+// ── Ce qu'une reprise s'interdit ──────────────────────────────────────────
+//
+// Écraser une valeur déjà posée. Elle ne remplit que le vide, une seule fois.
+function reprendreParametrageLivre(state, base) {
+  const faites = Array.isArray(state.params.reprises) ? state.params.reprises : [];
+  state.params.reprises = faites;
+  const reprendre = (nom, action) => {
+    if (faites.includes(nom)) return;
+    action();
+    faites.push(nom);
+  };
+
+  // Horaires imposés (R482) et exclusivité du matériel (porte-engin) : deux
+  // faits d'ORGANISATION DU PLATEAU, pas des préférences. Ils sont livrés
+  // dans le catalogue par défaut ; les états enregistrés avant eux ne les ont
+  // pas, et l'écran Paramètres n'offre aucune case pour l'exclusivité — sans
+  // cette reprise, elle serait inatteignable.
+  reprendre('horaires-imposes', () => {
+    for (const modele of base.formations) {
+      if (modele.debutImpose == null && modele.debutTestsImpose == null) continue;
+      const f = state.formations.find((x) => x.code === modele.code);
+      if (!f) continue;
+      if (f.debutImpose == null) f.debutImpose = modele.debutImpose ?? null;
+      if (f.debutTestsImpose == null) f.debutTestsImpose = modele.debutTestsImpose ?? null;
+    }
+    for (const modele of base.ressources) {
+      if (!modele.exclusifJour) continue;
+      const r = state.ressources.find((x) => x.id === modele.id);
+      if (r && !r.exclusifJour) r.exclusifJour = true;
+    }
+  });
+}
+
 export function migrate(state) {
   const base = defaultState();
   // Complète les champs manquants sans écraser les données existantes
@@ -269,6 +323,9 @@ export function migrate(state) {
     if (f.testOnly === undefined) f.testOnly = false;
     if (!Number.isFinite(f.dureeTest) || f.dureeTest <= 0) f.dureeTest = null;
     if (f.testSurveille === undefined) f.testSurveille = false;
+    // Même régime que dureeTest : vide vaut null et non 0 — 0, c'est minuit.
+    if (!Number.isFinite(f.debutImpose)) f.debutImpose = null;
+    if (!Number.isFinite(f.debutTestsImpose)) f.debutTestsImpose = null;
   }
   // Sites, zones et ressources : un état enregistré avant leur existence n'en
   // a aucun. Les injecter vides laisserait une application sans plateau ; on
@@ -288,6 +345,9 @@ export function migrate(state) {
   // un autre — l'hypothèse prudente, celle qui ne fait pas rouler quelqu'un
   // entre deux villes sans le dire.
   for (const s of state.sites) if (!s.pole) s.pole = s.id;
+  for (const r of state.ressources) if (r.exclusifJour === undefined) r.exclusifJour = false;
+
+  reprendreParametrageLivre(state, base);
 
   state.team = state.team || [];
   // Fenêtre de disponibilité ajoutée après coup : absente = sans limite, ce
