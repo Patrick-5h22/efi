@@ -23,7 +23,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultState, addInscription } from '../js/store.js';
+import { defaultState, addInscription, migrate } from '../js/store.js';
+import { PERSISTED_FIELDS, pickPersisted } from '../js/persisted.js';
 import { computeSchedule, suggestSlots, suggestTestPratique } from '../js/engine.js';
 import { formationByCode, debutImposeDe, debutTestsImposeDe } from '../js/config.js';
 
@@ -197,4 +198,54 @@ test('une formation sans horaire imposé n’est jamais signalée', () => {
   });
   const [r] = computeSchedule(s).rows;
   assert.deepEqual(imposes(r), [], r.errors.join(' | '));
+});
+
+// ── La reprise ────────────────────────────────────────────────────────────
+//
+// Déclarer la contrainte dans le catalogue livré ne suffit pas : l'état de
+// production existe DÉJÀ, ses quatre lignes R482 sont enregistrées, et rien
+// n'allait jamais y poser 480 et 780. La migration 012 crée les colonnes ;
+// elle ne remplit rien. Sans reprise, tout ce qui précède est inerte en
+// production — vérifié le 14/10/2026 : cinq contrôles de structure au vert et
+// quatre « debut_impose » à null.
+//
+// Le cas qui compte est celui d'un état venu de Supabase APRÈS la 012 : la
+// RPC y rend « debutImpose: null » explicitement. C'est pourquoi la reprise
+// ne peut pas se fier à l'absence du champ.
+
+test('un état enregistré avant les horaires imposés les reçoit', () => {
+  const s = defaultState();
+  // Ce que rend efi_load_state après la 012 : la clé existe, elle est nulle.
+  for (const f of s.formations) { f.debutImpose = null; f.debutTestsImpose = null; }
+  for (const r of s.ressources) r.exclusifJour = false;
+  delete s.params.reprises;
+
+  const repris = migrate(s);
+  const catA = formationByCode(repris.formations, 'R482-A');
+  assert.equal(catA.debutImpose, 480, 'la formation Cat A reprend son 8h00');
+  assert.equal(catA.debutTestsImpose, 780, 'ses tests reprennent leur 13h00');
+  assert.equal(repris.ressources.find((r) => r.id === 'porte-engin').exclusifJour, true,
+    'le porte-engin reprend son exclusivité — aucune case ne permet de la poser à la main');
+});
+
+test('une valeur effacée à la main n’est pas ressuscitée', () => {
+  // La distinction qui justifie le marqueur. Premier passage : la reprise a
+  // lieu. L'utilisateur vide ensuite le champ dans Paramètres. Deuxième
+  // passage : il doit rester vide, sinon Paramètres ne sert à rien.
+  const s = migrate(defaultState());
+  assert.ok(s.params.reprises.includes('horaires-imposes'), 'la reprise est consignée');
+
+  formationByCode(s.formations, 'R482-A').debutImpose = null;
+  const relu = migrate(structuredClone(s));
+  assert.equal(formationByCode(relu.formations, 'R482-A').debutImpose, null,
+    'le choix de l’utilisateur survit au rechargement');
+});
+
+test('le marqueur voyage jusqu’à la base', () => {
+  // Il vit dans params, qui part dans le jsonb de planning.params. S'il n'y
+  // était pas retenu, la reprise se rejouerait à chaque chargement et
+  // l'assertion précédente serait fausse en production.
+  const s = migrate(defaultState());
+  assert.ok(PERSISTED_FIELDS.includes('params'));
+  assert.ok(pickPersisted(s).params.reprises.includes('horaires-imposes'));
 });
