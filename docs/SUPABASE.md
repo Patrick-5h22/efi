@@ -136,6 +136,24 @@ donnent trois parcours et 3 100 €, puis les colonnes disparaissent. Dans le ca
 normal — application déjà rouverte — la migration annonce « aucune reprise
 nécessaire » et ne touche à rien.
 
+`docs/migrations/012-horaires-imposes.sql` ajoute
+`formations.debut_impose` et `formations.debut_tests_impose` (entiers,
+nullables, en minutes depuis minuit). `null` — le cas général — laisse le
+moteur placer librement dans la journée ; une valeur fige l'heure de début.
+
+Deux réglages distincts parce que ce sont deux séances distinctes, et deux
+sémantiques distinctes : la formation commence **à** l'heure dite, les tests
+**pas avant** la leur — ils s'enchaînent ensuite candidat par candidat.
+
+La journée R482 les utilise : 08h00 pour la formation, 13h00 pour les tests
+(Benoit, 09/10/2026 : « créneaux imposés, il faut conserver »).
+
+**Elle reprend la 011** : vérifié sur la réplique en retirant d'abord
+`exclusif_jour`, puis en n'appliquant que la 012 — les trois colonnes sont
+là ensuite, et l'aller-retour conserve 480/780 pour la R482 comme `null`
+pour la R489. Appliquer la 012 seule suffit donc, même sans avoir passé
+la 011.
+
 `docs/migrations/011-exclusivite-jour-materiel.sql` ajoute
 `ressources.exclusif_jour` (booléen, défaut `false`). Un matériel partagé
 ordinaire interdit deux séances **qui se chevauchent** ; le porte-engin de

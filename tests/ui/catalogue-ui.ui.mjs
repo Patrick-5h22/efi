@@ -101,6 +101,43 @@ const afterType = await page.evaluate(() => JSON.parse(localStorage.getItem('efi
 check('séance passée en épreuve surveillée', afterType.testOnly === true);
 check('tests séparés désactivés automatiquement', afterType.tests === false);
 
+// 10. Horaires imposés — deux colonnes, et un vidage qui rend « libre »
+//
+// Le code justifie d'avoir fait des horaires un réglage du DISPOSITIF par le
+// fait qu'ils se corrigent dans Paramètres. Si les colonnes n'y étaient pas,
+// ce serait un commentaire mensonger : voici ce qui le tient.
+const r482Idx = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('efi-planning-v1'));
+  return st.formations.findIndex((f) => f.code === 'R482-A');
+});
+check('la R482 affiche ses horaires imposés',
+  await page.locator(`input[data-f="${r482Idx}|debutImpose"]`).inputValue() === '08:00'
+  && await page.locator(`input[data-f="${r482Idx}|debutTestsImpose"]`).inputValue() === '13:00',
+  `${await page.locator(`input[data-f="${r482Idx}|debutImpose"]`).inputValue()} / `
+  + `${await page.locator(`input[data-f="${r482Idx}|debutTestsImpose"]`).inputValue()}`);
+
+const libreIdx = await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('efi-planning-v1'));
+  return st.formations.findIndex((f) => f.code === 'R489-3');
+});
+check('…et une formation à placement libre les laisse vides',
+  await page.locator(`input[data-f="${libreIdx}|debutImpose"]`).inputValue() === '');
+
+await page.fill(`input[data-f="${r482Idx}|debutImpose"]`, '09:00');
+await page.dispatchEvent(`input[data-f="${r482Idx}|debutImpose"]`, 'change');
+await page.waitForTimeout(400);
+check('un horaire modifié est enregistré en minutes',
+  await page.evaluate(() => JSON.parse(localStorage.getItem('efi-planning-v1'))
+    .formations.find((f) => f.code === 'R482-A').debutImpose) === 540);
+
+await page.fill(`input[data-f="${r482Idx}|debutImpose"]`, '');
+await page.dispatchEvent(`input[data-f="${r482Idx}|debutImpose"]`, 'change');
+await page.waitForTimeout(400);
+const vide = await page.evaluate(() => JSON.parse(localStorage.getItem('efi-planning-v1'))
+  .formations.find((f) => f.code === 'R482-A').debutImpose);
+check('vider rend le placement libre — null, et surtout pas 0 (minuit)',
+  vide === null, JSON.stringify(vide));
+
 check('aucune erreur JS', errors.length === 0, errors.join(' ; '));
 console.log(`\n${pass}/${pass + fail} OK`);
 await browser.close();

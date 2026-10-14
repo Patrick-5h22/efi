@@ -70,7 +70,9 @@ export function renderParametres(main) {
           <thead><tr>
             <th>Code</th><th>Formation</th><th>Recommandation</th><th>Séance</th>
             <th>Durée Initial (h)</th><th>Durée Recyclage (h)</th><th>Tests obligatoires</th>
-            <th>Durée test (h)</th><th>Capacité simultanée</th><th>Charge comptée</th><th></th>
+            <th>Durée test (h)</th><th>Capacité simultanée</th><th>Charge comptée</th>
+            <th title="Vide : le moteur place librement dans la journée">Formation à</th>
+            <th title="Vide : le moteur place librement dans la journée">Tests dès</th><th></th>
           </tr></thead>
           <tbody>
             ${state.formations.map((f, idx) => `
@@ -97,6 +99,12 @@ export function renderParametres(main) {
                       title="Vide : la durée générale ci-dessous s’applique">`}</td>
                 <td><input type="number" min="1" max="12" value="${f.capacite}" data-f="${idx}|capacite" style="width:60px"></td>
                 <td style="text-align:center"><input type="checkbox" ${f.chargeComptee !== false ? 'checked' : ''} data-f="${idx}|chargeComptee" title="Décoché : la séance mobilise un intervenant mais sort du plafond quotidien (surveillance)"></td>
+                <td><input type="time" value="${Number.isFinite(f.debutImpose) ? fmtTime(f.debutImpose) : ''}"
+                    data-f="${idx}|debutImpose" style="width:110px"
+                    title="Heure imposée de la formation. Vide : placement libre."></td>
+                <td><input type="time" value="${Number.isFinite(f.debutTestsImpose) ? fmtTime(f.debutTestsImpose) : ''}"
+                    data-f="${idx}|debutTestsImpose" style="width:110px"
+                    title="Les tests ne commencent pas avant cette heure, puis s’enchaînent. Vide : placement libre."></td>
                 <td><button class="btn btn-danger btn-sm" data-del-formation="${idx}" title="Retirer du catalogue">🗑</button></td>
               </tr>`).join('')}
           </tbody>
@@ -280,6 +288,11 @@ export function renderParametres(main) {
         // Vide = « prendre la durée générale » : on enregistre null, et non 0.
         const v = Number(input.value);
         f.dureeTest = input.value.trim() && v > 0 ? Math.round(v * 60) : null;
+      } else if (field === 'debutImpose' || field === 'debutTestsImpose') {
+        // Vide = « le moteur place librement » : on enregistre null, et non 0
+        // — qui vaudrait minuit et imposerait un horaire absurde.
+        const v = parseTime(input.value);
+        f[field] = input.value.trim() && Number.isFinite(v) ? v : null;
       } else if (field === 'capacite') f.capacite = Math.max(1, Number(input.value) || 1);
       else if (field === 'label' || field === 'reco') {
         const v = input.value.trim();
@@ -341,6 +354,9 @@ export function renderParametres(main) {
       dureeTest: dtest > 0 ? Math.round(dtest * 60) : null,
       capacite: Math.max(1, Number(main.querySelector('#nf-cap').value) || 1),
       chargeComptee: main.querySelector('#nf-charge').checked,
+      // Placement libre par défaut : les horaires imposés sont l'exception
+      // (la R482), et se règlent ensuite dans la ligne du catalogue.
+      debutImpose: null, debutTestsImpose: null,
     }, main.querySelector('#nf-modalite').value));
     app.commit();
     renderParametres(main);
